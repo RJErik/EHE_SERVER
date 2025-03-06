@@ -1,4 +1,4 @@
-package com.example.ehe_server.DatabaseEntities;
+package com.example.ehe_server.entities;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
@@ -6,13 +6,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "point")
-public class Point {
+@Table(name = "text_annotation")
+public class TextAnnotation {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "point_id")
-    private Integer pointId;
+    @Column(name = "text_id")
+    private Integer textId;
 
     @ManyToOne
     @JoinColumn(name = "canvas_id", nullable = false)
@@ -25,26 +25,31 @@ public class Point {
     @Column(name = "y", nullable = false, precision = 18, scale = 8)
     private BigDecimal y;
 
+    @Size(min = 1, max = 500)
+    @NotBlank
+    @Column(name = "content", nullable = false, length = 500)
+    private String content;
+
     @Pattern(regexp = "^#[0-9A-Fa-f]{6}$")
     @Column(name = "color", nullable = false, length = 7)
     private String color;
 
-    @Min(1)
-    @Max(50)
-    @Column(name = "size", nullable = false)
-    private Integer size;
+    @Min(8)
+    @Max(72)
+    @Column(name = "font_size", nullable = false)
+    private Integer fontSize;
 
     @Column(name = "creation_date", nullable = false, updatable = false,
             columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private LocalDateTime creationDate;
 
     // Getters and setters
-    public Integer getPointId() {
-        return pointId;
+    public Integer getTextId() {
+        return textId;
     }
 
-    public void setPointId(Integer pointId) {
-        this.pointId = pointId;
+    public void setTextId(Integer textId) {
+        this.textId = textId;
     }
 
     public Canvas getCanvas() {
@@ -71,6 +76,14 @@ public class Point {
         this.y = y;
     }
 
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
     public String getColor() {
         return color;
     }
@@ -79,12 +92,12 @@ public class Point {
         this.color = color;
     }
 
-    public Integer getSize() {
-        return size;
+    public Integer getFontSize() {
+        return fontSize;
     }
 
-    public void setSize(Integer size) {
-        this.size = size;
+    public void setFontSize(Integer fontSize) {
+        this.fontSize = fontSize;
     }
 
     public LocalDateTime getCreationDate() {

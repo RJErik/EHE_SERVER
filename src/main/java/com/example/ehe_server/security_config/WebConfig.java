@@ -1,4 +1,4 @@
-package com.example.ehe_server;
+package com.example.ehe_server.security_config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;

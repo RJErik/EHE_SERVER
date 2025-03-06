@@ -1,4 +1,4 @@
-package com.example.ehe_server.DatabaseEntities;
+package com.example.ehe_server.entities;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;

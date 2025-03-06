@@ -1,6 +1,6 @@
 package com.example.ehe_server.controller;
 
-import com.example.ehe_server.DatabaseEntities.User;
+import com.example.ehe_server.entities.User;
 import com.example.ehe_server.repository.TestUserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
