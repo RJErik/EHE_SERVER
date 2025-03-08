@@ -1,4 +1,4 @@
-package com.example.ehe_server.security_config;
+package com.example.ehe_server.securityConfig;
 
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;

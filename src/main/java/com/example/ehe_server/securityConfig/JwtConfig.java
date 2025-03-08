@@ -1,4 +1,4 @@
-package com.example.ehe_server.security_config;
+package com.example.ehe_server.securityConfig;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
