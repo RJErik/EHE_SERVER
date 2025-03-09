@@ -4,7 +4,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.security.Key;
 import java.security.KeyStore;
@@ -38,12 +40,32 @@ public class JwtConfig {
     }
 
     @Bean
-    public RSAPrivateKey jwtSigningKey(KeyStore keyStore) throws Exception {
-        Key key = keyStore.getKey(keyAlias, privateKeyPassword.toCharArray());
-        if (key instanceof RSAPrivateKey) {
-            return (RSAPrivateKey) key;
+    public RSAPrivateKey jwtSigningKey() {
+        try {
+            // Create a File object from the path
+            File keystoreFile = new File(keystorePath);
+
+            // Check if the file exists
+            if (!keystoreFile.exists()) {
+                throw new FileNotFoundException("Keystore file not found: " + keystorePath);
+            }
+
+            // Load the keystore
+            KeyStore keystore = KeyStore.getInstance("PKCS12");
+            try (FileInputStream is = new FileInputStream(keystoreFile)) {
+                keystore.load(is, keystorePassword.toCharArray());
+            }
+
+            // Get the private key
+            Key key = keystore.getKey(keyAlias, keystorePassword.toCharArray());
+            if (key instanceof RSAPrivateKey) {
+                return (RSAPrivateKey) key;
+            } else {
+                throw new RuntimeException("Key is not an RSA private key");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load JWT signing key", e);
         }
-        throw new IllegalStateException("Unable to load RSA private key");
     }
 
     @Bean
