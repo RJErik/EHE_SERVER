@@ -1,6 +1,6 @@
 package com.example.ehe_server.service.security;
 
-import com.example.ehe_server.service.intf.JwtTokenValidatorInterface;
+import com.example.ehe_server.service.intf.security.JwtTokenValidatorInterface;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.springframework.stereotype.Service;

@@ -1,6 +1,6 @@
 package com.example.ehe_server.service.security;
 
-import com.example.ehe_server.service.intf.JwtTokenGeneratorInterface;
+import com.example.ehe_server.service.intf.security.JwtTokenGeneratorInterface;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.springframework.beans.factory.annotation.Value;

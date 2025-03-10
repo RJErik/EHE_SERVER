@@ -1,4 +1,4 @@
-package com.example.ehe_server.service.intf;
+package com.example.ehe_server.service.intf.security;
 
 public interface JwtTokenValidatorInterface {
     boolean validateToken(String token);
