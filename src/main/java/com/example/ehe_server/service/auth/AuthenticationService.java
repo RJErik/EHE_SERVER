@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Service
 public class AuthenticationService implements AuthenticationServiceInterface {
@@ -22,6 +23,10 @@ public class AuthenticationService implements AuthenticationServiceInterface {
     private final JwtTokenGeneratorInterface jwtTokenGenerator;
     private final HashingServiceInterface hashingService;
     private final CookieServiceInterface cookieService;
+
+    // Email validation pattern
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
 
     public AuthenticationService(UserRepository userRepository,
                                  JwtTokenGeneratorInterface jwtTokenGenerator,
@@ -38,6 +43,35 @@ public class AuthenticationService implements AuthenticationServiceInterface {
         Map<String, Object> responseBody = new HashMap<>();
 
         try {
+            // Validate both fields are provided
+            if ((request.getEmail() == null || request.getEmail().trim().isEmpty()) &&
+                    (request.getPassword() == null || request.getPassword().trim().isEmpty())) {
+                responseBody.put("success", false);
+                responseBody.put("message", "Please enter both email and password");
+                return responseBody;
+            }
+
+            // Validate email is provided
+            if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
+                responseBody.put("success", false);
+                responseBody.put("message", "Please enter your email address");
+                return responseBody;
+            }
+
+            // Validate password is provided
+            if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+                responseBody.put("success", false);
+                responseBody.put("message", "Please enter your password");
+                return responseBody;
+            }
+
+            // Validate email format
+            if (!EMAIL_PATTERN.matcher(request.getEmail()).matches()) {
+                responseBody.put("success", false);
+                responseBody.put("message", "Please enter a valid email address");
+                return responseBody;
+            }
+
             // Hash the email for lookup
             String emailHash = hashingService.hashEmail(request.getEmail());
 
