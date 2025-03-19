@@ -1,7 +1,7 @@
 package com.example.ehe_server.service.auth;
 
 import com.example.ehe_server.dto.LoginRequest;
-import com.example.ehe_server.entities.User;
+import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.security.JwtTokenGeneratorInterface;
 import com.example.ehe_server.service.intf.auth.AuthenticationServiceInterface;

@@ -1,4 +1,4 @@
-package com.example.ehe_server.entities;
+package com.example.ehe_server.entity;
 
 import jakarta.persistence.*;
 
@@ -8,9 +8,6 @@ public class Admin {
 
     @Id
     private Integer adminId;
-
-    @Column(name = "permission_level", nullable = false)
-    private String permissionLevel;
 
     @OneToOne
     @MapsId // Shares primary key with User entity
@@ -24,14 +21,6 @@ public class Admin {
 
     public void setAdminId(Integer adminId) {
         this.adminId = adminId;
-    }
-
-    public String getPermissionLevel() {
-        return permissionLevel;
-    }
-
-    public void setPermissionLevel(String permissionLevel) {
-        this.permissionLevel = permissionLevel;
     }
 
     public User getUser() {

@@ -1,4 +1,4 @@
-package com.example.ehe_server.entities;
+package com.example.ehe_server.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;

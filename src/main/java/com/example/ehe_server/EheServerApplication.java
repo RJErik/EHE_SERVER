@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @SpringBootApplication
-@EntityScan(basePackages = {"com.example.ehe_server.entities"})
+@EntityScan(basePackages = {"com.example.ehe_server.entity"})
 @EnableJpaRepositories(basePackages = {"com.example.ehe_server.repository"})
 public class EheServerApplication {
 
