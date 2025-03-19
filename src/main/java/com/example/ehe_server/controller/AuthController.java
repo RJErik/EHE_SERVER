@@ -1,7 +1,7 @@
 package com.example.ehe_server.controller;
 
 import com.example.ehe_server.dto.LoginRequest;
-import com.example.ehe_server.service.auth.AuthenticationService;
+import com.example.ehe_server.service.intf.auth.AuthenticationServiceInterface;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -12,9 +12,9 @@ import java.util.Map;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private final AuthenticationService authenticationService;
+    private final AuthenticationServiceInterface authenticationService;
 
-    public AuthController(AuthenticationService authenticationService) {
+    public AuthController(AuthenticationServiceInterface authenticationService) {
         this.authenticationService = authenticationService;
     }
 
@@ -31,4 +31,3 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 }
-

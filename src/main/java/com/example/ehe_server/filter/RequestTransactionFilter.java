@@ -2,6 +2,10 @@ package com.example.ehe_server.filter;
 
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -14,11 +18,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import java.util.stream.Collectors;
 
 @Component
-@Order(1) // Execute this filter after Spring Security filters
+@Order(2) // Execute after Spring Security filters
 public class RequestTransactionFilter extends OncePerRequestFilter {
 
     private final JdbcTemplate jdbcTemplate;
@@ -38,32 +41,47 @@ public class RequestTransactionFilter extends OncePerRequestFilter {
         TransactionStatus txStatus = transactionManager.getTransaction(txDef);
 
         try {
-            // Get the user ID from the JWT token via SecurityContext
-            String auditUser = "system"; // Default if no authentication
+            // Default values
+            String userId = "unknown";
+            String userRole = "none";
 
+            // Get authentication from security context
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication != null && authentication.isAuthenticated()) {
-                Object principal = authentication.getPrincipal();
+            if (authentication != null && authentication.isAuthenticated() &&
+                    !(authentication instanceof AnonymousAuthenticationToken)) {
 
-                // The principal should be the user ID from the JWT token
+                // Extract user ID
+                Object principal = authentication.getPrincipal();
                 if (principal != null) {
-                    if (principal instanceof Long) {
-                        // For authenticated users, use their user ID
-                        auditUser = "user_" + principal;
-                    } else {
-                        auditUser = principal.toString();
-                    }
+                    userId = principal.toString();
                 }
-            } else {
-                // For public endpoints like login, use something identifiable
-                String requestPath = request.getRequestURI();
-                String remoteAddr = request.getRemoteAddr();
-                auditUser = "unauthenticated_" + remoteAddr + "_" + requestPath;
+
+                // Extract roles
+                if (!authentication.getAuthorities().isEmpty()) {
+                    userRole = authentication.getAuthorities().stream()
+                            .map(GrantedAuthority::getAuthority)
+                            .collect(Collectors.joining(","));
+                }
             }
 
-            // Set PostgreSQL session variable that will be used by audit triggers
-            jdbcTemplate.execute("SET LOCAL myapp.current_user = '" +
-                    auditUser.replace("'", "''") + "'");
+            // Set PostgreSQL session variables using queryForObject instead of update
+            jdbcTemplate.queryForObject(
+                    "SELECT set_config(?, ?, true)",
+                    String.class,
+                    "myapp.current_user", userId
+            );
+
+            jdbcTemplate.queryForObject(
+                    "SELECT set_config(?, ?, true)",
+                    String.class,
+                    "myapp.current_user_role", userRole
+            );
+
+            jdbcTemplate.queryForObject(
+                    "SELECT set_config(?, ?, true)",
+                    String.class,
+                    "myapp.request_path", request.getRequestURI()
+            );
 
             // Continue with request chain
             filterChain.doFilter(request, response);

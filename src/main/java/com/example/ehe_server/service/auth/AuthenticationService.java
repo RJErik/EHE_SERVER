@@ -2,16 +2,20 @@ package com.example.ehe_server.service.auth;
 
 import com.example.ehe_server.dto.LoginRequest;
 import com.example.ehe_server.entity.User;
+import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.intf.security.JwtTokenGeneratorInterface;
 import com.example.ehe_server.service.intf.auth.AuthenticationServiceInterface;
-import com.example.ehe_server.service.intf.auth.HashingServiceInterface;
 import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
+import com.example.ehe_server.service.intf.auth.HashingServiceInterface;
+import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
+import com.example.ehe_server.service.intf.security.JwtTokenGeneratorInterface;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -20,22 +24,28 @@ import java.util.regex.Pattern;
 public class AuthenticationService implements AuthenticationServiceInterface {
 
     private final UserRepository userRepository;
+    private final AdminRepository adminRepository;
     private final JwtTokenGeneratorInterface jwtTokenGenerator;
     private final HashingServiceInterface hashingService;
     private final CookieServiceInterface cookieService;
+    private final LoggingServiceInterface loggingService;
 
     // Email validation pattern
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
 
     public AuthenticationService(UserRepository userRepository,
+                                 AdminRepository adminRepository,
                                  JwtTokenGeneratorInterface jwtTokenGenerator,
                                  HashingServiceInterface hashingService,
-                                 CookieServiceInterface cookieService) {
+                                 CookieServiceInterface cookieService,
+                                 LoggingServiceInterface loggingService) {
         this.userRepository = userRepository;
+        this.adminRepository = adminRepository;
         this.jwtTokenGenerator = jwtTokenGenerator;
         this.hashingService = hashingService;
         this.cookieService = cookieService;
+        this.loggingService = loggingService;
     }
 
     @Override
@@ -48,6 +58,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
                     (request.getPassword() == null || request.getPassword().trim().isEmpty())) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Please enter both email and password");
+                loggingService.logAction("Login failed: Missing email and password");
                 return responseBody;
             }
 
@@ -55,6 +66,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Please enter your email address");
+                loggingService.logAction("Login failed: Missing email");
                 return responseBody;
             }
 
@@ -62,6 +74,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Please enter your password");
+                loggingService.logAction("Login failed: Missing password");
                 return responseBody;
             }
 
@@ -69,6 +82,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             if (!EMAIL_PATTERN.matcher(request.getEmail()).matches()) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Please enter a valid email address");
+                loggingService.logAction("Login failed: Invalid email format");
                 return responseBody;
             }
 
@@ -81,6 +95,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             if (userOpt.isEmpty()) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Invalid email or password");
+                loggingService.logAction("Login failed: User not found for email " + request.getEmail());
                 return responseBody;
             }
 
@@ -90,6 +105,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Your account is not active");
+                loggingService.logAction(user, "Login failed: Account not active");
                 return responseBody;
             }
 
@@ -97,25 +113,45 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             if (!BCrypt.checkpw(request.getPassword(), user.getPasswordHash())) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Invalid email or password");
+                loggingService.logAction(user, "Login failed: Invalid password");
                 return responseBody;
             }
 
-            // Generate JWT token
-            String jwtToken = jwtTokenGenerator.generateToken(Long.valueOf(user.getUserId()));
+            // Check if user is an admin
+            boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+
+            // Create roles list based on user status
+            List<String> roles = new ArrayList<>();
+            roles.add("USER"); // All authenticated users have USER role
+
+            if (isAdmin) {
+                roles.add("ADMIN"); // Add ADMIN role if user is in Admin table
+            }
+
+            // Generate JWT token with user ID and roles
+            String jwtToken = jwtTokenGenerator.generateToken(Long.valueOf(user.getUserId()), roles);
 
             // Create JWT cookie
             cookieService.createJwtCookie(jwtToken, response);
+
+            // Log successful login
+            loggingService.logAction(user, "Login successful");
 
             // Return success response
             responseBody.put("success", true);
             responseBody.put("message", "Login successful");
             responseBody.put("userName", user.getUserName());
+            responseBody.put("roles", roles);
 
             return responseBody;
 
         } catch (Exception e) {
             responseBody.put("success", false);
             responseBody.put("message", "An error occurred during login");
+
+            // Log the error
+            loggingService.logError("Error during login: " + e.getMessage(), e);
+
             return responseBody;
         }
     }

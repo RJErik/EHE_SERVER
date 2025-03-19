@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.security.interfaces.RSAPrivateKey;
 import java.util.Date;
+import java.util.List;
 
 @Service
 public class JwtTokenGeneratorService implements JwtTokenGeneratorInterface {
@@ -22,12 +23,13 @@ public class JwtTokenGeneratorService implements JwtTokenGeneratorInterface {
     }
 
     @Override
-    public String generateToken(Long userId) {
+    public String generateToken(Long userId, List<String> roles) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationTime);
 
         return Jwts.builder()
                 .claim("user_id", userId)
+                .claim("roles", roles)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(privateKey, SignatureAlgorithm.RS256)

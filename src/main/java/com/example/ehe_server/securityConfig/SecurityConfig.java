@@ -1,30 +1,19 @@
 package com.example.ehe_server.securityConfig;
 
 import com.example.ehe_server.service.intf.security.JwtTokenValidatorInterface;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -40,24 +29,24 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        // Using the modern lambda-based configuration
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> {
-                    auth.requestMatchers("/api/auth/**").permitAll()
+                    auth.requestMatchers("/api/auth/**").permitAll() // Public endpoints
+                            .requestMatchers("/api/admin/**").hasRole("ADMIN") // Admin-only endpoints
+                            .requestMatchers("/api/user/**").hasRole("USER") // User endpoints (includes admins)
                             .anyRequest().authenticated();
                 })
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // Disable HTTP Basic and form login
                 .httpBasic(basic -> basic.disable())
-                .formLogin(form -> form.disable())
-                // Add JWT filter before Spring's authentication filter
-                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+                .formLogin(form -> form.disable());
+        // No need to manually add the filter - it's a @Component with @Order
 
         return http.build();
     }
+
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -78,19 +67,20 @@ public class SecurityConfig {
     @Bean
     @Profile("prod") // This bean will only be active in the "prod" profile
     public SecurityFilterChain prodFilterChain(HttpSecurity http) throws Exception {
-        // Configure like the main filter chain
+        // Configure like the main filter chain with HTTPS requirement
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers("/api/auth/**").permitAll()
+                            .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                            .requestMatchers("/api/user/**").hasRole("USER")
                             .anyRequest().authenticated();
                 })
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
-                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
                 // Add HTTPS requirement
                 .requiresChannel(channel ->
                         channel.anyRequest().requiresSecure());
@@ -101,48 +91,5 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
-    }
-
-    private OncePerRequestFilter jwtAuthenticationFilter() {
-        return new OncePerRequestFilter() {
-            @Override
-            protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-                    throws ServletException, IOException {
-
-                // Skip filter for login and other public endpoints
-                String path = request.getRequestURI();
-                if (path.startsWith("/api/auth/")) {
-                    filterChain.doFilter(request, response);
-                    return;
-                }
-
-                // Extract JWT token from cookie
-                String token = null;
-                if (request.getCookies() != null) {
-                    for (Cookie cookie : request.getCookies()) {
-                        if ("jwt_token".equals(cookie.getName())) {
-                            token = cookie.getValue();
-                            break;
-                        }
-                    }
-                }
-
-                // Validate token and set Authentication if valid
-                if (token != null && jwtTokenValidator.validateToken(token)) {
-                    Long userId = jwtTokenValidator.getUserIdFromToken(token);
-                    if (userId != null) {
-                        UsernamePasswordAuthenticationToken authentication =
-                                new UsernamePasswordAuthenticationToken(
-                                        userId,
-                                        null,
-                                        Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
-                                );
-                        SecurityContextHolder.getContext().setAuthentication(authentication);
-                    }
-                }
-
-                filterChain.doFilter(request, response);
-            }
-        };
     }
 }

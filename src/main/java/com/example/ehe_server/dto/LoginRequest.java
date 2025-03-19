@@ -1,12 +1,13 @@
 package com.example.ehe_server.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 
 public class LoginRequest {
-    @NotBlank
+
+    @NotEmpty(message = "Email is required")
     private String email;
 
-    @NotBlank
+    @NotEmpty(message = "Password is required")
     private String password;
 
     // Getters and setters

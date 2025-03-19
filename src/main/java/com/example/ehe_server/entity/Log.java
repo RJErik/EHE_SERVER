@@ -13,7 +13,7 @@ public class Log {
     private Integer logId;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private User user;
 
     @Column(name = "log_description", nullable = false, columnDefinition = "TEXT")
