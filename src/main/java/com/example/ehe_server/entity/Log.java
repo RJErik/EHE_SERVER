@@ -23,6 +23,13 @@ public class Log {
             columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private LocalDateTime logDate;
 
+    @PrePersist
+    protected void onCreate() {
+        if (logDate == null) {
+            logDate = LocalDateTime.now();
+        }
+    }
+
     // Getters and setters
     public Integer getLogId() {
         return logId;

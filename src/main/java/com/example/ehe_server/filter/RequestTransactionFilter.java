@@ -2,10 +2,6 @@ package com.example.ehe_server.filter;
 
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -13,80 +9,53 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.example.ehe_server.service.context.ContextPropagationService;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.stream.Collectors;
 
 @Component
-@Order(2) // Execute after Spring Security filters
+@Order(2) // Run after security filters
 public class RequestTransactionFilter extends OncePerRequestFilter {
 
     private final JdbcTemplate jdbcTemplate;
     private final PlatformTransactionManager transactionManager;
+    private final ContextPropagationService contextService;
 
-    public RequestTransactionFilter(JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager) {
+    public RequestTransactionFilter(
+            JdbcTemplate jdbcTemplate,
+            PlatformTransactionManager transactionManager,
+            ContextPropagationService contextService) {
         this.jdbcTemplate = jdbcTemplate;
         this.transactionManager = transactionManager;
+        this.contextService = contextService;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Start a transaction for the entire request
-        TransactionDefinition txDef = new DefaultTransactionDefinition();
+        // Define transaction
+        DefaultTransactionDefinition txDef = new DefaultTransactionDefinition();
+        txDef.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
+
+        // Start transaction for the request
         TransactionStatus txStatus = transactionManager.getTransaction(txDef);
 
         try {
-            // Default values
-            String userId = "unknown";
-            String userRole = "none";
+            // Propagate security context to database session
+            contextService.propagateCurrentContext();
 
-            // Get authentication from security context
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication != null && authentication.isAuthenticated() &&
-                    !(authentication instanceof AnonymousAuthenticationToken)) {
-
-                // Extract user ID
-                Object principal = authentication.getPrincipal();
-                if (principal != null) {
-                    userId = principal.toString();
-                }
-
-                // Extract roles
-                if (!authentication.getAuthorities().isEmpty()) {
-                    userRole = authentication.getAuthorities().stream()
-                            .map(GrantedAuthority::getAuthority)
-                            .collect(Collectors.joining(","));
-                }
-            }
-
-            // Set PostgreSQL session variables using queryForObject instead of update
-            jdbcTemplate.queryForObject(
-                    "SELECT set_config(?, ?, true)",
-                    String.class,
-                    "myapp.current_user", userId
-            );
-
-            jdbcTemplate.queryForObject(
-                    "SELECT set_config(?, ?, true)",
-                    String.class,
-                    "myapp.current_user_role", userRole
-            );
-
-            jdbcTemplate.queryForObject(
-                    "SELECT set_config(?, ?, true)",
-                    String.class,
-                    "myapp.request_path", request.getRequestURI()
-            );
+            // Set request path - using SET instead of SET LOCAL
+            jdbcTemplate.execute("SET myapp.request_path = '" + request.getRequestURI() + "'");
 
             // Continue with request chain
             filterChain.doFilter(request, response);
 
-            // Commit the transaction if all went well
+            // Commit transaction if successful
             transactionManager.commit(txStatus);
         } catch (Exception e) {
             // Roll back on error
