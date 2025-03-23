@@ -17,14 +17,6 @@ public class DataSourceConfig {
     @ConfigurationProperties("spring.datasource.hikari")
     public HikariConfig hikariConfig() {
         HikariConfig config = new HikariConfig();
-
-        // Initialize connections with default values using SET
-        config.setConnectionInitSql(
-                "SET \"myapp.current_user\" = 'system'; " +
-                        "SET \"myapp.current_user_role\" = 'none'; " +
-                        "SET \"myapp.request_path\" = 'initialization'");
-
-
         return config;
     }
 

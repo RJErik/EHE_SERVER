@@ -9,7 +9,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import com.example.ehe_server.service.context.ContextPropagationService;
+import com.example.ehe_server.service.audit.AuditContextService;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -18,20 +18,20 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 @Component
-@Order(2) // Run after security filters
+@Order(1) // Run after security filters
 public class RequestTransactionFilter extends OncePerRequestFilter {
 
     private final JdbcTemplate jdbcTemplate;
     private final PlatformTransactionManager transactionManager;
-    private final ContextPropagationService contextService;
+    private final AuditContextService auditContextService;
 
     public RequestTransactionFilter(
             JdbcTemplate jdbcTemplate,
             PlatformTransactionManager transactionManager,
-            ContextPropagationService contextService) {
+            AuditContextService auditContextService) {
         this.jdbcTemplate = jdbcTemplate;
         this.transactionManager = transactionManager;
-        this.contextService = contextService;
+        this.auditContextService = auditContextService;
     }
 
     @Override
@@ -46,11 +46,8 @@ public class RequestTransactionFilter extends OncePerRequestFilter {
         TransactionStatus txStatus = transactionManager.getTransaction(txDef);
 
         try {
-            // Propagate security context to database session
-            contextService.propagateCurrentContext();
-
-            // Set request path - using SET instead of SET LOCAL
-            jdbcTemplate.execute("SET myapp.request_path = '" + request.getRequestURI() + "'");
+            // Set request path
+            auditContextService.setRequestPath(request.getRequestURI());
 
             // Continue with request chain
             filterChain.doFilter(request, response);

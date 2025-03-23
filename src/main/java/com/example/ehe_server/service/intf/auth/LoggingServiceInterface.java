@@ -4,7 +4,7 @@ import com.example.ehe_server.dto.LoginRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 
-public interface AuthenticationServiceInterface {
+public interface LoggingServiceInterface {
     Map<String, Object> authenticateUser(LoginRequest request, HttpServletResponse response);
     void logoutUser(HttpServletResponse response);
 }

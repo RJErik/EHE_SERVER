@@ -4,10 +4,10 @@ import com.example.ehe_server.dto.LoginRequest;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.intf.auth.AuthenticationServiceInterface;
+import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.intf.auth.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
 import com.example.ehe_server.service.intf.auth.HashingServiceInterface;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.security.JwtTokenGeneratorInterface;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.crypto.bcrypt.BCrypt;
@@ -21,31 +21,34 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 @Service
-public class AuthenticationService implements AuthenticationServiceInterface {
+public class LogInService implements LoggingServiceInterface {
 
     private final UserRepository userRepository;
     private final AdminRepository adminRepository;
     private final JwtTokenGeneratorInterface jwtTokenGenerator;
     private final HashingServiceInterface hashingService;
     private final CookieServiceInterface cookieService;
-    private final LoggingServiceInterface loggingService;
+    private final com.example.ehe_server.service.intf.log.LoggingServiceInterface loggingService;
+    private final AuditContextService auditContextService;
 
     // Email validation pattern
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
 
-    public AuthenticationService(UserRepository userRepository,
-                                 AdminRepository adminRepository,
-                                 JwtTokenGeneratorInterface jwtTokenGenerator,
-                                 HashingServiceInterface hashingService,
-                                 CookieServiceInterface cookieService,
-                                 LoggingServiceInterface loggingService) {
+    public LogInService(UserRepository userRepository,
+                        AdminRepository adminRepository,
+                        JwtTokenGeneratorInterface jwtTokenGenerator,
+                        HashingServiceInterface hashingService,
+                        CookieServiceInterface cookieService,
+                        com.example.ehe_server.service.intf.log.LoggingServiceInterface loggingService,
+                        AuditContextService auditContextService) {
         this.userRepository = userRepository;
         this.adminRepository = adminRepository;
         this.jwtTokenGenerator = jwtTokenGenerator;
         this.hashingService = hashingService;
         this.cookieService = cookieService;
         this.loggingService = loggingService;
+        this.auditContextService = auditContextService;
     }
 
     @Override
@@ -58,7 +61,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
                     (request.getPassword() == null || request.getPassword().trim().isEmpty())) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Please enter both email and password");
-                loggingService.logAction("Login failed: Missing email and password");
+                loggingService.logAction(null, auditContextService.getCurrentUser(), "Login failed: Missing email and password");
                 return responseBody;
             }
 
@@ -66,7 +69,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Please enter your email address");
-                loggingService.logAction("Login failed: Missing email");
+                loggingService.logAction(null, auditContextService.getCurrentUser(), "Login failed: Missing email");
                 return responseBody;
             }
 
@@ -74,7 +77,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Please enter your password");
-                loggingService.logAction("Login failed: Missing password");
+                loggingService.logAction(null, auditContextService.getCurrentUser(), "Login failed: Missing password");
                 return responseBody;
             }
 
@@ -82,7 +85,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             if (!EMAIL_PATTERN.matcher(request.getEmail()).matches()) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Please enter a valid email address");
-                loggingService.logAction("Login failed: Invalid email format");
+                loggingService.logAction(null, auditContextService.getCurrentUser(), "Login failed: Invalid email format");
                 return responseBody;
             }
 
@@ -95,7 +98,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             if (userOpt.isEmpty()) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Invalid email or password");
-                loggingService.logAction("Login failed: User not found for email " + request.getEmail());
+                loggingService.logAction(null, auditContextService.getCurrentUser(), "Login failed: User not found for email " + request.getEmail());
                 return responseBody;
             }
 
@@ -105,7 +108,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Your account is not active");
-                loggingService.logAction(user, "Login failed: Account not active");
+                loggingService.logAction(Integer.parseInt(auditContextService.getCurrentUser()), auditContextService.getCurrentUser(), "Login failed: Account not active");
                 return responseBody;
             }
 
@@ -113,9 +116,12 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             if (!BCrypt.checkpw(request.getPassword(), user.getPasswordHash())) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Invalid email or password");
-                loggingService.logAction(user, "Login failed: Invalid password");
+                loggingService.logAction(Integer.parseInt(auditContextService.getCurrentUser()), auditContextService.getCurrentUser(), "Login failed: Invalid password");
                 return responseBody;
             }
+
+            // Now we know the user, set the user context even though not authenticated yet
+            auditContextService.setCurrentUser(String.valueOf(user.getUserId()));
 
             // Check if user is an admin
             boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
@@ -128,6 +134,10 @@ public class AuthenticationService implements AuthenticationServiceInterface {
                 roles.add("ADMIN"); // Add ADMIN role if user is in Admin table
             }
 
+            // Update audit context with authenticated user and roles
+            String rolesString = String.join(",", roles);
+            auditContextService.setCurrentUserRole(rolesString);
+
             // Generate JWT token with user ID and roles
             String jwtToken = jwtTokenGenerator.generateToken(Long.valueOf(user.getUserId()), roles);
 
@@ -135,7 +145,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             cookieService.createJwtCookie(jwtToken, response);
 
             // Log successful login
-            loggingService.logAction(user, "Login successful");
+            loggingService.logAction(user.getUserId(), String.valueOf(user.getUserId()), "Login successful");
 
             // Return success response
             responseBody.put("success", true);
@@ -150,7 +160,7 @@ public class AuthenticationService implements AuthenticationServiceInterface {
             responseBody.put("message", "An error occurred during login");
 
             // Log the error
-            loggingService.logError("Error during login: " + e.getMessage(), e);
+            loggingService.logError(null,auditContextService.getCurrentUser(), "Error during login: " + e.getMessage(), e);
 
             return responseBody;
         }
@@ -158,6 +168,24 @@ public class AuthenticationService implements AuthenticationServiceInterface {
 
     @Override
     public void logoutUser(HttpServletResponse response) {
+        // Get the current user context before logout
+        String userId = auditContextService.getCurrentUser();
+
+        // Log the logout action
+        Integer userIdInt = null;
+        try {
+            userIdInt = Integer.parseInt(userId);
+        } catch (NumberFormatException e) {
+            // userId was not a valid number, leave userIdInt as null
+        }
+
+        loggingService.logAction(userIdInt, userId, "User logged out");
+
+        // Clear JWT cookie
         cookieService.clearJwtCookie(response);
+
+        // Reset user context
+        auditContextService.setCurrentUser("unauthenticated");
+        auditContextService.setCurrentUserRole("none");
     }
 }
