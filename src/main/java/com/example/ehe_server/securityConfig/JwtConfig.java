@@ -51,7 +51,7 @@ public class JwtConfig {
             }
 
             // Load the keystore
-            KeyStore keystore = KeyStore.getInstance("PKCS12");
+            KeyStore keystore = KeyStore.getInstance("JKS");
             try (FileInputStream is = new FileInputStream(keystoreFile)) {
                 keystore.load(is, keystorePassword.toCharArray());
             }

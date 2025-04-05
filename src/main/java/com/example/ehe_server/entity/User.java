@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Table(name = "\"user\"") // Escape reserved keyword
 public class User {
 
-    public enum AccountStatus { ACTIVE, SUSPENDED }
+    public enum AccountStatus { ACTIVE, SUSPENDED, NONVERIFIED }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

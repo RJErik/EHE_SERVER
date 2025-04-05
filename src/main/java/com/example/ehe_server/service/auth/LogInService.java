@@ -5,7 +5,7 @@ import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.audit.AuditContextService;
-import com.example.ehe_server.service.intf.auth.LoggingServiceInterface;
+import com.example.ehe_server.service.intf.auth.LogInServiceInterface;
 import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
 import com.example.ehe_server.service.intf.auth.HashingServiceInterface;
 import com.example.ehe_server.service.intf.security.JwtTokenGeneratorInterface;
@@ -21,7 +21,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 @Service
-public class LogInService implements LoggingServiceInterface {
+public class LogInService implements LogInServiceInterface {
 
     private final UserRepository userRepository;
     private final AdminRepository adminRepository;

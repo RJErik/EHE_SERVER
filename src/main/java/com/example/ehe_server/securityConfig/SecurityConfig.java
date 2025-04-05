@@ -1,6 +1,5 @@
 package com.example.ehe_server.securityConfig;
 
-import com.example.ehe_server.service.intf.security.JwtTokenValidatorInterface;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -21,44 +20,54 @@ import java.util.Collections;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final JwtTokenValidatorInterface jwtTokenValidator;
-
-    public SecurityConfig(JwtTokenValidatorInterface jwtTokenValidator) {
-        this.jwtTokenValidator = jwtTokenValidator;
-    }
+    // Keep the JwtTokenValidatorInterface if needed by other parts of your security setup
+    // private final JwtTokenValidatorInterface jwtTokenValidator;
+    // public SecurityConfig(JwtTokenValidatorInterface jwtTokenValidator) {
+    //     this.jwtTokenValidator = jwtTokenValidator;
+    // }
+    // If not needed directly here anymore, remove the constructor injection for it.
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable()) // Disable CSRF (common for stateless APIs)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // *** USE THIS FOR CORS ***
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers("/api/auth/**").permitAll() // Public endpoints
                             .requestMatchers("/api/admin/**").hasRole("ADMIN") // Admin-only endpoints
                             .requestMatchers("/api/user/**").hasRole("USER") // User endpoints (includes admins)
-                            .anyRequest().authenticated();
+                            .anyRequest().authenticated(); // All other requests require authentication
                 })
                 .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .httpBasic(basic -> basic.disable())
-                .formLogin(form -> form.disable());
-        // No need to manually add the filter - it's a @Component with @Order
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Stateless session management for JWT
+                .httpBasic(basic -> basic.disable()) // Disable HTTP Basic auth
+                .formLogin(form -> form.disable()); // Disable Form Login
+
+        // The JwtAuthenticationFilter should be added automatically as it's a @Component
+        // If not, you might need: .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        // assuming jwtAuthenticationFilter is injected or available as a bean.
 
         return http.build();
     }
 
-
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        // Allowed origin(s) - Frontend URL
         configuration.setAllowedOrigins(Collections.singletonList("http://localhost:5173"));
+        // Allowed HTTP methods
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        // Allowed headers
+        configuration.setAllowedHeaders(Arrays.asList("*")); // Allow all standard headers needed
+        // Allow credentials (cookies, authorization headers)
         configuration.setAllowCredentials(true);
+        // Expose headers required by the frontend (e.g., Set-Cookie for JWT)
         configuration.setExposedHeaders(Arrays.asList("Set-Cookie"));
-        configuration.setMaxAge(3600L);
+        // How long the results of a preflight request can be cached
+        configuration.setMaxAge(3600L); // 1 hour
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // Apply this configuration to all paths ("/**")
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
@@ -67,10 +76,10 @@ public class SecurityConfig {
     @Bean
     @Profile("prod") // This bean will only be active in the "prod" profile
     public SecurityFilterChain prodFilterChain(HttpSecurity http) throws Exception {
-        // Configure like the main filter chain with HTTPS requirement
+        // Configure like the main filter chain but add HTTPS requirement
         http
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Use the same CORS source
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers("/api/auth/**").permitAll()
                             .requestMatchers("/api/admin/**").hasRole("ADMIN")
@@ -81,7 +90,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
-                // Add HTTPS requirement
+                // Add HTTPS requirement for production
                 .requiresChannel(channel ->
                         channel.anyRequest().requiresSecure());
 

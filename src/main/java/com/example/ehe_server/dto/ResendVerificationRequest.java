@@ -1,0 +1,20 @@
+package com.example.ehe_server.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotEmpty;
+
+public class ResendVerificationRequest {
+
+    @NotEmpty(message = "Email is required")
+    @Email(message = "Please provide a valid email address")
+    private String email;
+
+    // Getter and Setter
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+}
