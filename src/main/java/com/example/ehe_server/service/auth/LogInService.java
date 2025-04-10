@@ -8,10 +8,11 @@ import com.example.ehe_server.service.audit.AuditContextService;
 import com.example.ehe_server.service.intf.auth.LogInServiceInterface;
 import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
 import com.example.ehe_server.service.intf.auth.HashingServiceInterface;
-import com.example.ehe_server.service.intf.security.JwtTokenGeneratorInterface;
+import com.example.ehe_server.service.intf.auth.JwtTokenGeneratorInterface;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
+import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,7 +29,7 @@ public class LogInService implements LogInServiceInterface {
     private final JwtTokenGeneratorInterface jwtTokenGenerator;
     private final HashingServiceInterface hashingService;
     private final CookieServiceInterface cookieService;
-    private final com.example.ehe_server.service.intf.log.LoggingServiceInterface loggingService;
+    private final LoggingServiceInterface loggingService;
     private final AuditContextService auditContextService;
 
     // Email validation pattern
@@ -40,7 +41,7 @@ public class LogInService implements LogInServiceInterface {
                         JwtTokenGeneratorInterface jwtTokenGenerator,
                         HashingServiceInterface hashingService,
                         CookieServiceInterface cookieService,
-                        com.example.ehe_server.service.intf.log.LoggingServiceInterface loggingService,
+                        LoggingServiceInterface loggingService,
                         AuditContextService auditContextService) {
         this.userRepository = userRepository;
         this.adminRepository = adminRepository;
@@ -97,14 +98,28 @@ public class LogInService implements LogInServiceInterface {
 
             if (userOpt.isEmpty()) {
                 responseBody.put("success", false);
-                responseBody.put("message", "Invalid email or password");
+                responseBody.put("message", "Invalid email or password. Try ");
+                Map<String, String> actionLink = new HashMap<>();
+                actionLink.put("text", "registering.");
+                actionLink.put("target", "register");
+                responseBody.put("actionLink", actionLink);
                 loggingService.logAction(null, auditContextService.getCurrentUser(), "Login failed: User not found for email " + request.getEmail());
                 return responseBody;
             }
 
             User user = userOpt.get();
+            auditContextService.setCurrentUser(String.valueOf(user.getUserId()));
 
             // Check account status
+
+            if (user.getAccountStatus() == User.AccountStatus.NONVERIFIED) {
+                responseBody.put("success", false);
+                responseBody.put("message", "Your account is not verified. Try verifying it.");
+                responseBody.put("showResendButton", true);
+                loggingService.logAction(Integer.parseInt(auditContextService.getCurrentUser()), auditContextService.getCurrentUser(), "Login failed: Account is not verified.");
+                return responseBody;
+            }
+
             if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Your account is not active");

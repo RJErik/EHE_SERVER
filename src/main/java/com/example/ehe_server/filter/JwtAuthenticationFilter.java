@@ -4,7 +4,7 @@ import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.audit.AuditContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-import com.example.ehe_server.service.intf.security.JwtTokenValidatorInterface;
+import com.example.ehe_server.service.intf.auth.JwtTokenValidatorInterface;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -47,8 +47,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         // Default audit context for unauthenticated requests
-        auditContextService.setCurrentUser("unknown");
-        auditContextService.setCurrentUserRole("none");
+        auditContextService.setCurrentUser("UNKNOWN");
+        auditContextService.setCurrentUserRole("NONE");
         auditContextService.setRequestPath(request.getRequestURI());
 
         // Skip filter for public endpoints

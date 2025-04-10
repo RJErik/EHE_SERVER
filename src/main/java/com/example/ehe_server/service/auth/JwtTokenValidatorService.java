@@ -1,6 +1,6 @@
-package com.example.ehe_server.service.security;
+package com.example.ehe_server.service.auth;
 
-import com.example.ehe_server.service.intf.security.JwtTokenValidatorInterface;
+import com.example.ehe_server.service.intf.auth.JwtTokenValidatorInterface;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;

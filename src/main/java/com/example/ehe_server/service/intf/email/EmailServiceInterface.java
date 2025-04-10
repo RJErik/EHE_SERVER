@@ -1,31 +1,20 @@
 package com.example.ehe_server.service.intf.email;
 
 import com.example.ehe_server.entity.User;
+import org.springframework.mail.MailException;
+
+import java.util.Map;
 
 public interface EmailServiceInterface {
 
-    /**
-     * Sends a verification email to the newly registered user.
-     * @param user The user who registered.
-     * @param token The verification token.
-     * @param recipientEmail The email address to send to (passed explicitly for decoupling).
-     */
     void sendVerificationEmail(User user, String token, String recipientEmail);
 
-    /**
-     * Sends a password reset email.
-     * Implement this later when needed.
-     * @param user The user requesting the reset.
-     * @param token The password reset token.
-     * @param recipientEmail The email address to send to.
-     */
-    // void sendPasswordResetEmail(User user, String token, String recipientEmail);
+    // void sendPasswordResetEmail(User user, String token, String recipientEmail); // Implement later
 
-    /**
-     * Sends a generic informational email.
-     * @param to The recipient email address.
-     * @param subject The email subject.
-     * @param text The email body content.
-     */
-    void sendSimpleMessage(String to, String subject, String text);
+    void sendSimpleMessage(String to, String subject, String text) throws MailException;
+
+    Map<String, Object> resendVerificationEmail(User user, String email);
+
+    // New method for password reset
+    void sendPasswordResetEmail(User user, String token, String recipientEmail);
 }

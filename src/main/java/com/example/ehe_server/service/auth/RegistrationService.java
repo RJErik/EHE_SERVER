@@ -14,6 +14,7 @@ import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 // Import JWT if needed elsewhere, but not for register response anymore
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value; // For expiry config
+import org.springframework.mail.MailException;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -100,7 +101,11 @@ public class RegistrationService implements RegistrationServiceInterface {
             String emailHash = hashingService.hashEmail(request.getEmail());
             if (userRepository.findByEmailHash(emailHash).isPresent()) {
                 responseBody.put("success", false);
-                responseBody.put("message", "Email is already registered");
+                responseBody.put("message", "Email is already registered. Try ");
+                Map<String, String> actionLink = new HashMap<>();
+                actionLink.put("text", "log in.");
+                actionLink.put("target", "login");
+                responseBody.put("actionLink", actionLink);
                 loggingService.logAction(null, auditContextService.getCurrentUser(), "Registration failed: Email already exists");
                 return responseBody;
             }
@@ -119,7 +124,7 @@ public class RegistrationService implements RegistrationServiceInterface {
             // Now that user is created, update the audit context for subsequent actions in this transaction
             auditContextService.setCurrentUser(String.valueOf(savedUser.getUserId()));
             // Role is not fully established yet, could set to 'NONVERIFIED' or keep as 'USER' contextually
-            auditContextService.setCurrentUserRole("USER_PENDING_VERIFICATION");
+            auditContextService.setCurrentUserRole("NONVERIFIED");
 
             // --- NEW: Generate and save verification token ---
             String token = UUID.randomUUID().toString();
@@ -129,21 +134,32 @@ public class RegistrationService implements RegistrationServiceInterface {
             // -------------------------------------------------
 
             // Log successful registration attempt (pending verification)
-            loggingService.logAction(savedUser.getUserId(), String.valueOf(savedUser.getUserId()), "User registered successfully (pending verification). Token generated.");
-
-            // --- NEW: Send verification email ---
-            // Pass the original email, not the hash
-            emailService.sendVerificationEmail(savedUser, token, request.getEmail());
-            // ------------------------------------
+            loggingService.logAction(null, String.valueOf(savedUser.getUserId()), "User registered successfully (pending verification). Token generated.");
 
             // --- REMOVED: JWT Generation and Cookie Setting ---
             // No automatic login on registration anymore
             // --------------------------------------------------
 
-            // Return success response indicating verification is needed
-            responseBody.put("success", true);
-            responseBody.put("message", "Registration successful. Please check your email (" + request.getEmail() + ") to verify your account.");
-            // DO NOT return user details or roles here
+            try {
+                // Call the *synchronous* version of the email sending method
+                emailService.sendVerificationEmail(savedUser, token, request.getEmail());
+
+                // If email sending was successful (no exception thrown), set the success response for the controller
+                responseBody.put("success", true);
+                responseBody.put("message", "Registration successful. Please check your email (" + request.getEmail() + ") to verify your account. It may be in spam.");
+                responseBody.put("showResendButton", true);
+                loggingService.logAction(null, auditContextService.getCurrentUser(), "Sent verification email to " + request.getEmail());
+
+            } catch (MailException e) {
+                // Set the response to indicate failure *because* the email couldn't be sent
+                responseBody.put("success", false);
+                responseBody.put("message", "Registration succeeded but failed to send verification email. Please try registering again later or contact support.");
+                responseBody.put("showResendButton", true);
+
+                // IMPORTANT: Throw a runtime exception to trigger Transaction rollback.
+                // The user record created above should be rolled back if we can't send the email.
+                loggingService.logError(null, auditContextService.getCurrentUser(), "Failed to send verification email to " + request.getEmail(), e);
+            }
 
             return responseBody;
 

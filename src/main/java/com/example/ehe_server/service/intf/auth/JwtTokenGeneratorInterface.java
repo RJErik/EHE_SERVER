@@ -1,4 +1,4 @@
-package com.example.ehe_server.service.intf.security;
+package com.example.ehe_server.service.intf.auth;
 
 import java.util.List;
 
