@@ -7,7 +7,6 @@ import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository; // Import new repository
 import com.example.ehe_server.service.audit.AuditContextService;
 // Removed unused cookie/jwt imports for registration
-import com.example.ehe_server.service.intf.auth.HashingServiceInterface;
 import com.example.ehe_server.service.intf.auth.RegistrationServiceInterface;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface; // Import email service
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
@@ -30,7 +29,6 @@ public class RegistrationService implements RegistrationServiceInterface {
 
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository; // Inject token repo
-    private final HashingServiceInterface hashingService;
     private final EmailServiceInterface emailService; // Inject email service
     private final LoggingServiceInterface loggingService;
     private final AuditContextService auditContextService;
@@ -47,13 +45,11 @@ public class RegistrationService implements RegistrationServiceInterface {
     public RegistrationService(
             UserRepository userRepository,
             VerificationTokenRepository verificationTokenRepository, // Add to constructor
-            HashingServiceInterface hashingService,
             EmailServiceInterface emailService, // Add to constructor
             LoggingServiceInterface loggingService,
             AuditContextService auditContextService) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository; // Assign
-        this.hashingService = hashingService;
         this.emailService = emailService; // Assign
         this.loggingService = loggingService;
         this.auditContextService = auditContextService;
@@ -98,8 +94,8 @@ public class RegistrationService implements RegistrationServiceInterface {
 
 
             // Check if email already exists
-            String emailHash = hashingService.hashEmail(request.getEmail());
-            if (userRepository.findByEmailHash(emailHash).isPresent()) {
+            String email = request.getEmail();
+            if (userRepository.findByEmail(email).isPresent()) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Email is already registered. Try ");
                 Map<String, String> actionLink = new HashMap<>();
@@ -113,7 +109,7 @@ public class RegistrationService implements RegistrationServiceInterface {
             // Create new user entity
             User newUser = new User();
             newUser.setUserName(request.getUsername());
-            newUser.setEmailHash(emailHash);
+            newUser.setEmail(email);
             newUser.setPasswordHash(BCrypt.hashpw(request.getPassword(), BCrypt.gensalt()));
             newUser.setAccountStatus(User.AccountStatus.NONVERIFIED); // <<<--- SET STATUS TO NONVERIFIED
             newUser.setRegistrationDate(LocalDateTime.now());

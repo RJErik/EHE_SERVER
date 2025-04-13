@@ -9,8 +9,6 @@ import io.jsonwebtoken.security.SignatureException;
 import org.springframework.stereotype.Service;
 
 import java.security.interfaces.RSAPublicKey;
-import java.util.ArrayList;
-import java.util.List;
 
 @Service
 public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
@@ -53,8 +51,7 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public List<String> getRolesFromToken(String token) {
+    public String getRoleFromToken(String token) {
         try {
             Claims claims = Jwts.parserBuilder()
                     .setSigningKey(publicKey)
@@ -62,9 +59,23 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
                     .parseClaimsJws(token)
                     .getBody();
 
-            return claims.get("roles", ArrayList.class);
+            // Debug - print all claims to see what's actually in the token
+            System.out.println("DEBUG - JWT Claims: " + claims.toString());
+
+            // Try direct access without type specification first
+            Object roleObj = claims.get("role");
+            System.out.println("DEBUG - Role object type: " + (roleObj != null ? roleObj.getClass().getName() : "null"));
+            System.out.println("DEBUG - Role object value: " + roleObj);
+
+            // Now get it with proper type casting
+            String role = claims.get("role", String.class);
+            System.out.println("DEBUG - Extracted role string: '" + role + "'");
+
+            return role;
         } catch (Exception e) {
-            return new ArrayList<>();
+            System.out.println("DEBUG - Exception extracting role: " + e.getMessage());
+            e.printStackTrace();
+            return null;
         }
     }
 }

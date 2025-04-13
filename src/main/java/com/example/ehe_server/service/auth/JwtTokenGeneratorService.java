@@ -23,13 +23,13 @@ public class JwtTokenGeneratorService implements JwtTokenGeneratorInterface {
     }
 
     @Override
-    public String generateToken(Long userId, List<String> roles) {
+    public String generateToken(Long userId, String role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationTime);
 
         return Jwts.builder()
                 .claim("user_id", userId)
-                .claim("roles", roles)
+                .claim("role", role)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(privateKey, SignatureAlgorithm.RS256)

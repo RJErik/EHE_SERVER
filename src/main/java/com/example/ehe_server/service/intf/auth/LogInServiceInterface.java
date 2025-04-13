@@ -6,5 +6,5 @@ import java.util.Map;
 
 public interface LogInServiceInterface {
     Map<String, Object> authenticateUser(LoginRequest request, HttpServletResponse response);
-    void logoutUser(HttpServletResponse response);
+    // logoutUser method removed
 }

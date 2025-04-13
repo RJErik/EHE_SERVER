@@ -7,16 +7,13 @@ import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.audit.AuditContextService;
 import com.example.ehe_server.service.intf.auth.LogInServiceInterface;
 import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
-import com.example.ehe_server.service.intf.auth.HashingServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtTokenGeneratorInterface;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -27,7 +24,6 @@ public class LogInService implements LogInServiceInterface {
     private final UserRepository userRepository;
     private final AdminRepository adminRepository;
     private final JwtTokenGeneratorInterface jwtTokenGenerator;
-    private final HashingServiceInterface hashingService;
     private final CookieServiceInterface cookieService;
     private final LoggingServiceInterface loggingService;
     private final AuditContextService auditContextService;
@@ -39,14 +35,12 @@ public class LogInService implements LogInServiceInterface {
     public LogInService(UserRepository userRepository,
                         AdminRepository adminRepository,
                         JwtTokenGeneratorInterface jwtTokenGenerator,
-                        HashingServiceInterface hashingService,
                         CookieServiceInterface cookieService,
                         LoggingServiceInterface loggingService,
                         AuditContextService auditContextService) {
         this.userRepository = userRepository;
         this.adminRepository = adminRepository;
         this.jwtTokenGenerator = jwtTokenGenerator;
-        this.hashingService = hashingService;
         this.cookieService = cookieService;
         this.loggingService = loggingService;
         this.auditContextService = auditContextService;
@@ -90,11 +84,8 @@ public class LogInService implements LogInServiceInterface {
                 return responseBody;
             }
 
-            // Hash the email for lookup
-            String emailHash = hashingService.hashEmail(request.getEmail());
-
             // Find user by email hash
-            Optional<User> userOpt = userRepository.findByEmailHash(emailHash);
+            Optional<User> userOpt = userRepository.findByEmail(request.getEmail());
 
             if (userOpt.isEmpty()) {
                 responseBody.put("success", false);
@@ -142,19 +133,17 @@ public class LogInService implements LogInServiceInterface {
             boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
 
             // Create roles list based on user status
-            List<String> roles = new ArrayList<>();
-            roles.add("USER"); // All authenticated users have USER role
+            String role = "USER"; // All authenticated users have USER role
 
             if (isAdmin) {
-                roles.add("ADMIN"); // Add ADMIN role if user is in Admin table
+                role = "ADMIN"; // Add ADMIN role if user is in Admin table
             }
 
             // Update audit context with authenticated user and roles
-            String rolesString = String.join(",", roles);
-            auditContextService.setCurrentUserRole(rolesString);
+            auditContextService.setCurrentUserRole(role);
 
             // Generate JWT token with user ID and roles
-            String jwtToken = jwtTokenGenerator.generateToken(Long.valueOf(user.getUserId()), roles);
+            String jwtToken = jwtTokenGenerator.generateToken(Long.valueOf(user.getUserId()), role);
 
             // Create JWT cookie
             cookieService.createJwtCookie(jwtToken, response);
@@ -164,9 +153,9 @@ public class LogInService implements LogInServiceInterface {
 
             // Return success response
             responseBody.put("success", true);
-            responseBody.put("message", "Login successful");
-            responseBody.put("userName", user.getUserName());
-            responseBody.put("roles", roles);
+//            responseBody.put("message", "Login successful");
+//            responseBody.put("userName", user.getUserName());
+//            responseBody.put("roles", roles);
 
             return responseBody;
 
@@ -179,28 +168,5 @@ public class LogInService implements LogInServiceInterface {
 
             return responseBody;
         }
-    }
-
-    @Override
-    public void logoutUser(HttpServletResponse response) {
-        // Get the current user context before logout
-        String userId = auditContextService.getCurrentUser();
-
-        // Log the logout action
-        Integer userIdInt = null;
-        try {
-            userIdInt = Integer.parseInt(userId);
-        } catch (NumberFormatException e) {
-            // userId was not a valid number, leave userIdInt as null
-        }
-
-        loggingService.logAction(userIdInt, userId, "User logged out");
-
-        // Clear JWT cookie
-        cookieService.clearJwtCookie(response);
-
-        // Reset user context
-        auditContextService.setCurrentUser("unauthenticated");
-        auditContextService.setCurrentUserRole("none");
     }
 }

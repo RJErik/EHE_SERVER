@@ -5,7 +5,6 @@ import com.example.ehe_server.entity.VerificationToken;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.AuditContextService;
-import com.example.ehe_server.service.intf.auth.HashingServiceInterface;
 import com.example.ehe_server.service.intf.auth.PasswordResetRequestServiceInterface;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
@@ -32,7 +31,6 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
 
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository;
-    private final HashingServiceInterface hashingService;
     private final EmailServiceInterface emailService;
     private final LoggingServiceInterface loggingService;
     private final AuditContextService auditContextService;
@@ -43,13 +41,11 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
     public PasswordResetRequestService(
             UserRepository userRepository,
             VerificationTokenRepository verificationTokenRepository,
-            HashingServiceInterface hashingService,
             EmailServiceInterface emailService,
             LoggingServiceInterface loggingService,
             AuditContextService auditContextService) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
-        this.hashingService = hashingService;
         this.emailService = emailService;
         this.loggingService = loggingService;
         this.auditContextService = auditContextService;
@@ -79,8 +75,7 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
             }
 
             // Hash the email and find user
-            String emailHash = hashingService.hashEmail(email);
-            var userOpt = userRepository.findByEmailHash(emailHash);
+            var userOpt = userRepository.findByEmail(email);
 
             if (userOpt.isEmpty()) {
                 // For security reasons, don't reveal if email exists or not

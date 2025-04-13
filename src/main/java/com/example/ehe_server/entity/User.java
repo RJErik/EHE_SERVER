@@ -22,8 +22,8 @@ public class User {
     private String userName;
 
     @NotBlank
-    @Column(name = "email_hash", nullable = false, unique = true, length = 255)
-    private String emailHash;
+    @Column(name = "email", nullable = false, unique = true, length = 255)
+    private String email;
 
     @NotBlank
     @Column(name = "password_hash", nullable = false, length = 255)
@@ -54,12 +54,12 @@ public class User {
         this.userName = userName;
     }
 
-    public String getEmailHash() {
-        return emailHash;
+    public String getEmail() {
+        return email;
     }
 
-    public void setEmailHash(String emailHash) {
-        this.emailHash = emailHash;
+    public void setEmail(String emailHash) {
+        this.email = email;
     }
 
     public String getPasswordHash() {

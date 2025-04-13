@@ -3,6 +3,9 @@ package com.example.ehe_server.controller;
 import com.example.ehe_server.dto.*;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
+import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
+import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.auth.*;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,36 +30,41 @@ public class AuthController {
     private final RegistrationServiceInterface registrationService;
     private final RegistrationVerificationServiceInterface verificationService;
     private final EmailServiceInterface emailService;
-    private final HashingServiceInterface hashingService; // Needed here for lookup
     private final UserRepository userRepository; // Needed here for lookup
     private final PasswordResetRequestServiceInterface passwordResetRequestService;
     private final PasswordResetTokenValidationServiceInterface passwordResetTokenValidationService;
     private final PasswordResetServiceInterface passwordResetService;
+    private final AuditContextService auditContextService;
+    private final UserContextServiceInterface userContextService;
 
     public AuthController(
             LogInServiceInterface authenticationService,
             RegistrationServiceInterface registrationService,
             RegistrationVerificationServiceInterface verificationService,
             EmailServiceInterface emailService,
-            HashingServiceInterface hashingService, // Inject HashingService
             UserRepository userRepository,
             PasswordResetRequestServiceInterface passwordResetRequestService,
             PasswordResetTokenValidationServiceInterface passwordResetTokenValidationService,
-            PasswordResetServiceInterface passwordResetService) { // Inject UserRepository
+            PasswordResetServiceInterface passwordResetService,
+            AuditContextService auditContextService,
+            UserContextServiceInterface userContextService) { // Inject UserRepository
         this.authenticationService = authenticationService;
         this.registrationService = registrationService;
         this.verificationService = verificationService;
         this.emailService = emailService;
-        this.hashingService = hashingService;
         this.userRepository = userRepository;
         this.passwordResetRequestService = passwordResetRequestService;
         this.passwordResetTokenValidationService = passwordResetTokenValidationService;
         this.passwordResetService = passwordResetService;
+        this.auditContextService = auditContextService;
+        this.userContextService = userContextService;
     }
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request,
                                                      HttpServletResponse response) {
+//        System.out.println("LOG IN ENDPOINT CALLED: " + auditContextService.getCurrentUser());
+        userContextService.setupUserContext();
         Map<String, Object> responseBody = authenticationService.authenticateUser(request, response);
         boolean success = (boolean) responseBody.getOrDefault("success", false);
         return success ? ResponseEntity.ok(responseBody) : ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseBody);
@@ -65,24 +73,19 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegistrationRequest request,
                                                         HttpServletResponse response) {
+        userContextService.setupUserContext();
         Map<String, Object> responseBody = registrationService.registerUser(request, response);
         boolean success = (boolean) responseBody.getOrDefault("success", false);
         return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
     }
 
-    @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletResponse response) {
-        authenticationService.logoutUser(response);
-        return ResponseEntity.ok().build();
-    }
-
     @PostMapping("/resend-verification")
     public ResponseEntity<Map<String, Object>> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        userContextService.setupUserContext();
         String email = request.getEmail();
 
         // --- Hashing and User Lookup moved to Controller ---
-        String emailHash = hashingService.hashEmail(email);
-        Optional<User> userOpt = userRepository.findByEmailHash(emailHash);
+        Optional<User> userOpt = userRepository.findByEmail(email);
 
         if (userOpt.isEmpty()) {
             // User not found based on the provided email hash
@@ -114,6 +117,7 @@ public class AuthController {
 
     @GetMapping("/verify_registration")
     public ResponseEntity<Map<String, Object>> verifyAccount(@RequestParam("token") String token) {
+        userContextService.setupUserContext();
         Map<String, Object> responseBody = verificationService.verifyRegistrationToken(token);
         boolean success = (boolean) responseBody.getOrDefault("success", false);
         return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
@@ -123,6 +127,7 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, Object>> requestPasswordReset(
             @Valid @RequestBody PasswordResetRequest request) {
+        userContextService.setupUserContext();
         Map<String, Object> responseBody = passwordResetRequestService.requestPasswordReset(request.getEmail());
         boolean success = (boolean) responseBody.getOrDefault("success", false);
         return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
@@ -130,6 +135,7 @@ public class AuthController {
 
     @GetMapping("/reset-password/validate")
     public ResponseEntity<Map<String, Object>> validateResetToken(@RequestParam("token") String token) {
+        userContextService.setupUserContext();
         Map<String, Object> responseBody = passwordResetTokenValidationService.validatePasswordResetToken(token);
         boolean success = (boolean) responseBody.getOrDefault("success", false);
         return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
@@ -137,6 +143,7 @@ public class AuthController {
 
     @PostMapping("/reset-password")
     public ResponseEntity<Map<String, Object>> resetPassword(@Valid @RequestBody NewPasswordRequest request) {
+        userContextService.setupUserContext();
         Map<String, Object> responseBody = passwordResetService.resetPassword(request.getToken(), request.getPassword());
         boolean success = (boolean) responseBody.getOrDefault("success", false);
         return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);

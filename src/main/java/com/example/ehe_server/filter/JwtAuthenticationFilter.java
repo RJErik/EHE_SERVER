@@ -10,6 +10,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -18,9 +19,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Component
 @Order(2)
@@ -30,6 +31,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final LoggingServiceInterface loggingService;
     private final UserRepository userRepository;
     private final AuditContextService auditContextService;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
+    // Be more specific about protected paths - exact matching for endpoints
+    private static final List<String> PROTECTED_PATHS = List.of(
+            "/api/user/",
+            "/api/admin/"
+            // Add other protected paths
+    );
 
     public JwtAuthenticationFilter(
             JwtTokenValidatorInterface jwtTokenValidator,
@@ -46,13 +57,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Default audit context for unauthenticated requests
-        auditContextService.setCurrentUser("UNKNOWN");
-        auditContextService.setCurrentUserRole("NONE");
+        String path = request.getRequestURI();
+
+        // Set the request path in audit context (still useful)
         auditContextService.setRequestPath(request.getRequestURI());
 
         // Skip filter for public endpoints
-        String path = request.getRequestURI();
         if (path.startsWith("/api/auth/")) {
             filterChain.doFilter(request, response);
             return;
@@ -69,17 +79,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
 
+        boolean isAuthenticated = false;
         try {
-            // Validate token and set Authentication if valid
+            // Validate token and set Spring Security context if valid
             if (token != null && jwtTokenValidator.validateToken(token)) {
                 Long userId = jwtTokenValidator.getUserIdFromToken(token);
-                List<String> roles = jwtTokenValidator.getRolesFromToken(token);
+                String role = jwtTokenValidator.getRoleFromToken(token);
 
-                if (userId != null && !roles.isEmpty()) {
-                    // Convert roles to Spring Security authorities
-                    List<SimpleGrantedAuthority> authorities = roles.stream()
-                            .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
-                            .collect(Collectors.toList());
+                // Check if both userId and role are valid
+                if (userId != null && role != null && !role.trim().isEmpty()) {
+                    // Convert role to Spring Security authority
+                    String prefixedRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+
+                    List<SimpleGrantedAuthority> authorities = Collections.singletonList(
+                            new SimpleGrantedAuthority(prefixedRole)
+                    );
 
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
@@ -89,29 +103,45 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             );
                     SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                    // Set audit context
-                    auditContextService.setCurrentUser(userId.toString());
-                    auditContextService.setCurrentUserRole(String.join(",", roles));
+                    // IMPORTANT: No longer setting PostgreSQL context here
+                    // This will be handled by UserContextService at the controller level
 
-                    // Log access to restricted endpoints
+                    isAuthenticated = true;
+
+                    // Log access to significant endpoints
                     if (isSignificantEndpoint(path)) {
                         Optional<User> userOpt = userRepository.findById(userId.intValue());
                         if (userOpt.isPresent()) {
                             loggingService.logAction(userId.intValue(), userId.toString(), "Accessed " + path);
                         }
                     }
-                } else if (isSignificantEndpoint(path)) {
-                    loggingService.logAction(null, "unknown", "Invalid token contents in request to " + path);
                 }
-            } else if (token != null && isSignificantEndpoint(path)) {
-                loggingService.logAction(null, "unknown", "Invalid token in request to " + path);
             }
         } catch (Exception e) {
-            if (isSignificantEndpoint(path)) {
-                loggingService.logError(null, "unknown", "Error validating token for " + path, e);
-            }
+            loggingService.logError(null, "system", "Exception during authentication: " + e.getMessage(), e);
         }
 
+        // Check if this is a protected path
+        boolean needsAuthentication = false;
+
+        // Handle exact endpoints
+        if (path.equals("/api/user/verify") || path.equals("/api/admin/verify")) {
+            needsAuthentication = true;
+        } else {
+            // For other paths, check if they start with any protected path
+            needsAuthentication = PROTECTED_PATHS.stream()
+                    .anyMatch(path::startsWith);
+        }
+
+        // If protected path and not authenticated, redirect to login
+        if (needsAuthentication && !isAuthenticated) {
+            loggingService.logAction(null, "system", "Redirecting unauthenticated user from " + path + " to login page");
+            response.setStatus(HttpServletResponse.SC_FOUND); // 302 Found
+            response.setHeader("Location", frontendUrl);
+            return;
+        }
+
+        // Continue with filter chain
         filterChain.doFilter(request, response);
     }
 
@@ -119,6 +149,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private boolean isSignificantEndpoint(String path) {
         return path.startsWith("/api/admin/") ||
                 path.contains("/profile") ||
-                path.contains("/settings");
+                path.contains("/settings") ||
+                path.contains("/user");
     }
 }

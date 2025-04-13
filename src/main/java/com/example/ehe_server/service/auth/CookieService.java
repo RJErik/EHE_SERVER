@@ -16,7 +16,7 @@ public class CookieService implements CookieServiceInterface {
     public void createJwtCookie(String jwtToken, HttpServletResponse response) {
         Cookie cookie = new Cookie("jwt_token", jwtToken);
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
+        cookie.setSecure(false); //turn to true after development.
         cookie.setPath("/");
         cookie.setMaxAge((int) (jwtExpirationTime / 1000));
         cookie.setAttribute("SameSite", "Strict");
