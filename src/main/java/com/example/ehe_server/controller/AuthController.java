@@ -36,6 +36,7 @@ public class AuthController {
     private final PasswordResetServiceInterface passwordResetService;
     private final AuditContextService auditContextService;
     private final UserContextServiceInterface userContextService;
+    private final EmailChangeVerificationServiceInterface emailChangeVerificationService;
 
     public AuthController(
             LogInServiceInterface authenticationService,
@@ -47,7 +48,8 @@ public class AuthController {
             PasswordResetTokenValidationServiceInterface passwordResetTokenValidationService,
             PasswordResetServiceInterface passwordResetService,
             AuditContextService auditContextService,
-            UserContextServiceInterface userContextService) { // Inject UserRepository
+            UserContextServiceInterface userContextService,
+            EmailChangeVerificationServiceInterface emailChangeVerificationService) { // Inject UserRepository
         this.authenticationService = authenticationService;
         this.registrationService = registrationService;
         this.verificationService = verificationService;
@@ -58,6 +60,7 @@ public class AuthController {
         this.passwordResetService = passwordResetService;
         this.auditContextService = auditContextService;
         this.userContextService = userContextService;
+        this.emailChangeVerificationService = emailChangeVerificationService;
     }
 
     @PostMapping("/login")
@@ -145,6 +148,19 @@ public class AuthController {
     public ResponseEntity<Map<String, Object>> resetPassword(@Valid @RequestBody NewPasswordRequest request) {
         userContextService.setupUserContext();
         Map<String, Object> responseBody = passwordResetService.resetPassword(request.getToken(), request.getPassword());
+        boolean success = (boolean) responseBody.getOrDefault("success", false);
+        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+    }
+
+    @GetMapping("/verify-email-change")
+    public ResponseEntity<Map<String, Object>> verifyEmailChange(@RequestParam("token") String token) {
+        // Setup user context for the verification (anonymous is okay for this endpoint)
+        userContextService.setupUserContext();
+
+        // Call email change verification service
+        Map<String, Object> responseBody = emailChangeVerificationService.verifyEmailChange(token);
+
+        // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);
         return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
     }

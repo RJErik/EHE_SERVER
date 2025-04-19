@@ -177,4 +177,27 @@ public class EmailService implements EmailServiceInterface {
                 auditContextService.getCurrentUser(),
                 "Password reset email sent to: " + recipientEmail);
     }
+
+    @Override
+    public void sendEmailChangeVerificationEmail(User user, String token, String newEmail) {
+        // Set audit context for this operation
+        auditContextService.setCurrentUser(Integer.toString(user.getUserId()));
+
+        String subject = "Verify Email Change for Event Horizon Exchange";
+        String verificationUrl = frontendUrl + "/verify-email-change?token=" + token;
+        String text = "Dear " + user.getUserName() + ",\n\n"
+                + "We received a request to change your email address to this one. "
+                + "Please click the link below to verify this email address and complete the change:\n"
+                + verificationUrl + "\n\n"
+                + "This link will expire in " + tokenExpiryHours + " hours.\n\n"
+                + "If you did not request this change, please ignore this email or contact support if you have concerns.\n\n"
+                + "Regards,\nThe Event Horizon Exchange Team";
+        sendSimpleMessage(newEmail, subject, text);
+
+        loggingService.logAction(user.getUserId(),
+                auditContextService.getCurrentUser(),
+                "Email change verification email sent to: " + newEmail);
+    }
+
+
 }
