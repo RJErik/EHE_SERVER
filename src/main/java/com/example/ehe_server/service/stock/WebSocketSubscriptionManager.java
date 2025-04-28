@@ -1,0 +1,309 @@
+package com.example.ehe_server.service.stock;
+
+import com.example.ehe_server.dto.websocket.CandleDataResponse;
+import com.example.ehe_server.dto.websocket.CandleDataResponse.CandleData;
+import com.example.ehe_server.dto.websocket.CandleUpdateMessage;
+import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
+import com.example.ehe_server.service.intf.stock.MarketCandleServiceInterface;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+@Service
+public class WebSocketSubscriptionManager {
+
+    private static class Subscription {
+        private final String id;
+        private String platformName;
+        private String stockSymbol;
+        private String timeframe;
+        private LocalDateTime startDate;
+        private LocalDateTime endDate;
+        private final String destination;
+        private LocalDateTime lastUpdateTime;
+
+        // Track the latest candle for modification detection
+        private LocalDateTime latestCandleTimestamp;
+        private BigDecimal latestCandleOpen;
+        private BigDecimal latestCandleHigh;
+        private BigDecimal latestCandleLow;
+        private BigDecimal latestCandleClose;
+        private BigDecimal latestCandleVolume;
+
+        public Subscription(
+                String id,
+                String platformName,
+                String stockSymbol,
+                String timeframe,
+                LocalDateTime startDate,
+                LocalDateTime endDate,
+                String destination) {
+            this.id = id;
+            this.platformName = platformName;
+            this.stockSymbol = stockSymbol;
+            this.timeframe = timeframe;
+            this.startDate = startDate;
+            this.endDate = endDate;
+            this.destination = destination;
+            this.lastUpdateTime = LocalDateTime.now();
+        }
+
+        // Getters
+        public String getId() { return id; }
+        public String getPlatformName() { return platformName; }
+        public String getStockSymbol() { return stockSymbol; }
+        public String getTimeframe() { return timeframe; }
+        public LocalDateTime getStartDate() { return startDate; }
+        public LocalDateTime getEndDate() { return endDate; }
+        public String getDestination() { return destination; }
+        public LocalDateTime getLastUpdateTime() { return lastUpdateTime; }
+
+        public LocalDateTime getLatestCandleTimestamp() { return latestCandleTimestamp; }
+        public BigDecimal getLatestCandleOpen() { return latestCandleOpen; }
+        public BigDecimal getLatestCandleHigh() { return latestCandleHigh; }
+        public BigDecimal getLatestCandleLow() { return latestCandleLow; }
+        public BigDecimal getLatestCandleClose() { return latestCandleClose; }
+        public BigDecimal getLatestCandleVolume() { return latestCandleVolume; }
+
+        public void setLastUpdateTime(LocalDateTime lastUpdateTime) {
+            this.lastUpdateTime = lastUpdateTime;
+        }
+
+        public void updateTimeRange(LocalDateTime newStartDate, LocalDateTime newEndDate) {
+            if (newStartDate != null) {
+                this.startDate = newStartDate;
+            }
+            if (newEndDate != null) {
+                this.endDate = newEndDate;
+            }
+        }
+
+        public void updateLatestCandle(CandleData candle) {
+            if (candle != null) {
+                this.latestCandleTimestamp = candle.getTimestamp();
+                this.latestCandleOpen = candle.getOpenPrice();
+                this.latestCandleHigh = candle.getHighPrice();
+                this.latestCandleLow = candle.getLowPrice();
+                this.latestCandleClose = candle.getClosePrice();
+                this.latestCandleVolume = candle.getVolume();
+            }
+        }
+    }
+
+    private final MarketCandleServiceInterface marketCandleService;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final LoggingServiceInterface loggingService;
+    private final Map<String, Subscription> activeSubscriptions = new ConcurrentHashMap<>();
+
+    public WebSocketSubscriptionManager(
+            MarketCandleServiceInterface marketCandleService,
+            SimpMessagingTemplate messagingTemplate,
+            LoggingServiceInterface loggingService) {
+        this.marketCandleService = marketCandleService;
+        this.messagingTemplate = messagingTemplate;
+        this.loggingService = loggingService;
+    }
+
+    /**
+     * Create a new subscription and return its ID
+     */
+    public String createSubscription(
+            String platformName,
+            String stockSymbol,
+            String timeframe,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            String destination) {
+
+        String subscriptionId = UUID.randomUUID().toString();
+
+        Subscription subscription = new Subscription(
+                subscriptionId,
+                platformName,
+                stockSymbol,
+                timeframe,
+                startDate,
+                endDate,
+                destination);
+
+        activeSubscriptions.put(subscriptionId, subscription);
+
+        // Log subscription creation
+        loggingService.logAction(null, "system",
+                "Created candle data subscription: " + subscriptionId +
+                        " for " + platformName + ":" + stockSymbol + " " + timeframe);
+
+        // Send initial data
+        sendInitialData(subscription);
+
+        return subscriptionId;
+    }
+
+    /**
+     * Cancel a subscription
+     */
+    public boolean cancelSubscription(String subscriptionId) {
+        Subscription removed = activeSubscriptions.remove(subscriptionId);
+        if (removed != null) {
+            loggingService.logAction(null, "system",
+                    "Cancelled candle data subscription: " + subscriptionId);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Update a subscription's time range
+     */
+    public boolean updateSubscription(
+            String subscriptionId,
+            LocalDateTime newStartDate,
+            LocalDateTime newEndDate,
+            boolean resetData) {
+
+        Subscription subscription = activeSubscriptions.get(subscriptionId);
+        if (subscription == null) {
+            return false;
+        }
+
+        // Update time range
+        subscription.updateTimeRange(newStartDate, newEndDate);
+
+        // Log update
+        loggingService.logAction(null, "system",
+                "Updated subscription " + subscriptionId + " time range to " +
+                        subscription.getStartDate() + " - " + subscription.getEndDate());
+
+        // If requested, reset data and send fresh data
+        if (resetData) {
+            sendInitialData(subscription);
+        }
+
+        return true;
+    }
+
+    /**
+     * Send initial data for a new subscription
+     */
+    private void sendInitialData(Subscription subscription) {
+        try {
+            CandleDataResponse response = marketCandleService.getCandleData(
+                    subscription.getPlatformName(),
+                    subscription.getStockSymbol(),
+                    subscription.getTimeframe(),
+                    subscription.getStartDate(),
+                    subscription.getEndDate());
+
+            // If successful, update the latest candle info
+            if (response.isSuccess() && response.getCandles() != null && !response.getCandles().isEmpty()) {
+                // Update with the last candle in the list
+                subscription.updateLatestCandle(response.getCandles().get(response.getCandles().size() - 1));
+            }
+
+            // Send to the subscription destination
+            messagingTemplate.convertAndSend(subscription.getDestination(), response);
+
+        } catch (Exception e) {
+            loggingService.logError(null, "system",
+                    "Error sending initial data for subscription " +
+                            subscription.getId() + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Scheduled task to check for updates and send them to clients
+     * Runs every 10 seconds
+     */
+    @Scheduled(fixedRate = 10000)
+    public void checkForUpdatesAndSendHeartbeats() {
+        LocalDateTime now = LocalDateTime.now();
+
+        activeSubscriptions.values().forEach(subscription -> {
+            try {
+                List<CandleDataResponse.CandleData> updatedCandles = new ArrayList<>();
+                boolean hasUpdates = false;
+
+                // Check for new candles first
+                List<CandleDataResponse.CandleData> newCandles =
+                        marketCandleService.getUpdatedCandles(
+                                subscription.getPlatformName(),
+                                subscription.getStockSymbol(),
+                                subscription.getTimeframe(),
+                                subscription.getStartDate(),
+                                subscription.getEndDate(),
+                                subscription.getLastUpdateTime());
+
+                if (!newCandles.isEmpty()) {
+                    updatedCandles.addAll(newCandles);
+                    hasUpdates = true;
+
+                    // Update the latest candle info with the most recent candle
+                    subscription.updateLatestCandle(newCandles.get(newCandles.size() - 1));
+                }
+
+                // For non-1-minute timeframes, also check if the latest candle was modified
+                if (!marketCandleService.isOneMinuteTimeframe(subscription.getTimeframe()) &&
+                        subscription.getLatestCandleTimestamp() != null) {
+
+                    CandleData modifiedCandle = marketCandleService.getModifiedLatestCandle(
+                            subscription.getPlatformName(),
+                            subscription.getStockSymbol(),
+                            subscription.getTimeframe(),
+                            subscription.getLatestCandleTimestamp(),
+                            subscription.getLatestCandleOpen(),
+                            subscription.getLatestCandleHigh(),
+                            subscription.getLatestCandleLow(),
+                            subscription.getLatestCandleClose(),
+                            subscription.getLatestCandleVolume());
+
+                    if (modifiedCandle != null) {
+                        // Only add if not already included in new candles
+                        if (updatedCandles.stream().noneMatch(c ->
+                                c.getTimestamp().equals(modifiedCandle.getTimestamp()))) {
+                            updatedCandles.add(modifiedCandle);
+                            hasUpdates = true;
+                        }
+
+                        // Update the latest candle info
+                        subscription.updateLatestCandle(modifiedCandle);
+                    }
+                }
+
+                // Create update message
+                CandleUpdateMessage updateMessage = new CandleUpdateMessage();
+                updateMessage.setSubscriptionId(subscription.getId());
+                updateMessage.setUpdateTimestamp(now);
+
+                // If there are updates, send them
+                if (hasUpdates) {
+                    updateMessage.setUpdateType("UPDATE");
+                    updateMessage.setUpdatedCandles(updatedCandles);
+                    messagingTemplate.convertAndSend(subscription.getDestination(), updateMessage);
+                    subscription.setLastUpdateTime(now);
+
+                    loggingService.logAction(null, "system",
+                            "Sent " + updatedCandles.size() + " candle updates for subscription " +
+                                    subscription.getId());
+                } else {
+                    // Send heartbeat every 10 seconds even if there are no updates
+                    updateMessage.setUpdateType("HEARTBEAT");
+                    updateMessage.setUpdatedCandles(new ArrayList<>());
+                    messagingTemplate.convertAndSend(subscription.getDestination(), updateMessage);
+                }
+
+            } catch (Exception e) {
+                loggingService.logError(null, "system",
+                        "Error checking updates for subscription " +
+                                subscription.getId() + ": " + e.getMessage(), e);
+            }
+        });
+    }
+}

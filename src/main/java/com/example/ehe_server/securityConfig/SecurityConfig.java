@@ -34,12 +34,11 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // Add this line to register your filter BEFORE UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> {
-                    auth.requestMatchers("/api/auth/**").permitAll()
+                    auth.requestMatchers("/api/auth/**").permitAll() // Add /ws/** here
                             .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                            .requestMatchers("/api/user/**").hasRole("USER")
+                            .requestMatchers("/api/user/**", "/ws/**").hasRole("USER")
                             .anyRequest().authenticated();
                 })
                 .sessionManagement(session ->
@@ -49,6 +48,7 @@ public class SecurityConfig {
 
         return http.build();
     }
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();

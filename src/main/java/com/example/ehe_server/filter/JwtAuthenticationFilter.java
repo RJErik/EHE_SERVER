@@ -38,7 +38,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     // Be more specific about protected paths - exact matching for endpoints
     private static final List<String> PROTECTED_PATHS = List.of(
             "/api/user/",
-            "/api/admin/"
+            "/api/admin/",
+            "/candles/"
             // Add other protected paths
     );
 

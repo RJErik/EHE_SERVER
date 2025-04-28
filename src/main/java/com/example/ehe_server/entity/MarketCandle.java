@@ -1,6 +1,7 @@
 package com.example.ehe_server.entity;
 
 import jakarta.persistence.*;
+import jakarta.persistence.Converter;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -10,12 +11,44 @@ import java.time.LocalDateTime;
 public class MarketCandle {
 
     public enum Timeframe {
-        @Column(name = "1m") M1,
-        @Column(name = "5m") M5,
-        @Column(name = "15m") M15,
-        @Column(name = "1h") H1,
-        @Column(name = "4h") H4,
-        @Column(name = "1d") D1
+        M1("1m"),
+        M5("5m"),
+        M15("15m"),
+        H1("1h"),
+        H4("4h"),
+        D1("1d");
+
+        private final String value;
+
+        Timeframe(String value) {
+            this.value = value;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public static Timeframe fromValue(String value) {
+            for (Timeframe tf : Timeframe.values()) {
+                if (tf.getValue().equals(value)) {
+                    return tf;
+                }
+            }
+            throw new IllegalArgumentException("Unknown timeframe: " + value);
+        }
+    }
+
+    @Converter
+    public static class TimeframeConverter implements AttributeConverter<Timeframe, String> {
+        @Override
+        public String convertToDatabaseColumn(Timeframe attribute) {
+            return attribute == null ? null : attribute.getValue();
+        }
+
+        @Override
+        public Timeframe convertToEntityAttribute(String dbData) {
+            return dbData == null ? null : Timeframe.fromValue(dbData);
+        }
     }
 
     @Id
@@ -27,7 +60,7 @@ public class MarketCandle {
     @JoinColumn(name = "platform_stock_id", nullable = false)
     private PlatformStock platformStock;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = TimeframeConverter.class)
     @Column(name = "timeframe", nullable = false, length = 50)
     private Timeframe timeframe;
 

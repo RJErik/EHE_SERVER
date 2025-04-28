@@ -11,10 +11,10 @@ public class PlatformStock {
     @Column(name = "platform_stock_id")
     private Integer platformStockId;
 
-    @Column(name = "platform_name", nullable = false, unique = true, length = 100)
+    @Column(name = "platform_name", nullable = false, length = 100)
     private String platformName;
 
-    @Column(name = "stock_symbol", nullable = false, unique = true, length = 50)
+    @Column(name = "stock_symbol", nullable = false, length = 50)
     private String stockSymbol;
 
     // Getters and setters
