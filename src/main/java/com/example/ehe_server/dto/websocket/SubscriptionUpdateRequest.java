@@ -7,6 +7,7 @@ public class SubscriptionUpdateRequest {
     private LocalDateTime newStartDate;
     private LocalDateTime newEndDate;
     private Boolean resetData; // Whether to clear existing data and refetch
+    private String subscriptionType; // Added field for subscription type
 
     // Getters and setters
     public String getSubscriptionId() {
@@ -39,5 +40,13 @@ public class SubscriptionUpdateRequest {
 
     public void setResetData(Boolean resetData) {
         this.resetData = resetData;
+    }
+
+    public String getSubscriptionType() {
+        return subscriptionType;
+    }
+
+    public void setSubscriptionType(String subscriptionType) {
+        this.subscriptionType = subscriptionType;
     }
 }

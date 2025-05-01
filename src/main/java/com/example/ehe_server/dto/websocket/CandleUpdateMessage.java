@@ -5,6 +5,7 @@ import java.util.List;
 
 public class CandleUpdateMessage {
     private String subscriptionId;
+    private String subscriptionType; // Added field
     private String updateType; // "NEW", "UPDATE", "HEARTBEAT"
     private List<CandleDataResponse.CandleData> updatedCandles;
     private LocalDateTime updateTimestamp;
@@ -16,6 +17,14 @@ public class CandleUpdateMessage {
 
     public void setSubscriptionId(String subscriptionId) {
         this.subscriptionId = subscriptionId;
+    }
+
+    public String getSubscriptionType() {
+        return subscriptionType;
+    }
+
+    public void setSubscriptionType(String subscriptionType) {
+        this.subscriptionType = subscriptionType;
     }
 
     public String getUpdateType() {

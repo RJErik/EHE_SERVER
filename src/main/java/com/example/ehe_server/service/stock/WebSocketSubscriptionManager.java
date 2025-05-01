@@ -68,7 +68,7 @@ public class WebSocketSubscriptionManager {
         public LocalDateTime getEndDate() { return endDate; }
         public String getDestination() { return destination; }
         public LocalDateTime getLastUpdateTime() { return lastUpdateTime; }
-        public String getSubscriptionType() { return subscriptionType; } // New getter
+        public String getSubscriptionType() { return subscriptionType; } // Getter
 
         public LocalDateTime getLatestCandleTimestamp() { return latestCandleTimestamp; }
         public BigDecimal getLatestCandleOpen() { return latestCandleOpen; }
@@ -87,6 +87,12 @@ public class WebSocketSubscriptionManager {
             }
             if (newEndDate != null) {
                 this.endDate = newEndDate;
+            }
+        }
+
+        public void updateSubscriptionType(String newSubscriptionType) {
+            if (newSubscriptionType != null) {
+                this.subscriptionType = newSubscriptionType;
             }
         }
 
@@ -126,7 +132,7 @@ public class WebSocketSubscriptionManager {
             LocalDateTime startDate,
             LocalDateTime endDate,
             String destination,
-            String subscriptionType) { // Updated parameter list
+            String subscriptionType) {
 
         String subscriptionId = UUID.randomUUID().toString();
 
@@ -138,7 +144,7 @@ public class WebSocketSubscriptionManager {
                 startDate,
                 endDate,
                 destination,
-                subscriptionType); // Pass subscription type
+                subscriptionType);
 
         activeSubscriptions.put(subscriptionId, subscription);
 
@@ -168,13 +174,14 @@ public class WebSocketSubscriptionManager {
     }
 
     /**
-     * Update a subscription's time range
+     * Update a subscription's time range and type
      */
     public boolean updateSubscription(
             String subscriptionId,
             LocalDateTime newStartDate,
             LocalDateTime newEndDate,
-            boolean resetData) {
+            boolean resetData,
+            String newSubscriptionType) { // Added parameter
 
         Subscription subscription = activeSubscriptions.get(subscriptionId);
         if (subscription == null) {
@@ -184,10 +191,16 @@ public class WebSocketSubscriptionManager {
         // Update time range
         subscription.updateTimeRange(newStartDate, newEndDate);
 
+        // Update subscription type if provided
+        if (newSubscriptionType != null) {
+            subscription.updateSubscriptionType(newSubscriptionType);
+        }
+
         // Log update
         loggingService.logAction(null, "system",
                 "Updated subscription " + subscriptionId + " time range to " +
-                        subscription.getStartDate() + " - " + subscription.getEndDate());
+                        subscription.getStartDate() + " - " + subscription.getEndDate() +
+                        (newSubscriptionType != null ? " and type to " + newSubscriptionType : ""));
 
         // If requested, reset data and send fresh data
         if (resetData) {
@@ -195,6 +208,26 @@ public class WebSocketSubscriptionManager {
         }
 
         return true;
+    }
+
+    /**
+     * Legacy method to maintain backward compatibility
+     */
+    public boolean updateSubscription(
+            String subscriptionId,
+            LocalDateTime newStartDate,
+            LocalDateTime newEndDate,
+            boolean resetData) {
+
+        return updateSubscription(subscriptionId, newStartDate, newEndDate, resetData, null);
+    }
+
+    /**
+     * Get subscription type for a given ID
+     */
+    public String getSubscriptionType(String subscriptionId) {
+        Subscription subscription = activeSubscriptions.get(subscriptionId);
+        return subscription != null ? subscription.getSubscriptionType() : null;
     }
 
     /**
@@ -291,6 +324,7 @@ public class WebSocketSubscriptionManager {
                 // Create update message
                 CandleUpdateMessage updateMessage = new CandleUpdateMessage();
                 updateMessage.setSubscriptionId(subscription.getId());
+                updateMessage.setSubscriptionType(subscription.getSubscriptionType()); // Include subscription type
                 updateMessage.setUpdateTimestamp(now);
 
                 // If there are updates, send them
@@ -302,7 +336,9 @@ public class WebSocketSubscriptionManager {
 
                     loggingService.logAction(null, "system",
                             "Sent " + updatedCandles.size() + " candle updates for subscription " +
-                                    subscription.getId());
+                                    subscription.getId() +
+                                    (subscription.getSubscriptionType() != null ?
+                                            " (Type: " + subscription.getSubscriptionType() + ")" : ""));
                 } else {
                     // Send heartbeat every 10 seconds even if there are no updates
                     updateMessage.setUpdateType("HEARTBEAT");

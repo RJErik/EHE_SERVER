@@ -163,19 +163,27 @@ public class StockCandleWebSocketController {
                     "WebSocket subscription update request for " + request.getSubscriptionId() +
                             " with new date range: " +
                             (request.getNewStartDate() != null ? request.getNewStartDate() : "unchanged") + " to " +
-                            (request.getNewEndDate() != null ? request.getNewEndDate() : "unchanged"));
+                            (request.getNewEndDate() != null ? request.getNewEndDate() : "unchanged") +
+                            (request.getSubscriptionType() != null ? " and type: " + request.getSubscriptionType() : ""));
 
-            // Update subscription
+            // Update subscription with the new type
             boolean updated = subscriptionManager.updateSubscription(
                     request.getSubscriptionId(),
                     request.getNewStartDate(),
                     request.getNewEndDate(),
-                    request.getResetData() != null && request.getResetData());
+                    request.getResetData() != null && request.getResetData(),
+                    request.getSubscriptionType());  // Pass the subscription type
 
             if (updated) {
                 response.put("success", true);
                 response.put("message", "Subscription updated successfully");
                 response.put("subscriptionId", request.getSubscriptionId());
+
+                // Include the subscription type in the response
+                String subscriptionType = subscriptionManager.getSubscriptionType(request.getSubscriptionId());
+                if (subscriptionType != null) {
+                    response.put("subscriptionType", subscriptionType);
+                }
             } else {
                 response.put("success", false);
                 response.put("message", "Subscription not found: " + request.getSubscriptionId());
