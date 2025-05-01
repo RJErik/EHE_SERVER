@@ -8,6 +8,7 @@ public class CandleSubscriptionRequest {
     private String timeframe;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
+    private String subscriptionType; // Also add this to support frontend type differentiation
 
     // Getters and setters
     public String getPlatformName() {
@@ -48,5 +49,13 @@ public class CandleSubscriptionRequest {
 
     public void setEndDate(LocalDateTime endDate) {
         this.endDate = endDate;
+    }
+
+    public String getSubscriptionType() {
+        return subscriptionType;
+    }
+
+    public void setSubscriptionType(String subscriptionType) {
+        this.subscriptionType = subscriptionType;
     }
 }

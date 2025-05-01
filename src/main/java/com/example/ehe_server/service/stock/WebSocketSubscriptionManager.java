@@ -29,6 +29,7 @@ public class WebSocketSubscriptionManager {
         private LocalDateTime endDate;
         private final String destination;
         private LocalDateTime lastUpdateTime;
+        private String subscriptionType; // Added field
 
         // Track the latest candle for modification detection
         private LocalDateTime latestCandleTimestamp;
@@ -45,7 +46,8 @@ public class WebSocketSubscriptionManager {
                 String timeframe,
                 LocalDateTime startDate,
                 LocalDateTime endDate,
-                String destination) {
+                String destination,
+                String subscriptionType) { // Updated constructor
             this.id = id;
             this.platformName = platformName;
             this.stockSymbol = stockSymbol;
@@ -53,6 +55,7 @@ public class WebSocketSubscriptionManager {
             this.startDate = startDate;
             this.endDate = endDate;
             this.destination = destination;
+            this.subscriptionType = subscriptionType; // Store the subscription type
             this.lastUpdateTime = LocalDateTime.now();
         }
 
@@ -65,6 +68,7 @@ public class WebSocketSubscriptionManager {
         public LocalDateTime getEndDate() { return endDate; }
         public String getDestination() { return destination; }
         public LocalDateTime getLastUpdateTime() { return lastUpdateTime; }
+        public String getSubscriptionType() { return subscriptionType; } // New getter
 
         public LocalDateTime getLatestCandleTimestamp() { return latestCandleTimestamp; }
         public BigDecimal getLatestCandleOpen() { return latestCandleOpen; }
@@ -121,7 +125,8 @@ public class WebSocketSubscriptionManager {
             String timeframe,
             LocalDateTime startDate,
             LocalDateTime endDate,
-            String destination) {
+            String destination,
+            String subscriptionType) { // Updated parameter list
 
         String subscriptionId = UUID.randomUUID().toString();
 
@@ -132,14 +137,16 @@ public class WebSocketSubscriptionManager {
                 timeframe,
                 startDate,
                 endDate,
-                destination);
+                destination,
+                subscriptionType); // Pass subscription type
 
         activeSubscriptions.put(subscriptionId, subscription);
 
         // Log subscription creation
         loggingService.logAction(null, "system",
                 "Created candle data subscription: " + subscriptionId +
-                        " for " + platformName + ":" + stockSymbol + " " + timeframe);
+                        " for " + platformName + ":" + stockSymbol + " " + timeframe +
+                        (subscriptionType != null ? " (Type: " + subscriptionType + ")" : ""));
 
         // Send initial data
         sendInitialData(subscription);
@@ -201,6 +208,10 @@ public class WebSocketSubscriptionManager {
                     subscription.getTimeframe(),
                     subscription.getStartDate(),
                     subscription.getEndDate());
+
+            // Set the subscription ID and type in the response
+            response.setSubscriptionId(subscription.getId());
+            response.setSubscriptionType(subscription.getSubscriptionType());
 
             // If successful, update the latest candle info
             if (response.isSuccess() && response.getCandles() != null && !response.getCandles().isEmpty()) {

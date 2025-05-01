@@ -12,6 +12,8 @@ public class CandleDataResponse {
     private String timeframe;
     private List<CandleData> candles;
     private LocalDateTime lastUpdateTime;
+    private String subscriptionId; // Add this field
+    private String subscriptionType; // Also add this to support frontend type differentiation
 
     // Inner class for candle data
     public static class CandleData {
@@ -128,5 +130,21 @@ public class CandleDataResponse {
 
     public void setLastUpdateTime(LocalDateTime lastUpdateTime) {
         this.lastUpdateTime = lastUpdateTime;
+    }
+
+    public String getSubscriptionId() {
+        return subscriptionId;
+    }
+
+    public void setSubscriptionId(String subscriptionId) {
+        this.subscriptionId = subscriptionId;
+    }
+
+    public String getSubscriptionType() {
+        return subscriptionType;
+    }
+
+    public void setSubscriptionType(String subscriptionType) {
+        this.subscriptionType = subscriptionType;
     }
 }

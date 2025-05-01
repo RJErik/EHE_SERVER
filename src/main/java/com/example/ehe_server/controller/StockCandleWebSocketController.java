@@ -46,7 +46,8 @@ public class StockCandleWebSocketController {
                     userId != null ? userId.toString() : "anonymous",
                     "WebSocket subscription request for " +
                             request.getPlatformName() + ":" + request.getStockSymbol() +
-                            " " + request.getTimeframe());
+                            " " + request.getTimeframe() +
+                            (request.getSubscriptionType() != null ? " (Type: " + request.getSubscriptionType() + ")" : ""));
 
             // Validate request
             if (request.getPlatformName() == null || request.getStockSymbol() == null ||
@@ -65,12 +66,14 @@ public class StockCandleWebSocketController {
                     request.getTimeframe(),
                     request.getStartDate(),
                     request.getEndDate(),
-                    "/user/" + userId + "/queue/candles");
+                    "/user/" + userId + "/queue/candles",
+                    request.getSubscriptionType());
 
             // Return subscription details
             response.put("success", true);
             response.put("subscriptionId", subscriptionId);
             response.put("message", "Subscription created successfully");
+            response.put("subscriptionType", request.getSubscriptionType());
 
         } catch (Exception e) {
             loggingService.logError(null, "system",
@@ -116,9 +119,11 @@ public class StockCandleWebSocketController {
             if (cancelled) {
                 response.put("success", true);
                 response.put("message", "Subscription cancelled successfully");
+                response.put("subscriptionId", subscriptionId);
             } else {
                 response.put("success", false);
                 response.put("message", "Subscription not found: " + subscriptionId);
+                response.put("subscriptionId", subscriptionId);
             }
 
         } catch (Exception e) {
@@ -170,9 +175,11 @@ public class StockCandleWebSocketController {
             if (updated) {
                 response.put("success", true);
                 response.put("message", "Subscription updated successfully");
+                response.put("subscriptionId", request.getSubscriptionId());
             } else {
                 response.put("success", false);
                 response.put("message", "Subscription not found: " + request.getSubscriptionId());
+                response.put("subscriptionId", request.getSubscriptionId());
             }
 
         } catch (Exception e) {

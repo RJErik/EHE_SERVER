@@ -159,6 +159,7 @@ public class MarketCandleService implements MarketCandleServiceInterface {
         return response;
     }
 
+
     @Override
     public List<CandleData> getUpdatedCandles(
             String platformName,
