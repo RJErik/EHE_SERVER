@@ -1,12 +1,19 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.dto.ApiKeyAddRequest;
+import com.example.ehe_server.dto.ApiKeyDeleteRequest;
+import com.example.ehe_server.dto.ApiKeyUpdateRequest;
 import com.example.ehe_server.dto.EmailChangeRequest;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.intf.user.ApiKeyAddServiceInterface;
+import com.example.ehe_server.service.intf.user.ApiKeyDeleteServiceInterface;
+import com.example.ehe_server.service.intf.user.ApiKeyListServiceInterface;
+import com.example.ehe_server.service.intf.user.ApiKeyUpdateServiceInterface;
 import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
-import com.example.ehe_server.service.intf.user.*;
 import com.example.ehe_server.service.intf.auth.PasswordResetRequestServiceInterface;
+import com.example.ehe_server.service.intf.user.*;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -30,17 +37,26 @@ public class UserController {
     private final UserInfoServiceInterface userInfoService;
     private final UserDeactivationServiceInterface userDeactivationService;
     private final EmailChangeRequestServiceInterface emailChangeRequestService;
+    private final ApiKeyAddServiceInterface apiKeyAddService;
+    private final ApiKeyUpdateServiceInterface apiKeyUpdateService;
+    private final ApiKeyDeleteServiceInterface apiKeyDeleteService;
+    private final ApiKeyListServiceInterface apiKeyListService;
 
-    public UserController(UserValidationServiceInterface userValidationService,
-                          UserLogoutServiceInterface userLogoutService,
-                          AuditContextService auditContextService,
-                          UserContextServiceInterface userContextService,
-                          UserRepository userRepository,
-                          PasswordResetRequestServiceInterface passwordResetRequestService,
-                          JwtTokenRenewalServiceInterface jwtTokenRenewalService,
-                          UserInfoServiceInterface userInfoService,
-                          UserDeactivationServiceInterface userDeactivationService,
-                          EmailChangeRequestServiceInterface emailChangeRequestService) {
+    public UserController(
+            UserValidationServiceInterface userValidationService,
+            UserLogoutServiceInterface userLogoutService,
+            AuditContextService auditContextService,
+            UserContextServiceInterface userContextService,
+            UserRepository userRepository,
+            PasswordResetRequestServiceInterface passwordResetRequestService,
+            JwtTokenRenewalServiceInterface jwtTokenRenewalService,
+            UserInfoServiceInterface userInfoService,
+            UserDeactivationServiceInterface userDeactivationService,
+            EmailChangeRequestServiceInterface emailChangeRequestService,
+            ApiKeyAddServiceInterface apiKeyAddService,
+            ApiKeyUpdateServiceInterface apiKeyUpdateService,
+            ApiKeyDeleteServiceInterface apiKeyDeleteService,
+            ApiKeyListServiceInterface apiKeyListService) {
         this.userValidationService = userValidationService;
         this.userLogoutService = userLogoutService;
         this.auditContextService = auditContextService;
@@ -51,6 +67,10 @@ public class UserController {
         this.userInfoService = userInfoService;
         this.userDeactivationService = userDeactivationService;
         this.emailChangeRequestService = emailChangeRequestService;
+        this.apiKeyAddService = apiKeyAddService;
+        this.apiKeyUpdateService = apiKeyUpdateService;
+        this.apiKeyDeleteService = apiKeyDeleteService;
+        this.apiKeyListService = apiKeyListService;
     }
 
     @GetMapping("/verify")
@@ -163,6 +183,73 @@ public class UserController {
 
         // Call email change request service
         Map<String, Object> responseBody = emailChangeRequestService.requestEmailChange(userId, request.getNewEmail());
+
+        // Return appropriate response
+        boolean success = (boolean) responseBody.getOrDefault("success", false);
+        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+    }
+
+    // API Key Management Endpoints
+
+    @GetMapping("/api-keys")
+    public ResponseEntity<Map<String, Object>> listApiKeys() {
+        // Setup the user context from Spring Security
+        userContextService.setupUserContext();
+
+        // Get the current user ID from the audit context
+        Long userId = Long.parseLong(auditContextService.getCurrentUser());
+
+        // Call API key list service
+        Map<String, Object> responseBody = apiKeyListService.listApiKeys(userId);
+
+        // Return appropriate response
+        boolean success = (boolean) responseBody.getOrDefault("success", false);
+        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+    }
+
+    @PostMapping("/api-keys")
+    public ResponseEntity<Map<String, Object>> addApiKey(@Valid @RequestBody ApiKeyAddRequest request) {
+        // Setup the user context from Spring Security
+        userContextService.setupUserContext();
+
+        // Get the current user ID from the audit context
+        Long userId = Long.parseLong(auditContextService.getCurrentUser());
+
+        // Call API key add service
+        Map<String, Object> responseBody = apiKeyAddService.addApiKey(userId, request.getPlatformName(), request.getApiKeyValue());
+
+        // Return appropriate response
+        boolean success = (boolean) responseBody.getOrDefault("success", false);
+        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+    }
+
+    @PutMapping("/api-keys")
+    public ResponseEntity<Map<String, Object>> updateApiKey(@Valid @RequestBody ApiKeyUpdateRequest request) {
+        // Setup the user context from Spring Security
+        userContextService.setupUserContext();
+
+        // Get the current user ID from the audit context
+        Long userId = Long.parseLong(auditContextService.getCurrentUser());
+
+        // Call API key update service
+        Map<String, Object> responseBody = apiKeyUpdateService.updateApiKey(
+                userId, request.getApiKeyId(), request.getPlatformName(), request.getApiKeyValue());
+
+        // Return appropriate response
+        boolean success = (boolean) responseBody.getOrDefault("success", false);
+        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+    }
+
+    @DeleteMapping("/api-keys")
+    public ResponseEntity<Map<String, Object>> deleteApiKey(@Valid @RequestBody ApiKeyDeleteRequest request) {
+        // Setup the user context from Spring Security
+        userContextService.setupUserContext();
+
+        // Get the current user ID from the audit context
+        Long userId = Long.parseLong(auditContextService.getCurrentUser());
+
+        // Call API key delete service
+        Map<String, Object> responseBody = apiKeyDeleteService.deleteApiKey(userId, request.getApiKeyId());
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);
