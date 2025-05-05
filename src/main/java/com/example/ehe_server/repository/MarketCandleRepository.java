@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MarketCandleRepository extends JpaRepository<MarketCandle, Integer> {
@@ -22,4 +23,9 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
     MarketCandle findTopByPlatformStockAndTimeframeOrderByTimestampDesc(
             PlatformStock platformStock,
             Timeframe timeframe);
+
+    Optional<MarketCandle> findByPlatformStockAndTimeframeAndTimestampEquals(
+            PlatformStock platformStock,
+            MarketCandle.Timeframe timeframe,
+            LocalDateTime timestamp);
 }
