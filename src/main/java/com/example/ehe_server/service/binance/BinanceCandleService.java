@@ -382,31 +382,76 @@ public class BinanceCandleService {
                 groupedCandles.get(timeframeStart).add(candle);
             }
 
-            // Process each group to create aggregated candles
-            List<MarketCandle> aggregatedCandles = new ArrayList<>();
+            // Process each group to create or update aggregated candles
+            List<MarketCandle> candles = new ArrayList<>();
 
             for (Map.Entry<LocalDateTime, List<MarketCandle>> entry : groupedCandles.entrySet()) {
                 LocalDateTime timeframeStart = entry.getKey();
                 List<MarketCandle> candlesInPeriod = entry.getValue();
 
-                // Only create aggregated candle if we have enough data
-                if (candlesInPeriod.size() > 0) {
-                    MarketCandle aggregated = createAggregatedCandle(
-                            stock, timeframe, timeframeStart, candlesInPeriod);
-                    aggregatedCandles.add(aggregated);
+                // Only process if we have candles in this period
+                if (!candlesInPeriod.isEmpty()) {
+                    // Check if an aggregate candle already exists
+                    MarketCandle candle = candleRepository
+                            .findByPlatformStockAndTimeframeAndTimestampEquals(
+                                    stock, timeframe, timeframeStart)
+                            .orElse(null);
+
+                    if (candle == null) {
+                        // Create new candle
+                        candle = createAggregatedCandle(stock, timeframe, timeframeStart, candlesInPeriod);
+                    } else {
+                        // Update existing candle with new data
+                        updateExistingCandle(candle, candlesInPeriod);
+                    }
+
+                    candles.add(candle);
                 }
             }
 
-            // Save aggregated candles
-            if (!aggregatedCandles.isEmpty()) {
-                candleRepository.saveAll(aggregatedCandles);
-                loggingService.logAction(null, "System", "Saved " + aggregatedCandles.size() +
-                        " aggregated candles for timeframe " + timeframe);
+            // Save all candles
+            if (!candles.isEmpty()) {
+                candleRepository.saveAll(candles);
+                loggingService.logAction(null, "System", "Saved/updated " + candles.size() +
+                        " candles for timeframe " + timeframe);
             }
         } catch (Exception e) {
             loggingService.logError(null, "System", "Error aggregating candles to timeframe " +
                     timeframe + ": " + e.getMessage(), e);
         }
+    }
+
+    private void updateExistingCandle(MarketCandle existingCandle, List<MarketCandle> minuteCandles) {
+        // Sort candles by timestamp to ensure correct order
+        minuteCandles.sort(Comparator.comparing(MarketCandle::getTimestamp));
+
+        // Update high if needed
+        BigDecimal newHigh = minuteCandles.stream()
+                .map(MarketCandle::getHighPrice)
+                .max(BigDecimal::compareTo)
+                .orElse(BigDecimal.ZERO);
+
+        if (newHigh.compareTo(existingCandle.getHighPrice()) > 0) {
+            existingCandle.setHighPrice(newHigh);
+        }
+
+        // Update low if needed
+        BigDecimal newLow = minuteCandles.stream()
+                .map(MarketCandle::getLowPrice)
+                .min(BigDecimal::compareTo)
+                .orElse(BigDecimal.ZERO);
+
+        if (newLow.compareTo(existingCandle.getLowPrice()) < 0) {
+            existingCandle.setLowPrice(newLow);
+        }
+
+        // Always update close to the latest
+        existingCandle.setClosePrice(minuteCandles.get(minuteCandles.size() - 1).getClosePrice());
+
+        // Don't update open (it should be from the first candle in the period)
+        // For volume, we'd need to be careful about double-counting
+        // This is a simplified approach - a more accurate solution would involve
+        // tracking which minute candles have been included in the aggregate
     }
 
     private LocalDateTime calculateTimeframeStart(LocalDateTime time, int minutes) {
