@@ -9,6 +9,9 @@ public class ApiKeyAddRequest {
     @NotBlank(message = "API key value is required")
     private String apiKeyValue;
 
+    @NotBlank(message = "Secret key value is required")
+    private String secretKey;
+
     // Getters and setters
     public String getPlatformName() {
         return platformName;
@@ -24,5 +27,13 @@ public class ApiKeyAddRequest {
 
     public void setApiKeyValue(String apiKeyValue) {
         this.apiKeyValue = apiKeyValue;
+    }
+
+    public String getSecretKey() {
+        return secretKey;
+    }
+
+    public void setSecretKey(String secretKey) {
+        this.secretKey = secretKey;
     }
 }

@@ -75,6 +75,13 @@ public class ApiKeyListService implements ApiKeyListServiceInterface {
                 String maskedValue = maskApiKeyValue(apiKeyValue);
                 dto.setMaskedApiKeyValue(maskedValue);
 
+                // Mask the secret key value if it exists - same masking approach
+                if (apiKey.getSecretKeyEncrypt() != null && !apiKey.getSecretKeyEncrypt().isEmpty()) {
+                    String secretKeyValue = apiKey.getSecretKeyEncrypt();
+                    String maskedSecretKey = maskApiKeyValue(secretKeyValue);
+                    dto.setMaskedSecretKey(maskedSecretKey);
+                }
+
                 apiKeyDtos.add(dto);
             }
 

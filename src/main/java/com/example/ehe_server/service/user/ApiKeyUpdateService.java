@@ -39,7 +39,7 @@ public class ApiKeyUpdateService implements ApiKeyUpdateServiceInterface {
 
     @Override
     @Transactional
-    public Map<String, Object> updateApiKey(Long userId, Integer apiKeyId, String platformName, String apiKeyValue) {
+    public Map<String, Object> updateApiKey(Long userId, Integer apiKeyId, String platformName, String apiKeyValue, String secretKey) {
         Map<String, Object> response = new HashMap<>();
 
         try {
@@ -87,7 +87,16 @@ public class ApiKeyUpdateService implements ApiKeyUpdateServiceInterface {
             // Update the API key
             ApiKey apiKey = apiKeyOpt.get();
             apiKey.setPlatformName(platformName);
-            apiKey.setApiKeyValueEncrypt(apiKeyValue); // Not encrypting for now as specified
+
+            // Only update API key value if provided
+            if (apiKeyValue != null && !apiKeyValue.isEmpty()) {
+                apiKey.setApiKeyValueEncrypt(apiKeyValue);
+            }
+
+            // Only update secret key if provided
+            if (secretKey != null && !secretKey.isEmpty()) {
+                apiKey.setSecretKeyEncrypt(secretKey);
+            }
 
             apiKeyRepository.save(apiKey);
 

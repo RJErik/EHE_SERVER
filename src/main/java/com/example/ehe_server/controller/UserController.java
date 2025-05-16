@@ -215,8 +215,9 @@ public class UserController {
         // Get the current user ID from the audit context
         Long userId = Long.parseLong(auditContextService.getCurrentUser());
 
-        // Call API key add service
-        Map<String, Object> responseBody = apiKeyAddService.addApiKey(userId, request.getPlatformName(), request.getApiKeyValue());
+        // Call API key add service with secret key
+        Map<String, Object> responseBody = apiKeyAddService.addApiKey(
+                userId, request.getPlatformName(), request.getApiKeyValue(), request.getSecretKey());
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);
@@ -231,9 +232,10 @@ public class UserController {
         // Get the current user ID from the audit context
         Long userId = Long.parseLong(auditContextService.getCurrentUser());
 
-        // Call API key update service
+        // Call API key update service with secret key
         Map<String, Object> responseBody = apiKeyUpdateService.updateApiKey(
-                userId, request.getApiKeyId(), request.getPlatformName(), request.getApiKeyValue());
+                userId, request.getApiKeyId(), request.getPlatformName(),
+                request.getApiKeyValue(), request.getSecretKey());
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);

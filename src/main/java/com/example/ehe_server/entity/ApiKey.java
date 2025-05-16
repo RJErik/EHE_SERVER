@@ -22,6 +22,9 @@ public class ApiKey {
     @Column(name = "api_key_value_encrypt", nullable = false)
     private String apiKeyValueEncrypt;
 
+    @Column(name = "secret_key_encrypt")
+    private String secretKeyEncrypt;
+
     @Column(name = "date_added", nullable = false,
             updatable = false, insertable = false,
             columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
@@ -58,6 +61,14 @@ public class ApiKey {
 
     public void setApiKeyValueEncrypt(String apiKeyValueEncrypt) {
         this.apiKeyValueEncrypt = apiKeyValueEncrypt;
+    }
+
+    public String getSecretKeyEncrypt() {
+        return secretKeyEncrypt;
+    }
+
+    public void setSecretKeyEncrypt(String secretKeyEncrypt) {
+        this.secretKeyEncrypt = secretKeyEncrypt;
     }
 
     public LocalDateTime getDateAdded() {

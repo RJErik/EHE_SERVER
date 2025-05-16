@@ -39,7 +39,7 @@ public class ApiKeyAddService implements ApiKeyAddServiceInterface {
 
     @Override
     @Transactional
-    public Map<String, Object> addApiKey(Long userId, String platformName, String apiKeyValue) {
+    public Map<String, Object> addApiKey(Long userId, String platformName, String apiKeyValue, String secretKey) {
         Map<String, Object> response = new HashMap<>();
 
         try {
@@ -79,6 +79,7 @@ public class ApiKeyAddService implements ApiKeyAddServiceInterface {
             apiKey.setUser(user);
             apiKey.setPlatformName(platformName);
             apiKey.setApiKeyValueEncrypt(apiKeyValue); // Not encrypting for now as specified
+            apiKey.setSecretKeyEncrypt(secretKey); // Add the secret key
 
             apiKeyRepository.save(apiKey);
 

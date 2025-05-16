@@ -4,6 +4,7 @@ public class ApiKeyDto {
     private Integer apiKeyId;
     private String platformName;
     private String maskedApiKeyValue;
+    private String maskedSecretKey;
 
     // Getters and setters
     public Integer getApiKeyId() {
@@ -28,5 +29,13 @@ public class ApiKeyDto {
 
     public void setMaskedApiKeyValue(String maskedApiKeyValue) {
         this.maskedApiKeyValue = maskedApiKeyValue;
+    }
+
+    public String getMaskedSecretKey() {
+        return maskedSecretKey;
+    }
+
+    public void setMaskedSecretKey(String maskedSecretKey) {
+        this.maskedSecretKey = maskedSecretKey;
     }
 }
