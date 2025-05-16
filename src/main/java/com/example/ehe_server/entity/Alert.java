@@ -41,7 +41,7 @@ public class Alert {
     private LocalDateTime dateCreated;
 
     @Column(name = "is_active", nullable = false)
-    private boolean isActive;
+    private boolean active;
 
     // Getters and setters
     public Integer getAlertId() {
@@ -93,10 +93,10 @@ public class Alert {
     }
 
     public boolean isActive() {
-        return isActive;
+        return active;
     }
 
     public void setActive(boolean active) {
-        isActive = active;
+        this.active = active;
     }
 }
