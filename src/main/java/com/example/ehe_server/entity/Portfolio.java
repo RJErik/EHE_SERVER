@@ -21,6 +21,10 @@ public class Portfolio {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @OneToOne
+    @JoinColumn(name = "api_key_id")
+    private ApiKey apiKey;
+
     @Size(max = 100)
     @NotBlank
     @Column(name = "portfolio_name", nullable = false, length = 100)
@@ -49,6 +53,14 @@ public class Portfolio {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public ApiKey getApiKey() {
+        return apiKey;
+    }
+
+    public void setApiKey(ApiKey apiKey) {
+        this.apiKey = apiKey;
     }
 
     public String getPortfolioName() {

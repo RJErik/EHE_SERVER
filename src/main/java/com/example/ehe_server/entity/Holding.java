@@ -26,11 +26,6 @@ public class Holding {
     @Column(name = "quantity", nullable = false, precision = 18, scale = 8)
     private BigDecimal quantity;
 
-    @DecimalMin(value = "0.00000001", inclusive = false)
-    @Digits(integer = 10, fraction = 8)
-    @Column(name = "purchase_price", nullable = false, precision = 18, scale = 8)
-    private BigDecimal purchasePrice;
-
     // Getters and setters
     public Integer getHoldingId() {
         return holdingId;
@@ -62,13 +57,5 @@ public class Holding {
 
     public void setQuantity(BigDecimal quantity) {
         this.quantity = quantity;
-    }
-
-    public BigDecimal getPurchasePrice() {
-        return purchasePrice;
-    }
-
-    public void setPurchasePrice(BigDecimal purchasePrice) {
-        this.purchasePrice = purchasePrice;
     }
 }
