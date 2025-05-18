@@ -2,6 +2,7 @@ package com.example.ehe_server.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -33,6 +34,9 @@ public class Portfolio {
     @Enumerated(EnumType.STRING)
     @Column(name = "portfolio_type", nullable = false, length = 50)
     private PortfolioType portfolioType;
+
+    @Column(name = "reserved_cash", precision = 18, scale = 8)
+    private BigDecimal reservedCash;
 
     @Column(name = "creation_date", nullable = false, updatable = false,
             columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
@@ -77,6 +81,14 @@ public class Portfolio {
 
     public void setPortfolioType(PortfolioType portfolioType) {
         this.portfolioType = portfolioType;
+    }
+
+    public BigDecimal getReservedCash() {
+        return reservedCash;
+    }
+
+    public void setReservedCash(BigDecimal reservedCash) {
+        this.reservedCash = reservedCash;
     }
 
     public LocalDateTime getCreationDate() {
