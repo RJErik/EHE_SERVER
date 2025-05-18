@@ -4,6 +4,7 @@ import com.example.ehe_server.dto.PortfolioCreateRequest;
 import com.example.ehe_server.dto.PortfolioDeleteRequest;
 import com.example.ehe_server.dto.PortfolioSearchRequest;
 import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
+import com.example.ehe_server.service.intf.portfolio.PortfolioDetailsServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioSearchServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioValueServiceInterface;
@@ -19,16 +20,19 @@ public class PortfolioController {
     private final PortfolioServiceInterface portfolioService;
     private final PortfolioSearchServiceInterface portfolioSearchService;
     private final PortfolioValueServiceInterface portfolioValueService;
+    private final PortfolioDetailsServiceInterface portfolioDetailsService;
     private final UserContextServiceInterface userContextService;
 
     public PortfolioController(
             PortfolioServiceInterface portfolioService,
             PortfolioSearchServiceInterface portfolioSearchService,
             PortfolioValueServiceInterface portfolioValueService,
+            PortfolioDetailsServiceInterface portfolioDetailsService,
             UserContextServiceInterface userContextService) {
         this.portfolioService = portfolioService;
         this.portfolioSearchService = portfolioSearchService;
         this.portfolioValueService = portfolioValueService;
+        this.portfolioDetailsService = portfolioDetailsService;
         this.userContextService = userContextService;
     }
 
@@ -141,6 +145,25 @@ public class PortfolioController {
 
         // Call portfolio value service to calculate value
         Map<String, Object> responseBody = portfolioValueService.calculatePortfolioValue(portfolioId);
+
+        // Return appropriate response
+        boolean success = (boolean) responseBody.getOrDefault("success", false);
+        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+    }
+
+    /**
+     * Endpoint to get detailed information about a portfolio
+     *
+     * @param portfolioId ID of the portfolio to get details for
+     * @return Success status and detailed portfolio information including holdings
+     */
+    @GetMapping("/portfolio/{portfolioId}/details")
+    public ResponseEntity<Map<String, Object>> getPortfolioDetails(@PathVariable Integer portfolioId) {
+        // Setup the user context from Spring Security
+        userContextService.setupUserContext();
+
+        // Call portfolio details service
+        Map<String, Object> responseBody = portfolioDetailsService.getPortfolioDetails(portfolioId);
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);
