@@ -1,9 +1,13 @@
 package com.example.ehe_server.controller;
 
 import com.example.ehe_server.dto.PlatformRequest;
+import com.example.ehe_server.dto.TradeRequest;
+import com.example.ehe_server.dto.TradingCapacityRequest;
 import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.stock.PlatformServiceInterface;
 import com.example.ehe_server.service.intf.stock.StockServiceInterface;
+import com.example.ehe_server.service.intf.trade.TradingCapacityServiceInterface;
+import com.example.ehe_server.service.intf.trade.TradingServiceInterface;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,14 +20,20 @@ public class StockController {
     private final PlatformServiceInterface platformService;
     private final StockServiceInterface stockService;
     private final UserContextServiceInterface userContextService;
+    private final TradingCapacityServiceInterface tradingCapacityService;
+    private final TradingServiceInterface tradingService;
 
     public StockController(
             PlatformServiceInterface platformService,
             StockServiceInterface stockService,
-            UserContextServiceInterface userContextService) {
+            UserContextServiceInterface userContextService,
+            TradingCapacityServiceInterface tradingCapacityService,
+            TradingServiceInterface tradingService) {
         this.platformService = platformService;
         this.stockService = stockService;
         this.userContextService = userContextService;
+        this.tradingCapacityService = tradingCapacityService;
+        this.tradingService = tradingService;
     }
 
     /**
@@ -58,6 +68,51 @@ public class StockController {
 
         // Call stock service with the platform from request body
         Map<String, Object> responseBody = stockService.getStocksByPlatform(request.getPlatform());
+
+        // Return appropriate response
+        boolean success = (boolean) responseBody.getOrDefault("success", false);
+        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+    }
+
+    /**
+     * Endpoint to retrieve trading capacity for a specific stock in a portfolio
+     * Updates holdings from exchange API and returns current capacity
+     *
+     * @param request Contains the portfolio ID and stock symbol
+     * @return Trading capacity details including current holdings and maximum buy/sell quantities
+     */
+    @PostMapping("/trading-capacity")
+    public ResponseEntity<Map<String, Object>> getTradingCapacity(@RequestBody TradingCapacityRequest request) {
+        // Setup the user context from Spring Security
+        userContextService.setupUserContext();
+
+        // Call the trading capacity service
+        Map<String, Object> responseBody = tradingCapacityService.getTradingCapacity(
+                request.getPortfolioId(), request.getStockSymbol());
+
+        // Return appropriate response
+        boolean success = (boolean) responseBody.getOrDefault("success", false);
+        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+    }
+
+    /**
+     * Endpoint to execute a market order (buy or sell)
+     *
+     * @param request Contains portfolio ID, stock symbol, action (BUY/SELL), amount, and quantity type
+     * @return Order details and success status
+     */
+    @PostMapping("/trade")
+    public ResponseEntity<Map<String, Object>> executeMarketOrder(@RequestBody TradeRequest request) {
+        // Setup the user context from Spring Security
+        userContextService.setupUserContext();
+
+        // Call the trading service
+        Map<String, Object> responseBody = tradingService.executeMarketOrder(
+                request.getPortfolioId(),
+                request.getStockSymbol(),
+                request.getAction(),
+                request.getAmount(),
+                request.getQuantityType());
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);

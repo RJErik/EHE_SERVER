@@ -1,13 +1,11 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.dto.PortfolioByPlatformRequest;
 import com.example.ehe_server.dto.PortfolioCreateRequest;
 import com.example.ehe_server.dto.PortfolioDeleteRequest;
 import com.example.ehe_server.dto.PortfolioSearchRequest;
 import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
-import com.example.ehe_server.service.intf.portfolio.PortfolioDetailsServiceInterface;
-import com.example.ehe_server.service.intf.portfolio.PortfolioSearchServiceInterface;
-import com.example.ehe_server.service.intf.portfolio.PortfolioServiceInterface;
-import com.example.ehe_server.service.intf.portfolio.PortfolioValueServiceInterface;
+import com.example.ehe_server.service.intf.portfolio.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,18 +20,21 @@ public class PortfolioController {
     private final PortfolioValueServiceInterface portfolioValueService;
     private final PortfolioDetailsServiceInterface portfolioDetailsService;
     private final UserContextServiceInterface userContextService;
+    private final PortfolioByPlatformServiceInterface portfolioByPlatformServiceInterface;
 
     public PortfolioController(
             PortfolioServiceInterface portfolioService,
             PortfolioSearchServiceInterface portfolioSearchService,
             PortfolioValueServiceInterface portfolioValueService,
             PortfolioDetailsServiceInterface portfolioDetailsService,
-            UserContextServiceInterface userContextService) {
+            UserContextServiceInterface userContextService,
+            PortfolioByPlatformServiceInterface portfolioByPlatformServiceInterface) {
         this.portfolioService = portfolioService;
         this.portfolioSearchService = portfolioSearchService;
         this.portfolioValueService = portfolioValueService;
         this.portfolioDetailsService = portfolioDetailsService;
         this.userContextService = userContextService;
+        this.portfolioByPlatformServiceInterface = portfolioByPlatformServiceInterface;
     }
 
     /**
@@ -164,6 +165,19 @@ public class PortfolioController {
 
         // Call portfolio details service
         Map<String, Object> responseBody = portfolioDetailsService.getPortfolioDetails(portfolioId);
+
+        // Return appropriate response
+        boolean success = (boolean) responseBody.getOrDefault("success", false);
+        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+    }
+
+    @PostMapping("/portfolio/by-platform")
+    public ResponseEntity<Map<String, Object>> getPortfoliosByPlatform(@RequestBody PortfolioByPlatformRequest request) {
+        // Setup the user context from Spring Security
+        userContextService.setupUserContext();
+
+        // Call portfolio service
+        Map<String, Object> responseBody = portfolioByPlatformServiceInterface.getPortfoliosByPlatform(request.getPlatform());
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);
