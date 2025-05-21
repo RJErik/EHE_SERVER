@@ -112,7 +112,8 @@ public class StockController {
                 request.getStockSymbol(),
                 request.getAction(),
                 request.getAmount(),
-                request.getQuantityType());
+                request.getQuantityType(),
+                null);
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);

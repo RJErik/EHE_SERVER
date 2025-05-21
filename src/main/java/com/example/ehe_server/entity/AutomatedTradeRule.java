@@ -19,6 +19,11 @@ public class AutomatedTradeRule {
         @Column(name = "Sell") SELL
     }
 
+    public enum QuantityType {
+        @Column(name = "Quantity") QUANTITY,
+        @Column(name = "Quote Order Quantity") QUOTE_ORDER_QTY
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "automated_trade_rule_id")
@@ -43,6 +48,10 @@ public class AutomatedTradeRule {
     @Enumerated(EnumType.STRING)
     @Column(name = "action_type", nullable = false)
     private ActionType actionType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "quantity_type", nullable = false)
+    private QuantityType quantityType;
 
     @DecimalMin(value = "0.00000001", inclusive = false)
     @Digits(integer = 10, fraction = 8)
@@ -70,7 +79,95 @@ public class AutomatedTradeRule {
         return automatedTradeRuleId;
     }
 
-    // Other getters and setters following the pattern above
-    // ...
-}
+    public void setAutomatedTradeRuleId(Integer automatedTradeRuleId) {
+        this.automatedTradeRuleId = automatedTradeRuleId;
+    }
 
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public Portfolio getPortfolio() {
+        return portfolio;
+    }
+
+    public void setPortfolio(Portfolio portfolio) {
+        this.portfolio = portfolio;
+    }
+
+    public PlatformStock getPlatformStock() {
+        return platformStock;
+    }
+
+    public void setPlatformStock(PlatformStock platformStock) {
+        this.platformStock = platformStock;
+    }
+
+    public ConditionType getConditionType() {
+        return conditionType;
+    }
+
+    public void setConditionType(ConditionType conditionType) {
+        this.conditionType = conditionType;
+    }
+
+    public ActionType getActionType() {
+        return actionType;
+    }
+
+    public void setActionType(ActionType actionType) {
+        this.actionType = actionType;
+    }
+
+    public QuantityType getQuantityType() {
+        return quantityType;
+    }
+
+    public void setQuantityType(QuantityType quantityType) {
+        this.quantityType = quantityType;
+    }
+
+    public BigDecimal getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(BigDecimal quantity) {
+        this.quantity = quantity;
+    }
+
+    public BigDecimal getThresholdValue() {
+        return thresholdValue;
+    }
+
+    public void setThresholdValue(BigDecimal thresholdValue) {
+        this.thresholdValue = thresholdValue;
+    }
+
+    public ApiKey getApiKey() {
+        return apiKey;
+    }
+
+    public void setApiKey(ApiKey apiKey) {
+        this.apiKey = apiKey;
+    }
+
+    public LocalDateTime getDateCreated() {
+        return dateCreated;
+    }
+
+    public void setDateCreated(LocalDateTime dateCreated) {
+        this.dateCreated = dateCreated;
+    }
+
+    public boolean isActive() {
+        return isActive;
+    }
+
+    public void setActive(boolean active) {
+        isActive = active;
+    }
+}

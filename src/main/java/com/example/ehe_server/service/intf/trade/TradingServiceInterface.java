@@ -15,5 +15,5 @@ public interface TradingServiceInterface {
      * @return Map containing success status and trade details or error message
      */
     Map<String, Object> executeMarketOrder(Integer portfolioId, String stockSymbol, String action,
-                                           BigDecimal amount, String quantityType);
+                                           BigDecimal amount, String quantityType, Integer explicitUserId);
 }
