@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 
 import java.security.interfaces.RSAPrivateKey;
 import java.util.Date;
-import java.util.List;
 
 @Service
 public class JwtTokenGeneratorService implements JwtTokenGeneratorInterface {

@@ -2,10 +2,11 @@ package com.example.ehe_server.service.portfolio;
 
 import com.example.ehe_server.entity.*;
 import com.example.ehe_server.repository.*;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioDetailsServiceInterface;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -13,29 +14,26 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
+@Transactional
 public class PortfolioDetailsService implements PortfolioDetailsServiceInterface {
 
     private final PortfolioRepository portfolioRepository;
-    private final UserRepository userRepository;
     private final HoldingRepository holdingRepository;
     private final MarketCandleRepository marketCandleRepository;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private final UserContextService userContextService;
 
     public PortfolioDetailsService(
             PortfolioRepository portfolioRepository,
-            UserRepository userRepository,
             HoldingRepository holdingRepository,
             MarketCandleRepository marketCandleRepository,
-            LoggingServiceInterface loggingService,
-            AuditContextService auditContextService) {
+            LoggingServiceInterface loggingService, UserContextService userContextService) {
         this.portfolioRepository = portfolioRepository;
-        this.userRepository = userRepository;
         this.holdingRepository = holdingRepository;
         this.marketCandleRepository = marketCandleRepository;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -43,35 +41,15 @@ public class PortfolioDetailsService implements PortfolioDetailsServiceInterface
         Map<String, Object> result = new HashMap<>();
 
         try {
-            // Get current user ID from audit context
-            String userIdStr = auditContextService.getCurrentUser();
-            Integer userId = Integer.parseInt(userIdStr);
-
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Portfolio details retrieval failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Portfolio details retrieval failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
+            // Get current user ID from user context
+            Integer userId = Integer.parseInt(userContextService.getCurrentUserIdAsString());
 
             // Check if portfolio exists and belongs to the user
             Optional<Portfolio> portfolioOptional = portfolioRepository.findByPortfolioIdAndUser_UserId(portfolioId, userId);
             if (portfolioOptional.isEmpty()) {
                 result.put("success", false);
                 result.put("message", "Portfolio not found or doesn't belong to the user");
-                loggingService.logAction(userId, userIdStr,
-                        "Portfolio details retrieval failed: Portfolio not found or doesn't belong to user, portfolioId=" + portfolioId);
+                loggingService.logAction("Portfolio details retrieval failed: Portfolio not found or doesn't belong to user, portfolioId=" + portfolioId);
                 return result;
             }
 
@@ -145,13 +123,11 @@ public class PortfolioDetailsService implements PortfolioDetailsServiceInterface
             result.put("portfolio", portfolioDetails);
 
             // Log success
-            loggingService.logAction(userId, userIdStr,
-                    "Retrieved details for portfolio: " + portfolio.getPortfolioName());
+            loggingService.logAction("Retrieved details for portfolio: " + portfolio.getPortfolioName());
 
         } catch (Exception e) {
             // Log error
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error retrieving portfolio details: " + e.getMessage(), e);
+            loggingService.logError("Error retrieving portfolio details: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);

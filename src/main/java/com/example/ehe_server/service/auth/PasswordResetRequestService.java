@@ -2,9 +2,10 @@ package com.example.ehe_server.service.auth;
 
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
+import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.PasswordResetRequestServiceInterface;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
@@ -21,6 +22,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class PasswordResetRequestService implements PasswordResetRequestServiceInterface {
 
     private static final int RATE_LIMIT_MAX_REQUESTS = 5;
@@ -33,7 +35,8 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailServiceInterface emailService;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
+    private final AdminRepository adminRepository;
+    private final UserContextService userContextService;
 
     @Value("${app.verification.token.expiry-hours}")
     private long tokenExpiryHours;
@@ -42,13 +45,13 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
             UserRepository userRepository,
             VerificationTokenRepository verificationTokenRepository,
             EmailServiceInterface emailService,
-            LoggingServiceInterface loggingService,
-            AuditContextService auditContextService) {
+            LoggingServiceInterface loggingService, AdminRepository adminRepository, UserContextService userContextService) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.emailService = emailService;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
+        this.adminRepository = adminRepository;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -61,16 +64,14 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
             if (email == null || email.trim().isEmpty()) {
                 response.put("success", false);
                 response.put("message", "Email is required");
-                loggingService.logAction(null, auditContextService.getCurrentUser(),
-                        "Password reset failed: Missing email");
+                loggingService.logAction("Password reset failed: Missing email");
                 return response;
             }
 
             if (!EMAIL_PATTERN.matcher(email).matches()) {
                 response.put("success", false);
                 response.put("message", "Please enter a valid email address");
-                loggingService.logAction(null, auditContextService.getCurrentUser(),
-                        "Password reset failed: Invalid email format");
+                loggingService.logAction("Password reset failed: Invalid email format");
                 return response;
             }
 
@@ -83,16 +84,21 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
                 response.put("success", true);
                 response.put("message", "If your email is registered, you will receive password reset instructions shortly.");
                 response.put("showResendButton", true);
-                loggingService.logAction(null, auditContextService.getCurrentUser(),
-                        "Password reset request for non-existent email: " + email);
+                loggingService.logAction("Password reset request for non-existent email: " + email);
                 return response;
             }
 
             User user = userOpt.get();
             String userIdStr = String.valueOf(user.getUserId());
+            boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
 
             // Set audit context
-            auditContextService.setCurrentUser(userIdStr);
+            String role = "USER"; // All authenticated users have USER role
+
+            if (isAdmin) {
+                role = "ADMIN"; // Add ADMIN role if user is in Admin table
+            }
+            userContextService.setUser(userIdStr, role);
 
             // Check account status
             if (user.getAccountStatus() != User.AccountStatus.ACTIVE &&
@@ -101,8 +107,7 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
                 response.put("success", true);
                 response.put("message", "If your email is registered, you will receive password reset instructions shortly.");
                 response.put("showResendButton", true);
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Password reset requested for suspended account: " + email);
+                loggingService.logAction("Password reset requested for suspended account: " + email);
                 return response;
             }
 
@@ -116,8 +121,7 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
                 response.put("message", "Too many password reset requests. Please wait " +
                         RATE_LIMIT_MINUTES + " minutes before trying again.");
                 response.put("showResendButton", true);
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Password reset rate limit hit for: " + email);
+                loggingService.logAction("Password reset rate limit hit for: " + email);
                 return response;
             }
 
@@ -132,8 +136,7 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
 
             if (!tokensToUpdate.isEmpty()) {
                 verificationTokenRepository.saveAll(tokensToUpdate);
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Invalidated " + tokensToUpdate.size() + " previous active password reset token(s)");
+                loggingService.logAction("Invalidated " + tokensToUpdate.size() + " previous active password reset token(s)");
             }
 
             // Create new token - with shorter expiry for password resets
@@ -143,8 +146,7 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
             VerificationToken newToken = new VerificationToken(
                     user, token, VerificationToken.TokenType.PASSWORD_RESET, expiryDate);
             verificationTokenRepository.save(newToken);
-            loggingService.logAction(user.getUserId(), userIdStr,
-                    "Generated new password reset token");
+            loggingService.logAction("Generated new password reset token");
 
             // Send email with reset link
             try {
@@ -155,14 +157,12 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
                 return response;
             } catch (Exception e) {
                 // Log failure but don't reveal to user
-                loggingService.logError(user.getUserId(), userIdStr,
-                        "Failed to send password reset email to " + email, e);
+                loggingService.logError("Failed to send password reset email to " + email, e);
                 // Throw to trigger transaction rollback
                 throw e;
             }
         } catch (Exception e) {
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error during password reset request: " + e.getMessage(), e);
+            loggingService.logError("Error during password reset request: " + e.getMessage(), e);
             response.put("success", false);
             response.put("message", "An error occurred. Please try again later.");
             return response;

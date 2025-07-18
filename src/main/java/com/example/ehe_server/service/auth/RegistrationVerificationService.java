@@ -2,35 +2,37 @@ package com.example.ehe_server.service.auth;
 
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
+import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.RegistrationVerificationServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
 @Service
+@Transactional
 public class RegistrationVerificationService implements RegistrationVerificationServiceInterface {
 
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
+    private final AdminRepository adminRepository;
+    private final UserContextService userContextService;
 
     public RegistrationVerificationService(UserRepository userRepository,
                                            VerificationTokenRepository verificationTokenRepository,
-                                           LoggingServiceInterface loggingService,
-                                           AuditContextService auditContextService) { // Inject EmailService
+                                           LoggingServiceInterface loggingService, AdminRepository adminRepository, UserContextService userContextService) { // Inject EmailService
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
+        this.adminRepository = adminRepository;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -43,7 +45,7 @@ public class RegistrationVerificationService implements RegistrationVerification
             response.put("success", false);
             response.put("message", "Invalid verification token. The link may be incorrect or the token does not exist.");
             // Cannot reliably log user ID here as token is invalid
-            loggingService.logAction(null, auditContextService.getCurrentUser(), "Verification attempt with non-existent token: " + token);
+            loggingService.logAction("Verification attempt with non-existent token: " + token);
             return response;
         }
 
@@ -54,7 +56,16 @@ public class RegistrationVerificationService implements RegistrationVerification
 
         // Set audit context if user found
         if (user != null) {
-            auditContextService.setCurrentUser(userIdStr);
+            // Update audit context
+            boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+
+            // Set audit context
+            String role = "USER"; // All authenticated users have USER role
+
+            if (isAdmin) {
+                role = "ADMIN"; // Add ADMIN role if user is in Admin table
+            }
+            userContextService.setUser(userIdStr, role);
         }
 
         if (verificationToken.isExpired()) {
@@ -63,7 +74,7 @@ public class RegistrationVerificationService implements RegistrationVerification
             response.put("message", "Verification token has expired. Please request a new verification email.");
             response.put("showResendButton", true);
 
-            loggingService.logAction(user != null ? user.getUserId() : null, auditContextService.getCurrentUser(), "Verification attempt with expired token: " + token);
+            loggingService.logAction("Verification attempt with expired token: " + token);
 
             return response;
         }
@@ -71,7 +82,7 @@ public class RegistrationVerificationService implements RegistrationVerification
         if (verificationToken.getStatus() != VerificationToken.TokenStatus.ACTIVE) {
             response.put("success", false);
             response.put("message", "Token is not active. It may have already been used or invalidated.");
-            loggingService.logAction(user != null ? user.getUserId() : null, auditContextService.getCurrentUser(), "Verification attempt with non-active token (" + verificationToken.getStatus() + "): " + token);
+            loggingService.logAction("Verification attempt with non-active token (" + verificationToken.getStatus() + "): " + token);
             return response;
         }
 
@@ -81,7 +92,7 @@ public class RegistrationVerificationService implements RegistrationVerification
         if (verificationToken.getTokenType() != VerificationToken.TokenType.REGISTRATION) {
             response.put("success", false);
             response.put("message", "Invalid token type provided. This link cannot be used for account verification.");
-            loggingService.logAction(user != null ? user.getUserId() : null, userIdStr, "Verification attempt with wrong token type (" + verificationToken.getTokenType() + "): " + token);
+            loggingService.logAction("Verification attempt with wrong token type (" + verificationToken.getTokenType() + "): " + token);
             return response;
         }
 
@@ -89,7 +100,7 @@ public class RegistrationVerificationService implements RegistrationVerification
         if (user == null) { // Should not happen if FK constraint exists, but check anyway
             response.put("success", false);
             response.put("message", "Internal error: User associated with token not found.");
-            loggingService.logError(null, "system", "Token " + verificationToken.getVerificationTokenId() + " has no associated user.", new IllegalStateException("User is null for valid token"));
+            loggingService.logError("Token " + verificationToken.getVerificationTokenId() + " has no associated user.", new IllegalStateException("User is null for valid token"));
             return response;
         }
 
@@ -99,7 +110,7 @@ public class RegistrationVerificationService implements RegistrationVerification
         userRepository.save(user);
         verificationTokenRepository.save(verificationToken); // Save updated token status
 
-        loggingService.logAction(user.getUserId(), auditContextService.getCurrentUser(), "User account successfully verified with token: " + token);
+        loggingService.logAction("User account successfully verified with token: " + token);
         response.put("success", true);
         response.put("message", "Account verified successfully. You can now log in.");
 

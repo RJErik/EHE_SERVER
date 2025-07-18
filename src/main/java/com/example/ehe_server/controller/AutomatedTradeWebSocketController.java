@@ -1,12 +1,11 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.automatictrade.AutomatedTradeWebSocketSubscriptionManager;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.annotation.SendToUser;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.util.HashMap;
@@ -17,41 +16,29 @@ public class AutomatedTradeWebSocketController {
 
     private final AutomatedTradeWebSocketSubscriptionManager subscriptionManager;
     private final LoggingServiceInterface loggingService;
+    private final UserContextService userContextService;
 
     public AutomatedTradeWebSocketController(
             AutomatedTradeWebSocketSubscriptionManager subscriptionManager,
-            LoggingServiceInterface loggingService) {
+            LoggingServiceInterface loggingService, UserContextService userContextService) {
         this.subscriptionManager = subscriptionManager;
         this.loggingService = loggingService;
+        this.userContextService = userContextService;
     }
 
     @MessageMapping("/automated-trades/subscribe")
     @SendToUser("/queue/automated-trades")
-    public Map<String, Object> subscribeToAutomatedTrades(
-            SimpMessageHeaderAccessor headerAccessor) {
+    public Map<String, Object> subscribeToAutomatedTrades() {
 
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // Extract user ID from JWT token
-            Authentication authentication = (Authentication) headerAccessor.getUser();
-            Long userId = authentication != null ? (Long) authentication.getPrincipal() : null;
-
-            if (userId == null) {
-                response.put("success", false);
-                response.put("message", "User authentication required");
-                return response;
-            }
-
             // Log subscription request
-            loggingService.logAction(
-                    userId.intValue(),
-                    userId.toString(),
-                    "WebSocket subscription request for automated trades");
+            loggingService.logAction("WebSocket subscription request for automated trades");
 
             // Create subscription for this user
             String subscriptionId = subscriptionManager.createSubscription(
-                    userId.intValue(),
+                    userContextService.getCurrentUserId().intValue(),
                     "/user/queue/automated-trades");
 
             // Return subscription details
@@ -60,8 +47,7 @@ public class AutomatedTradeWebSocketController {
             response.put("message", "Automated trade subscription created successfully");
 
         } catch (Exception e) {
-            loggingService.logError(null, "system",
-                    "Error creating automated trade subscription: " + e.getMessage(), e);
+            loggingService.logError("Error creating automated trade subscription: " + e.getMessage(), e);
             response.put("success", false);
             response.put("message", "Error creating automated trade subscription: " + e.getMessage());
         }
@@ -72,14 +58,11 @@ public class AutomatedTradeWebSocketController {
     @MessageMapping("/automated-trades/unsubscribe")
     @SendToUser("/queue/automated-trades")
     public Map<String, Object> unsubscribeFromAutomatedTrades(
-            @Payload Map<String, String> request,
-            SimpMessageHeaderAccessor headerAccessor) {
+            @Payload Map<String, String> request) {
 
         Map<String, Object> response = new HashMap<>();
 
         try {
-            Authentication authentication = (Authentication) headerAccessor.getUser();
-            Long userId = authentication != null ? (Long) authentication.getPrincipal() : null;
             String subscriptionId = request.get("subscriptionId");
 
             if (subscriptionId == null) {
@@ -88,10 +71,7 @@ public class AutomatedTradeWebSocketController {
                 return response;
             }
 
-            loggingService.logAction(
-                    userId != null ? userId.intValue() : null,
-                    userId != null ? userId.toString() : "anonymous",
-                    "WebSocket unsubscribe request for automated trade subscription " + subscriptionId);
+            loggingService.logAction("WebSocket unsubscribe request for automated trade subscription " + subscriptionId);
 
             boolean cancelled = subscriptionManager.cancelSubscription(subscriptionId);
 
@@ -106,8 +86,7 @@ public class AutomatedTradeWebSocketController {
             }
 
         } catch (Exception e) {
-            loggingService.logError(null, "system",
-                    "Error cancelling automated trade subscription: " + e.getMessage(), e);
+            loggingService.logError("Error cancelling automated trade subscription: " + e.getMessage(), e);
             response.put("success", false);
             response.put("message", "Error cancelling automated trade subscription: " + e.getMessage());
         }

@@ -3,7 +3,6 @@ package com.example.ehe_server.controller;
 import com.example.ehe_server.dto.AutomatedTradeRuleCreateRequest;
 import com.example.ehe_server.dto.AutomatedTradeRuleDeleteRequest;
 import com.example.ehe_server.dto.AutomatedTradeRuleSearchRequest;
-import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeRuleSearchServiceInterface;
 import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeRuleServiceInterface;
 import org.springframework.http.ResponseEntity;
@@ -17,15 +16,12 @@ public class AutomatedTradeRuleController {
 
     private final AutomatedTradeRuleServiceInterface automatedTradeRuleService;
     private final AutomatedTradeRuleSearchServiceInterface automatedTradeRuleSearchService;
-    private final UserContextServiceInterface userContextService;
 
     public AutomatedTradeRuleController(
             AutomatedTradeRuleServiceInterface automatedTradeRuleService,
-            AutomatedTradeRuleSearchServiceInterface automatedTradeRuleSearchService,
-            UserContextServiceInterface userContextService) {
+            AutomatedTradeRuleSearchServiceInterface automatedTradeRuleSearchService) {
         this.automatedTradeRuleService = automatedTradeRuleService;
         this.automatedTradeRuleSearchService = automatedTradeRuleSearchService;
-        this.userContextService = userContextService;
     }
 
     /**
@@ -35,9 +31,6 @@ public class AutomatedTradeRuleController {
      */
     @GetMapping("/automated-trade-rules")
     public ResponseEntity<Map<String, Object>> getAutomatedTradeRules() {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call automated trade rule service
         Map<String, Object> responseBody = automatedTradeRuleService.getAutomatedTradeRules();
 
@@ -54,9 +47,6 @@ public class AutomatedTradeRuleController {
      */
     @PostMapping("/automated-trade-rules/add")
     public ResponseEntity<Map<String, Object>> addAutomatedTradeRule(@RequestBody AutomatedTradeRuleCreateRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call automated trade rule service to add item
         Map<String, Object> responseBody = automatedTradeRuleService.createAutomatedTradeRule(
                 request.getPortfolioId(),
@@ -81,9 +71,6 @@ public class AutomatedTradeRuleController {
      */
     @DeleteMapping("/automated-trade-rules/remove")
     public ResponseEntity<Map<String, Object>> removeAutomatedTradeRule(@RequestBody AutomatedTradeRuleDeleteRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call automated trade rule service to remove item
         Map<String, Object> responseBody = automatedTradeRuleService.removeAutomatedTradeRule(request.getId());
 
@@ -100,9 +87,6 @@ public class AutomatedTradeRuleController {
      */
     @PostMapping("/automated-trade-rules/search")
     public ResponseEntity<Map<String, Object>> searchAutomatedTradeRules(@RequestBody AutomatedTradeRuleSearchRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call automated trade rule search service
         Map<String, Object> responseBody = automatedTradeRuleSearchService.searchAutomatedTradeRules(
                 request.getPortfolioId(),

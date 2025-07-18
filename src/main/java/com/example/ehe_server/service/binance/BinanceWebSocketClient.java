@@ -1,9 +1,11 @@
 package com.example.ehe_server.service.binance;
 
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.client.WebSocketClient;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
@@ -17,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 @Service
+@Transactional
 public class BinanceWebSocketClient extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final LoggingServiceInterface loggingService;
@@ -25,19 +28,21 @@ public class BinanceWebSocketClient extends TextWebSocketHandler {
     private final AtomicInteger lastId = new AtomicInteger(1);
 
     private static final String WS_BASE_URL = "wss://stream.binance.com:9443/ws";
+    private final UserContextService userContextService;
 
-    public BinanceWebSocketClient(ObjectMapper objectMapper, LoggingServiceInterface loggingService) {
+    public BinanceWebSocketClient(ObjectMapper objectMapper, LoggingServiceInterface loggingService, UserContextService userContextService) {
         this.objectMapper = objectMapper;
         this.loggingService = loggingService;
+        this.userContextService = userContextService;
     }
 
     public void subscribeToKlineStream(String symbol, String interval, Consumer<JsonNode> handler) {
+        userContextService.setUser("SYSTEM", "SYSTEM");
         String streamName = symbol.toLowerCase() + "@kline_" + interval;
-        String endpoint = WS_BASE_URL;
 
         try {
             WebSocketClient client = new StandardWebSocketClient();
-            WebSocketSession session = client.doHandshake(this, null, URI.create(endpoint)).get();
+            WebSocketSession session = client.doHandshake(this, null, URI.create(WS_BASE_URL)).get();
 
             // Store session for management
             sessions.put(streamName, session);
@@ -47,9 +52,9 @@ public class BinanceWebSocketClient extends TextWebSocketHandler {
             TextMessage subscribeMsg = createSubscriptionMessage(streamName);
             session.sendMessage(subscribeMsg);
 
-            loggingService.logAction(null, "System", "Subscribed to Binance WebSocket stream: " + streamName);
+            loggingService.logAction("Subscribed to Binance WebSocket stream: " + streamName);
         } catch (Exception e) {
-            loggingService.logError(null, "System", "Failed to connect to Binance WebSocket: " + e.getMessage(), e);
+            loggingService.logError("Failed to connect to Binance WebSocket: " + e.getMessage(), e);
             throw new RuntimeException("WebSocket connection failed", e);
         }
     }
@@ -65,12 +70,13 @@ public class BinanceWebSocketClient extends TextWebSocketHandler {
 
     @Override
     public void handleTextMessage(WebSocketSession session, TextMessage message) {
+        userContextService.setUser("SYSTEM", "SYSTEM");
         try {
             JsonNode jsonNode = objectMapper.readTree(message.getPayload());
 
             // Handle subscription responses
             if (jsonNode.has("id") && jsonNode.has("result")) {
-                loggingService.logAction(null, "System", "Subscription response: " + message.getPayload());
+                loggingService.logAction("Subscription response: " + message.getPayload());
                 return;
             }
 
@@ -88,18 +94,20 @@ public class BinanceWebSocketClient extends TextWebSocketHandler {
                 }
             }
         } catch (Exception e) {
-            loggingService.logError(null, "System", "Error processing WebSocket message: " + e.getMessage(), e);
+            loggingService.logError("Error processing WebSocket message: " + e.getMessage(), e);
         }
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        loggingService.logAction(null, "System", "Binance WebSocket connection established");
+        userContextService.setUser("SYSTEM", "SYSTEM");
+        loggingService.logAction("Binance WebSocket connection established");
     }
 
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) {
-        loggingService.logError(null, "System", "Binance WebSocket transport error: " + exception.getMessage(), exception);
+        userContextService.setUser("SYSTEM", "SYSTEM");
+        loggingService.logError("Binance WebSocket transport error: " + exception.getMessage(), exception);
 
         // Attempt to reconnect streams for this session
         for (Map.Entry<String, WebSocketSession> entry : sessions.entrySet()) {
@@ -108,7 +116,7 @@ public class BinanceWebSocketClient extends TextWebSocketHandler {
                 Consumer<JsonNode> handler = handlers.get(streamName);
 
                 if (handler != null) {
-                    loggingService.logAction(null, "System", "Attempting to reconnect stream: " + streamName);
+                    loggingService.logAction("Attempting to reconnect stream: " + streamName);
                     sessions.remove(streamName);
 
                     // Extract symbol and interval from stream name
@@ -125,7 +133,8 @@ public class BinanceWebSocketClient extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        loggingService.logAction(null, "System", "Binance WebSocket connection closed: " + status);
+        userContextService.setUser("SYSTEM", "SYSTEM");
+        loggingService.logAction("Binance WebSocket connection closed: " + status);
 
         // Similar reconnection logic as in handleTransportError
         for (Map.Entry<String, WebSocketSession> entry : sessions.entrySet()) {

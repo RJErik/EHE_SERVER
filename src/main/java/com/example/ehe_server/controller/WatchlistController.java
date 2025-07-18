@@ -3,7 +3,6 @@ package com.example.ehe_server.controller;
 import com.example.ehe_server.dto.WatchlistDeleteRequest;
 import com.example.ehe_server.dto.WatchlistItemRequest;
 import com.example.ehe_server.dto.WatchlistSearchRequest;
-import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.watchlist.WatchlistCandleServiceInterface;
 import com.example.ehe_server.service.intf.watchlist.WatchlistSearchServiceInterface;
 import com.example.ehe_server.service.intf.watchlist.WatchlistServiceInterface;
@@ -19,17 +18,14 @@ public class WatchlistController {
     private final WatchlistServiceInterface watchlistService;
     private final WatchlistSearchServiceInterface watchlistSearchService;
     private final WatchlistCandleServiceInterface watchlistCandleService;
-    private final UserContextServiceInterface userContextService;
 
     public WatchlistController(
             WatchlistServiceInterface watchlistService,
             WatchlistSearchServiceInterface watchlistSearchService,
-            WatchlistCandleServiceInterface watchlistCandleService,
-            UserContextServiceInterface userContextService) {
+            WatchlistCandleServiceInterface watchlistCandleService) {
         this.watchlistService = watchlistService;
         this.watchlistSearchService = watchlistSearchService;
         this.watchlistCandleService = watchlistCandleService;
-        this.userContextService = userContextService;
     }
 
     /**
@@ -39,9 +35,6 @@ public class WatchlistController {
      */
     @GetMapping("/watchlist")
     public ResponseEntity<Map<String, Object>> getWatchlistItems() {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call watchlist service
         Map<String, Object> responseBody = watchlistService.getWatchlistItems();
 
@@ -58,9 +51,6 @@ public class WatchlistController {
      */
     @PostMapping("/watchlist/add")
     public ResponseEntity<Map<String, Object>> addWatchlistItem(@RequestBody WatchlistItemRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call watchlist service to add item
         Map<String, Object> responseBody = watchlistService.addWatchlistItem(
                 request.getPlatform(), request.getSymbol());
@@ -78,9 +68,6 @@ public class WatchlistController {
      */
     @DeleteMapping("/watchlist/remove")
     public ResponseEntity<Map<String, Object>> removeWatchlistItem(@RequestBody WatchlistDeleteRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call watchlist service to remove item
         Map<String, Object> responseBody = watchlistService.removeWatchlistItem(request.getId());
 
@@ -97,9 +84,6 @@ public class WatchlistController {
      */
     @PostMapping("/watchlist/search")
     public ResponseEntity<Map<String, Object>> searchWatchlist(@RequestBody WatchlistSearchRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call watchlist search service
         Map<String, Object> responseBody = watchlistSearchService.searchWatchlistItems(
                 request.getPlatform(), request.getSymbol());
@@ -116,9 +100,6 @@ public class WatchlistController {
      */
     @GetMapping("/watchlist/candles")
     public ResponseEntity<Map<String, Object>> getWatchlistCandles() {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call watchlist candle service
         Map<String, Object> responseBody = watchlistCandleService.getLatestCandles();
 

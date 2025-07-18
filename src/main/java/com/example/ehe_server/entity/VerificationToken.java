@@ -47,7 +47,6 @@ public class VerificationToken {
     // --- Constructors ---
     public VerificationToken() {
         this.issueDate = LocalDateTime.now(); // Default issue date
-        this.status = TokenStatus.ACTIVE;     // Ensure default status
     }
 
     public VerificationToken(User user, String token, TokenType tokenType, LocalDateTime expiryDate) {

@@ -3,6 +3,7 @@ package com.example.ehe_server.service.binance;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -11,6 +12,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@Transactional
 public class BinanceApiClient {
     private final RestTemplate restTemplate;
     private static final String API_BASE_URL = "https://api.binance.com";
@@ -42,7 +44,9 @@ public class BinanceApiClient {
         HttpHeaders headers = new HttpHeaders();
         HttpEntity<?> entity = new HttpEntity<>(headers);
 
-        loggingService.logAction(null, "System", "Requesting Binance klines: " + builder.toUriString());
+        //SYSTEM SET HERE
+
+        loggingService.logAction("Requesting Binance klines: " + builder.toUriString());
         ResponseEntity<String> response = restTemplate.exchange(
                 builder.toUriString(),
                 HttpMethod.GET,
@@ -69,13 +73,15 @@ public class BinanceApiClient {
         if (now - windowStart < MINUTE_IN_MS && count > WEIGHT_LIMIT_PER_MINUTE * 0.9) {
             // Calculate remaining time in the current window
             long waitTime = MINUTE_IN_MS - (now - windowStart);
-            loggingService.logAction(null, "System", "Rate limit approaching for " + requestKey + ", waiting " + waitTime + " ms");
+            //SYSTEM SET HERE
+            loggingService.logAction("Rate limit approaching for " + requestKey + ", waiting " + waitTime + " ms");
 
             try {
                 Thread.sleep(waitTime);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                loggingService.logError(null, "System", "Rate limit wait interrupted", e);
+                //SYSTEM SET HERE
+                loggingService.logError("Rate limit wait interrupted", e);
             }
 
             // Reset counters after waiting
@@ -107,7 +113,8 @@ public class BinanceApiClient {
     private void updateRateLimitFromHeaders(HttpHeaders headers) {
         if (headers.containsKey("X-MBX-USED-WEIGHT-1M")) {
             String usedWeight = headers.getFirst("X-MBX-USED-WEIGHT-1M");
-            loggingService.logAction(null, "System", "Current Binance API weight: " + usedWeight + "/" + WEIGHT_LIMIT_PER_MINUTE);
+            //SYSTEM SET HERE
+            loggingService.logAction("Current Binance API weight: " + usedWeight + "/" + WEIGHT_LIMIT_PER_MINUTE);
         }
     }
 }

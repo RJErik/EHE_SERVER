@@ -5,13 +5,13 @@ import com.example.ehe_server.entity.*;
 import com.example.ehe_server.repository.AutomatedTradeRuleRepository;
 import com.example.ehe_server.repository.MarketCandleRepository;
 import com.example.ehe_server.repository.TransactionRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.trade.TradingServiceInterface;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,7 +20,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@Transactional
 public class AutomatedTradeWebSocketSubscriptionManager {
+
+    private final UserContextService userContextService;
 
     private static class AutomatedTradeSubscription {
         private final String id;
@@ -45,7 +48,6 @@ public class AutomatedTradeWebSocketSubscriptionManager {
     private final LoggingServiceInterface loggingService;
     private final TradingServiceInterface tradingService;
     private final TransactionRepository transactionRepository;
-    private final AuditContextService auditContextService;
     private final Map<String, AutomatedTradeSubscription> activeSubscriptions = new ConcurrentHashMap<>();
 
     public AutomatedTradeWebSocketSubscriptionManager(
@@ -54,15 +56,14 @@ public class AutomatedTradeWebSocketSubscriptionManager {
             SimpMessagingTemplate messagingTemplate,
             LoggingServiceInterface loggingService,
             TradingServiceInterface tradingService,
-            TransactionRepository transactionRepository,
-            AuditContextService auditContextService) {
+            TransactionRepository transactionRepository, UserContextService userContextService) {
         this.automatedTradeRuleRepository = automatedTradeRuleRepository;
         this.marketCandleRepository = marketCandleRepository;
         this.messagingTemplate = messagingTemplate;
         this.loggingService = loggingService;
         this.tradingService = tradingService;
         this.transactionRepository = transactionRepository;
-        this.auditContextService = auditContextService;
+        this.userContextService = userContextService;
     }
 
     /**
@@ -78,8 +79,7 @@ public class AutomatedTradeWebSocketSubscriptionManager {
 
         activeSubscriptions.put(subscriptionId, subscription);
 
-        loggingService.logAction(userId, userId.toString(),
-                "Created automated trade subscription: " + subscriptionId);
+        loggingService.logAction("Created automated trade subscription: " + subscriptionId);
 
         return subscriptionId;
     }
@@ -90,8 +90,7 @@ public class AutomatedTradeWebSocketSubscriptionManager {
     public boolean cancelSubscription(String subscriptionId) {
         AutomatedTradeSubscription removed = activeSubscriptions.remove(subscriptionId);
         if (removed != null) {
-            loggingService.logAction(removed.getUserId(), removed.getUserId().toString(),
-                    "Cancelled automated trade subscription: " + subscriptionId);
+            loggingService.logAction("Cancelled automated trade subscription: " + subscriptionId);
             return true;
         }
         return false;
@@ -102,10 +101,11 @@ public class AutomatedTradeWebSocketSubscriptionManager {
      */
     @Scheduled(fixedRate = 60000) // Run every minute
     public void checkAutomatedTradeRules() {
+        userContextService.setUser("SYSTEM", "SYSTEM");
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime currentMinute = now.truncatedTo(ChronoUnit.MINUTES);
 
-        loggingService.logAction(null, "system", "Checking automated trade rules at " + currentMinute);
+        loggingService.logAction("Checking automated trade rules at " + currentMinute);
 
         try {
             // Get all active automated trade rules
@@ -119,8 +119,7 @@ public class AutomatedTradeWebSocketSubscriptionManager {
                 processRule(rule, currentMinute);
             }
         } catch (Exception e) {
-            loggingService.logError(null, "system",
-                    "Error in automated trade rule check: " + e.getMessage(), e);
+            loggingService.logError("Error in automated trade rule check: " + e.getMessage(), e);
         }
     }
 
@@ -137,8 +136,8 @@ public class AutomatedTradeWebSocketSubscriptionManager {
                             platformStock, MarketCandle.Timeframe.M1);
 
             if (latestCandle == null) {
-                loggingService.logAction(rule.getUser().getUserId(), rule.getUser().getUserId().toString(),
-                        "No candle data found for " + platformStock.getStockSymbol() + " when checking rule #" + rule.getAutomatedTradeRuleId());
+                loggingService.logAction("No candle data found for " + platformStock.getStockSymbol() +
+                        " when checking rule #" + rule.getAutomatedTradeRuleId());
                 return;
             }
 
@@ -150,8 +149,8 @@ public class AutomatedTradeWebSocketSubscriptionManager {
                 executeAutomatedTrade(rule, latestCandle);
             }
         } catch (Exception e) {
-            loggingService.logError(rule.getUser().getUserId(), rule.getUser().getUserId().toString(),
-                    "Error processing automated trade rule #" + rule.getAutomatedTradeRuleId() + ": " + e.getMessage(), e);
+            loggingService.logError("Error processing automated trade rule #" + rule.getAutomatedTradeRuleId() +
+                    ": " + e.getMessage(), e);
         }
     }
 
@@ -180,11 +179,8 @@ public class AutomatedTradeWebSocketSubscriptionManager {
         int userId = rule.getUser().getUserId();
         String userIdStr = String.valueOf(userId);
 
-        auditContextService.setCurrentUser(userIdStr);
-
         try {
-            loggingService.logAction(userId, userIdStr,
-                    "Executing automated trade for rule #" + rule.getAutomatedTradeRuleId());
+            loggingService.logAction("Executing automated trade for rule #" + rule.getAutomatedTradeRuleId());
 
             // Determine action parameters
             Integer portfolioId = rule.getPortfolio().getPortfolioId();
@@ -221,24 +217,22 @@ public class AutomatedTradeWebSocketSubscriptionManager {
             rule.setActive(false);
             automatedTradeRuleRepository.save(rule);
 
-            loggingService.logAction(userId, userIdStr,
-                    "Automated trade rule #" + rule.getAutomatedTradeRuleId() +
+            loggingService.logAction("Automated trade rule #" + rule.getAutomatedTradeRuleId() +
                             " executed and deactivated. Trade success: " + success);
 
             // Send notification to all active subscriptions for this user
             sendAutomatedTradeNotification(rule, triggeringCandle, success, tradingResult, transactionId);
 
         } catch (Exception e) {
-            loggingService.logError(userId, userIdStr,
-                    "Error executing automated trade for rule #" + rule.getAutomatedTradeRuleId() + ": " + e.getMessage(), e);
+            loggingService.logError("Error executing automated trade for rule #" + rule.getAutomatedTradeRuleId() +
+                    ": " + e.getMessage(), e);
 
             // Send failure notification
             try {
                 sendAutomatedTradeNotification(rule, triggeringCandle, false,
                         Map.of("success", false, "message", e.getMessage()), null);
             } catch (Exception ne) {
-                loggingService.logError(userId, userIdStr,
-                        "Error sending failure notification: " + ne.getMessage(), ne);
+                loggingService.logError("Error sending failure notification: " + ne.getMessage(), ne);
             }
 
             // Still deactivate the rule to prevent repeated failures
@@ -299,8 +293,7 @@ public class AutomatedTradeWebSocketSubscriptionManager {
                         notification
                 );
 
-                loggingService.logAction(userId, userId.toString(),
-                        "Sent automated trade notification for rule #" + rule.getAutomatedTradeRuleId());
+                loggingService.logAction("Sent automated trade notification for rule #" + rule.getAutomatedTradeRuleId());
             }
         }
     }

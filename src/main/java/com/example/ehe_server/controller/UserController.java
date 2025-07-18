@@ -6,7 +6,6 @@ import com.example.ehe_server.dto.ApiKeyUpdateRequest;
 import com.example.ehe_server.dto.EmailChangeRequest;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
 import com.example.ehe_server.service.intf.user.ApiKeyAddServiceInterface;
 import com.example.ehe_server.service.intf.user.ApiKeyDeleteServiceInterface;
 import com.example.ehe_server.service.intf.user.ApiKeyListServiceInterface;
@@ -29,7 +28,6 @@ public class UserController {
 
     private final UserValidationServiceInterface userValidationService;
     private final UserLogoutServiceInterface userLogoutService;
-    private final AuditContextService auditContextService;
     private final UserContextServiceInterface userContextService;
     private final UserRepository userRepository;
     private final PasswordResetRequestServiceInterface passwordResetRequestService;
@@ -45,7 +43,6 @@ public class UserController {
     public UserController(
             UserValidationServiceInterface userValidationService,
             UserLogoutServiceInterface userLogoutService,
-            AuditContextService auditContextService,
             UserContextServiceInterface userContextService,
             UserRepository userRepository,
             PasswordResetRequestServiceInterface passwordResetRequestService,
@@ -59,7 +56,6 @@ public class UserController {
             ApiKeyListServiceInterface apiKeyListService) {
         this.userValidationService = userValidationService;
         this.userLogoutService = userLogoutService;
-        this.auditContextService = auditContextService;
         this.userContextService = userContextService;
         this.userRepository = userRepository;
         this.passwordResetRequestService = passwordResetRequestService;
@@ -75,9 +71,6 @@ public class UserController {
 
     @GetMapping("/verify")
     public ResponseEntity<Map<String, Object>> verifyUser() {
-        // Setup the user context from Spring Security - this sets the PostgreSQL context
-        userContextService.setupUserContext();
-
         // Verify user status
         Map<String, Object> response = userValidationService.verifyUser();
         return ResponseEntity.ok(response);
@@ -85,14 +78,8 @@ public class UserController {
 
     @GetMapping("/info")
     public ResponseEntity<Map<String, Object>> getUserInfo() {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
-        // Get the current user ID from the audit context
-        Long userId = Long.parseLong(auditContextService.getCurrentUser());
-
         // Call user info service
-        Map<String, Object> responseBody = userInfoService.getUserInfo(userId);
+        Map<String, Object> responseBody = userInfoService.getUserInfo(userContextService.getCurrentUserId());
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);
@@ -101,9 +88,6 @@ public class UserController {
 
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(HttpServletResponse response) {
-        // Setup the user context
-        userContextService.setupUserContext();
-
         // Call logout service
         Map<String, Object> responseBody = userLogoutService.logoutUser(response);
 
@@ -113,17 +97,10 @@ public class UserController {
 
     @PostMapping("/request-password-reset")
     public ResponseEntity<Map<String, Object>> requestPasswordReset() {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
+        // Find the user by ID
+        Optional<User> userOpt = userRepository.findById(Integer.parseInt(userContextService.getCurrentUserIdAsString()));
 
         Map<String, Object> response = new HashMap<>();
-
-        String userIdStr = auditContextService.getCurrentUser();
-        // Convert string ID to integer
-        Integer userId = Integer.parseInt(userIdStr);
-
-        // Find the user by ID
-        Optional<User> userOpt = userRepository.findById(userId);
 
         if (userOpt.isEmpty()) {
             response.put("success", false);
@@ -143,14 +120,8 @@ public class UserController {
 
     @PostMapping("/renew-token")
     public ResponseEntity<Map<String, Object>> renewToken(HttpServletResponse response) {
-        // Setup the user context
-        userContextService.setupUserContext();
-
-        // Get the current user ID from the audit context
-        Long userId = Long.parseLong(auditContextService.getCurrentUser());
-
         // Call token renewal service
-        Map<String, Object> responseBody = jwtTokenRenewalService.renewToken(userId, response);
+        Map<String, Object> responseBody = jwtTokenRenewalService.renewToken(userContextService.getCurrentUserId(), response);
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);
@@ -159,14 +130,8 @@ public class UserController {
 
     @PostMapping("/deactivate")
     public ResponseEntity<Map<String, Object>> deactivateAccount() {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
-        // Get the current user ID from the audit context
-        Long userId = Long.parseLong(auditContextService.getCurrentUser());
-
         // Call deactivation service
-        Map<String, Object> responseBody = userDeactivationService.deactivateUser(userId);
+        Map<String, Object> responseBody = userDeactivationService.deactivateUser(userContextService.getCurrentUserId());
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);
@@ -175,14 +140,8 @@ public class UserController {
 
     @PostMapping("/change-email")
     public ResponseEntity<Map<String, Object>> requestEmailChange(@Valid @RequestBody EmailChangeRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
-        // Get the current user ID from the audit context
-        Long userId = Long.parseLong(auditContextService.getCurrentUser());
-
         // Call email change request service
-        Map<String, Object> responseBody = emailChangeRequestService.requestEmailChange(userId, request.getNewEmail());
+        Map<String, Object> responseBody = emailChangeRequestService.requestEmailChange(userContextService.getCurrentUserId(), request.getNewEmail());
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);
@@ -193,14 +152,8 @@ public class UserController {
 
     @GetMapping("/api-keys")
     public ResponseEntity<Map<String, Object>> listApiKeys() {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
-        // Get the current user ID from the audit context
-        Long userId = Long.parseLong(auditContextService.getCurrentUser());
-
         // Call API key list service
-        Map<String, Object> responseBody = apiKeyListService.listApiKeys(userId);
+        Map<String, Object> responseBody = apiKeyListService.listApiKeys(userContextService.getCurrentUserId());
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);
@@ -209,15 +162,9 @@ public class UserController {
 
     @PostMapping("/api-keys")
     public ResponseEntity<Map<String, Object>> addApiKey(@Valid @RequestBody ApiKeyAddRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
-        // Get the current user ID from the audit context
-        Long userId = Long.parseLong(auditContextService.getCurrentUser());
-
         // Call API key add service with secret key
         Map<String, Object> responseBody = apiKeyAddService.addApiKey(
-                userId, request.getPlatformName(), request.getApiKeyValue(), request.getSecretKey());
+                userContextService.getCurrentUserId(), request.getPlatformName(), request.getApiKeyValue(), request.getSecretKey());
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);
@@ -226,15 +173,9 @@ public class UserController {
 
     @PutMapping("/api-keys")
     public ResponseEntity<Map<String, Object>> updateApiKey(@Valid @RequestBody ApiKeyUpdateRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
-        // Get the current user ID from the audit context
-        Long userId = Long.parseLong(auditContextService.getCurrentUser());
-
         // Call API key update service with secret key
         Map<String, Object> responseBody = apiKeyUpdateService.updateApiKey(
-                userId, request.getApiKeyId(), request.getPlatformName(),
+                userContextService.getCurrentUserId(), request.getApiKeyId(), request.getPlatformName(),
                 request.getApiKeyValue(), request.getSecretKey());
 
         // Return appropriate response
@@ -244,14 +185,8 @@ public class UserController {
 
     @DeleteMapping("/api-keys")
     public ResponseEntity<Map<String, Object>> deleteApiKey(@Valid @RequestBody ApiKeyDeleteRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
-        // Get the current user ID from the audit context
-        Long userId = Long.parseLong(auditContextService.getCurrentUser());
-
         // Call API key delete service
-        Map<String, Object> responseBody = apiKeyDeleteService.deleteApiKey(userId, request.getApiKeyId());
+        Map<String, Object> responseBody = apiKeyDeleteService.deleteApiKey(userContextService.getCurrentUserId(), request.getApiKeyId());
 
         // Return appropriate response
         boolean success = (boolean) responseBody.getOrDefault("success", false);

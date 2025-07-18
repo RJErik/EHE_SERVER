@@ -20,7 +20,7 @@ public class EmailChangeRequest {
     @Email
     @Pattern(regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
             message = "Email must be in valid format")
-    @Column(name = "new_email", nullable = false, length = 255)
+    @Column(name = "new_email", nullable = false)
     private String newEmail;
 
     // Default constructor

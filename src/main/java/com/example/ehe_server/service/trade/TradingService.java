@@ -2,10 +2,8 @@ package com.example.ehe_server.service.trade;
 
 import com.example.ehe_server.entity.ApiKey;
 import com.example.ehe_server.entity.Portfolio;
-import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.PortfolioRepository;
-import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.binance.BinanceAccountService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.trade.TradingServiceInterface;
@@ -19,29 +17,26 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
+@Transactional
 public class TradingService implements TradingServiceInterface {
 
     private final PortfolioRepository portfolioRepository;
-    private final UserRepository userRepository;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
     private final BinanceAccountService binanceAccountService;
 
     // Define precision constants for Binance API
     private static final int QUOTE_ORDER_QTY_PRECISION = 8; // Standard precision for most quote assets like USDT
     private static final int QUANTITY_PRECISION = 8; // Standard precision for most base assets
+    private final UserContextService userContextService;
 
     public TradingService(
             PortfolioRepository portfolioRepository,
-            UserRepository userRepository,
             LoggingServiceInterface loggingService,
-            AuditContextService auditContextService,
-            BinanceAccountService binanceAccountService) {
+            BinanceAccountService binanceAccountService, UserContextService userContextService) {
         this.portfolioRepository = portfolioRepository;
-        this.userRepository = userRepository;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
         this.binanceAccountService = binanceAccountService;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -55,15 +50,14 @@ public class TradingService implements TradingServiceInterface {
                     " for portfolio: " + portfolioId + " using " + quantityType);
 
             // Get current user ID from audit context
-            Integer userId;
+            int userId;
             String userIdStr;
 
             if (explicitUserId != null) {
                 userId = explicitUserId;
-                userIdStr = explicitUserId.toString();
             } else {
                 // Fall back to audit context for regular (non-automated) trades
-                userIdStr = auditContextService.getCurrentUser();
+                userIdStr = userContextService.getCurrentUserIdAsString();
                 if (userIdStr == null || userIdStr.isEmpty()) {
                     result.put("success", false);
                     result.put("message", "No user context available");
@@ -72,31 +66,12 @@ public class TradingService implements TradingServiceInterface {
                 userId = Integer.parseInt(userIdStr);
             }
 
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Market order execution failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Market order execution failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
-
             // Check if portfolio exists and belongs to the user
             Optional<Portfolio> portfolioOptional = portfolioRepository.findByPortfolioIdAndUser_UserId(portfolioId, userId);
             if (portfolioOptional.isEmpty()) {
                 result.put("success", false);
                 result.put("message", "Portfolio not found or doesn't belong to the user");
-                loggingService.logAction(userId, userIdStr,
-                        "Market order execution failed: Portfolio not found or doesn't belong to user, portfolioId=" + portfolioId);
+                loggingService.logAction("Market order execution failed: Portfolio not found or doesn't belong to user, portfolioId=" + portfolioId);
                 return result;
             }
 
@@ -106,8 +81,7 @@ public class TradingService implements TradingServiceInterface {
             if (apiKey == null) {
                 result.put("success", false);
                 result.put("message", "No API key associated with portfolio. Cannot execute trade.");
-                loggingService.logAction(userId, userIdStr,
-                        "Market order execution failed: No API key associated with portfolio: " + portfolioId);
+                loggingService.logAction("Market order execution failed: No API key associated with portfolio: " + portfolioId);
                 return result;
             }
 
@@ -138,8 +112,7 @@ public class TradingService implements TradingServiceInterface {
             } else {
                 result.put("success", false);
                 result.put("message", "Invalid quantity type: " + quantityType);
-                loggingService.logAction(userId, userIdStr,
-                        "Market order execution failed: Invalid quantity type: " + quantityType);
+                loggingService.logAction("Market order execution failed: Invalid quantity type: " + quantityType);
                 return result;
             }
 
@@ -155,14 +128,14 @@ public class TradingService implements TradingServiceInterface {
                 // Log the successful trade
                 String tradeDetails = action + " " + (quantity != null ? quantity : quoteOrderQty) +
                         " of " + stockSymbol + " using " + quantityType;
-                loggingService.logAction(userId, userIdStr, "Market order executed: " + tradeDetails);
+                loggingService.logAction("Market order executed: " + tradeDetails);
             } else {
                 // Order failed
                 result.put("success", false);
                 result.put("message", "Failed to execute order: " +
                         (orderResult.containsKey("message") ? orderResult.get("message") : "Unknown error"));
 
-                loggingService.logAction(userId, userIdStr, "Market order failed: " +
+                loggingService.logAction("Market order failed: " +
                         (orderResult.containsKey("message") ? orderResult.get("message") : "Unknown error"));
             }
 
@@ -171,8 +144,7 @@ public class TradingService implements TradingServiceInterface {
             e.printStackTrace();
 
             // Log error
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error executing market order: " + e.getMessage(), e);
+            loggingService.logError("Error executing market order: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);

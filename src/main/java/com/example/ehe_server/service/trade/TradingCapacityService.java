@@ -2,7 +2,7 @@ package com.example.ehe_server.service.trade;
 
 import com.example.ehe_server.entity.*;
 import com.example.ehe_server.repository.*;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.binance.BinanceAccountService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.trade.TradingCapacityServiceInterface;
@@ -14,34 +14,31 @@ import java.math.RoundingMode;
 import java.util.*;
 
 @Service
+@Transactional
 public class TradingCapacityService implements TradingCapacityServiceInterface {
 
     private final PortfolioRepository portfolioRepository;
-    private final UserRepository userRepository;
     private final HoldingRepository holdingRepository;
     private final PlatformStockRepository platformStockRepository;
     private final MarketCandleRepository marketCandleRepository;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
     private final BinanceAccountService binanceAccountService;
+    private final UserContextService userContextService;
 
     public TradingCapacityService(
             PortfolioRepository portfolioRepository,
-            UserRepository userRepository,
             HoldingRepository holdingRepository,
             PlatformStockRepository platformStockRepository,
             MarketCandleRepository marketCandleRepository,
             LoggingServiceInterface loggingService,
-            AuditContextService auditContextService,
-            BinanceAccountService binanceAccountService) {
+            BinanceAccountService binanceAccountService, UserContextService userContextService) {
         this.portfolioRepository = portfolioRepository;
-        this.userRepository = userRepository;
         this.holdingRepository = holdingRepository;
         this.platformStockRepository = platformStockRepository;
         this.marketCandleRepository = marketCandleRepository;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
         this.binanceAccountService = binanceAccountService;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -52,35 +49,15 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
         try {
             System.out.println("Calculating trading capacity for portfolioId: " + portfolioId + ", stock: " + stockSymbol);
 
-            // Get current user ID from audit context
-            String userIdStr = auditContextService.getCurrentUser();
-            Integer userId = Integer.parseInt(userIdStr);
-
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Trading capacity calculation failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Trading capacity calculation failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
+            // Get current user ID from user context
+            Integer userId = Integer.parseInt(userContextService.getCurrentUserIdAsString());
 
             // Check if portfolio exists and belongs to the user
             Optional<Portfolio> portfolioOptional = portfolioRepository.findByPortfolioIdAndUser_UserId(portfolioId, userId);
             if (portfolioOptional.isEmpty()) {
                 result.put("success", false);
                 result.put("message", "Portfolio not found or doesn't belong to the user");
-                loggingService.logAction(userId, userIdStr,
-                        "Trading capacity calculation failed: Portfolio not found or doesn't belong to user, portfolioId=" + portfolioId);
+                loggingService.logAction("Trading capacity calculation failed: Portfolio not found or doesn't belong to user, portfolioId=" + portfolioId);
                 return result;
             }
 
@@ -90,8 +67,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
             if (apiKey == null) {
                 result.put("success", false);
                 result.put("message", "No API key associated with portfolio. Cannot determine trading capacity.");
-                loggingService.logAction(userId, userIdStr,
-                        "Trading capacity calculation failed: No API key associated with portfolio: " + portfolioId);
+                loggingService.logAction("Trading capacity calculation failed: No API key associated with portfolio: " + portfolioId);
                 return result;
             }
 
@@ -103,8 +79,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
             } catch (Exception e) {
                 // Log the error but continue with existing data
                 System.out.println("Warning: Failed to update holdings from exchange: " + e.getMessage());
-                loggingService.logError(userId, userIdStr,
-                        "Warning: Failed to update holdings from exchange: " + e.getMessage(), e);
+                loggingService.logError("Warning: Failed to update holdings from exchange: " + e.getMessage(), e);
                 // We'll continue with the data we already have
             }
 
@@ -143,8 +118,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
                 if (stocks.isEmpty()) {
                     result.put("success", false);
                     result.put("message", "Stock not found for the given platform: " + stockSymbol);
-                    loggingService.logAction(userId, userIdStr,
-                            "Trading capacity calculation failed: Stock not found: " + stockSymbol + " on platform: " + platformName);
+                    loggingService.logAction("Trading capacity calculation failed: Stock not found: " + stockSymbol + " on platform: " + platformName);
                     return result;
                 }
             }
@@ -165,7 +139,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
             }
 
             // Get the latest market price for this stock
-            BigDecimal currentPrice = BigDecimal.ZERO;
+            BigDecimal currentPrice;
             MarketCandle latestCandle = marketCandleRepository.findTopByPlatformStockAndTimeframeOrderByTimestampDesc(
                     stock, MarketCandle.Timeframe.M1);
 
@@ -175,8 +149,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
             } else {
                 result.put("success", false);
                 result.put("message", "Could not retrieve current price for " + stockSymbol);
-                loggingService.logAction(userId, userIdStr,
-                        "Trading capacity calculation failed: No price data for: " + stockSymbol);
+                loggingService.logAction("Trading capacity calculation failed: No price data for: " + stockSymbol);
                 return result;
             }
 
@@ -209,16 +182,14 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
             result.put("capacity", capacityData);
 
             // Log success
-            loggingService.logAction(userId, userIdStr,
-                    "Calculated trading capacity for " + stockSymbol + " in portfolio " + portfolio.getPortfolioName());
+            loggingService.logAction("Calculated trading capacity for " + stockSymbol + " in portfolio " + portfolio.getPortfolioName());
 
         } catch (Exception e) {
             System.out.println("Error calculating trading capacity: " + e.getMessage());
             e.printStackTrace();
 
             // Log error
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error calculating trading capacity: " + e.getMessage(), e);
+            loggingService.logError("Error calculating trading capacity: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);

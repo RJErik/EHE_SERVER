@@ -4,7 +4,6 @@ import com.example.ehe_server.entity.PlatformStock;
 import com.example.ehe_server.repository.PlatformStockRepository;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.stock.StockServiceInterface;
-import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.annotation.PostConstruct;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -15,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@Transactional
 public class BinanceDataInitializationService {
     private static final String PLATFORM_NAME = "Binance";
 
@@ -42,11 +42,13 @@ public class BinanceDataInitializationService {
 
     @PostConstruct
     public void initialize() {
-        loggingService.logAction(null, "System", "Initializing Binance data synchronization");
+        //SYSTEM SET HERE
+        loggingService.logAction("Initializing Binance data synchronization");
 
         // Check if we need to do initialization as system user
         if (!stockRepository.existsByPlatformName(PLATFORM_NAME)) {
-            loggingService.logAction(null, "System", "No Binance stocks found. Please add them through the admin interface first.");
+            //SYSTEM SET HERE
+            loggingService.logAction("No Binance stocks found. Please add them through the admin interface first.");
             return;
         }
 
@@ -54,14 +56,16 @@ public class BinanceDataInitializationService {
         List<PlatformStock> stocks = stockRepository.findByPlatformName(PLATFORM_NAME);
 
         if (!stocks.isEmpty()) {
-            loggingService.logAction(null, "System", "Found " + stocks.size() + " Binance symbols in database");
+            //SYSTEM SET HERE
+            loggingService.logAction("Found " + stocks.size() + " Binance symbols in database");
 
             // Initialize each stock
             for (PlatformStock stock : stocks) {
                 setupSymbol(stock.getStockSymbol());
             }
         } else {
-            loggingService.logAction(null, "System", "No Binance symbols found in database. Add some through the API first.");
+            //SYSTEM SET HERE
+            loggingService.logAction("No Binance symbols found in database. Add some through the API first.");
         }
     }
 
@@ -83,23 +87,27 @@ public class BinanceDataInitializationService {
                     }
                 }
             } else {
-                loggingService.logAction(null, "System", "Failed to get stocks from StockService: " +
+                //SYSTEM SET HERE
+                loggingService.logAction("Failed to get stocks from StockService: " +
                         stocksResponse.getOrDefault("message", "Unknown error"));
             }
         } catch (Exception e) {
-            loggingService.logError(null, "System", "Error syncing all Binance stocks: " + e.getMessage(), e);
+            //SYSTEM SET HERE
+            loggingService.logError("Error syncing all Binance stocks: " + e.getMessage(), e);
         }
     }
 
     public void setupSymbol(String symbol) {
         try {
             // Step 1: Sync historical data
-            loggingService.logAction(null, "System", "Starting historical data sync for " + symbol);
+            //SYSTEM SET HERE
+            loggingService.logAction("Starting historical data sync for " + symbol);
             candleService.syncHistoricalData(symbol);
 
             // Step 2: Set up real-time updates if not already subscribed
             if (!activeSubscriptions.getOrDefault(symbol, false)) {
-                loggingService.logAction(null, "System", "Setting up real-time updates for " + symbol);
+                //SYSTEM SET HERE
+                loggingService.logAction("Setting up real-time updates for " + symbol);
                 PlatformStock stock = getStock(symbol);
 
                 if (stock != null) {
@@ -110,7 +118,8 @@ public class BinanceDataInitializationService {
                 }
             }
         } catch (Exception e) {
-            loggingService.logError(null, "System", "Failed to initialize " + symbol + " data: " + e.getMessage(), e);
+            //SYSTEM SET HERE
+            loggingService.logError("Failed to initialize " + symbol + " data: " + e.getMessage(), e);
         }
     }
 
@@ -118,14 +127,16 @@ public class BinanceDataInitializationService {
     @Scheduled(cron = "0 5 0 * * *") // 00:05 UTC daily
     public void performDailyMaintenance() {
         try {
-            loggingService.logAction(null, "System", "Running daily maintenance to ensure data completeness");
+            //SYSTEM SET HERE
+            loggingService.logAction("Running daily maintenance to ensure data completeness");
 
             List<PlatformStock> stocks = stockRepository.findByPlatformName(PLATFORM_NAME);
             for (PlatformStock stock : stocks) {
                 candleService.syncHistoricalData(stock.getStockSymbol());
             }
         } catch (Exception e) {
-            loggingService.logError(null, "System", "Error during daily maintenance: " + e.getMessage(), e);
+            //SYSTEM SET HERE
+            loggingService.logError("Error during daily maintenance: " + e.getMessage(), e);
         }
     }
 
@@ -133,7 +144,8 @@ public class BinanceDataInitializationService {
     @Scheduled(cron = "0 0 * * * *") // Every hour
     public void verifyWebSocketConnections() {
         try {
-            loggingService.logAction(null, "System", "Verifying WebSocket connections");
+            //SYSTEM SET HERE
+            loggingService.logAction("Verifying WebSocket connections");
 
             List<PlatformStock> stocks = stockRepository.findByPlatformName(PLATFORM_NAME);
             for (PlatformStock stock : stocks) {
@@ -146,7 +158,8 @@ public class BinanceDataInitializationService {
                 }
             }
         } catch (Exception e) {
-            loggingService.logError(null, "System", "Error verifying WebSocket connections: " + e.getMessage(), e);
+            //SYSTEM SET HERE
+            loggingService.logError("Error verifying WebSocket connections: " + e.getMessage(), e);
         }
     }
 

@@ -1,13 +1,12 @@
 package com.example.ehe_server.service.automatictrade;
 
 import com.example.ehe_server.entity.AutomatedTradeRule;
-import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.AutomatedTradeRuleRepository;
-import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeRuleSearchServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
@@ -15,23 +14,20 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearchServiceInterface {
 
     private final AutomatedTradeRuleRepository automatedTradeRuleRepository;
-    private final UserRepository userRepository;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private final UserContextService userContextService;
 
     public AutomatedTradeRuleSearchService(
             AutomatedTradeRuleRepository automatedTradeRuleRepository,
-            UserRepository userRepository,
-            LoggingServiceInterface loggingService,
-            AuditContextService auditContextService) {
+            LoggingServiceInterface loggingService, UserContextService userContextService) {
         this.automatedTradeRuleRepository = automatedTradeRuleRepository;
-        this.userRepository = userRepository;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -48,27 +44,8 @@ public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearch
         Map<String, Object> result = new HashMap<>();
 
         try {
-            // Get current user ID from audit context
-            String userIdStr = auditContextService.getCurrentUser();
-            Integer userId = Integer.parseInt(userIdStr);
-
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Automated trade rule search failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Automated trade rule search failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
+            // Get current user ID from user context
+            Integer userId = Integer.parseInt(userContextService.getCurrentUserIdAsString());
 
             // Parse condition type if provided
             AutomatedTradeRule.ConditionType conditionType = null;
@@ -78,8 +55,7 @@ public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearch
                 } catch (IllegalArgumentException e) {
                     result.put("success", false);
                     result.put("message", "Invalid condition type");
-                    loggingService.logAction(userId, userIdStr,
-                            "Automated trade rule search failed: Invalid condition type: " + conditionTypeStr);
+                    loggingService.logAction("Automated trade rule search failed: Invalid condition type: " + conditionTypeStr);
                     return result;
                 }
             }
@@ -92,8 +68,7 @@ public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearch
                 } catch (IllegalArgumentException e) {
                     result.put("success", false);
                     result.put("message", "Invalid action type");
-                    loggingService.logAction(userId, userIdStr,
-                            "Automated trade rule search failed: Invalid action type: " + actionTypeStr);
+                    loggingService.logAction("Automated trade rule search failed: Invalid action type: " + actionTypeStr);
                     return result;
                 }
             }
@@ -106,8 +81,7 @@ public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearch
                 } catch (IllegalArgumentException e) {
                     result.put("success", false);
                     result.put("message", "Invalid quantity type");
-                    loggingService.logAction(userId, userIdStr,
-                            "Automated trade rule search failed: Invalid quantity type: " + quantityTypeStr);
+                    loggingService.logAction("Automated trade rule search failed: Invalid quantity type: " + quantityTypeStr);
                     return result;
                 }
             }
@@ -157,7 +131,7 @@ public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearch
                 logMessage = logMessage.substring(0, logMessage.length() - 2);
             }
 
-            loggingService.logAction(userId, userIdStr, logMessage);
+            loggingService.logAction(logMessage);
 
             // Transform to response format
             List<Map<String, Object>> rulesList = filteredRules.stream()
@@ -184,13 +158,11 @@ public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearch
             result.put("automatedTradeRules", rulesList);
 
             // Log success
-            loggingService.logAction(userId, userIdStr,
-                    "Automated trade rule search successful, found " + rulesList.size() + " rules");
+            loggingService.logAction("Automated trade rule search successful, found " + rulesList.size() + " rules");
 
         } catch (Exception e) {
             // Log error
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error searching automated trade rules: " + e.getMessage(), e);
+            loggingService.logError("Error searching automated trade rules: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);

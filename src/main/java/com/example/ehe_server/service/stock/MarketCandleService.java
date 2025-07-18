@@ -10,6 +10,7 @@ import com.example.ehe_server.repository.PlatformStockRepository;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.stock.MarketCandleServiceInterface;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,6 +21,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class MarketCandleService implements MarketCandleServiceInterface {
 
     private final MarketCandleRepository marketCandleRepository;
@@ -141,7 +143,8 @@ public class MarketCandleService implements MarketCandleServiceInterface {
             e.printStackTrace();
             response.setSuccess(false);
             response.setMessage("Error fetching candle data: " + e.getMessage());
-            loggingService.logError(null, "system", "Error fetching candle data: " + e.getMessage(), e);
+            //SYSTEM SET HERE
+            loggingService.logError("Error fetching candle data: " + e.getMessage(), e);
         }
 
         System.out.println("getCandleData() completed at " + LocalDateTime.now().format(formatter));
@@ -247,7 +250,8 @@ public class MarketCandleService implements MarketCandleServiceInterface {
         } catch (Exception e) {
             System.out.println("CRITICAL ERROR in getUpdatedCandles: " + e.getMessage());
             e.printStackTrace();
-            loggingService.logError(null, "system", "Error fetching updated candles: " + e.getMessage(), e);
+            //SYSTEM SET HERE
+            loggingService.logError("Error fetching updated candles: " + e.getMessage(), e);
             System.out.println(">>> RETURNING 0 CANDLES DUE TO ERROR FOR TIMEFRAME " + timeframeStr + " <<<");
             return new ArrayList<>();
         }
@@ -368,7 +372,8 @@ public class MarketCandleService implements MarketCandleServiceInterface {
         } catch (Exception e) {
             System.out.println("ERROR in getModifiedLatestCandle: " + e.getMessage());
             e.printStackTrace();
-            loggingService.logError(null, "system", "Error checking for modified candle: " + e.getMessage(), e);
+            //SYSTEM SET HERE
+            loggingService.logError("Error checking for modified candle: " + e.getMessage(), e);
             System.out.println(">>> RETURNING NO MODIFIED CANDLES DUE TO ERROR FOR TIMEFRAME " + timeframeStr + " <<<");
             return null;
         }

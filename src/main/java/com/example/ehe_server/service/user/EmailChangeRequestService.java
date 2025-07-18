@@ -3,10 +3,11 @@ package com.example.ehe_server.service.user;
 import com.example.ehe_server.entity.EmailChangeRequest;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
+import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.EmailChangeRequestRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.user.EmailChangeRequestServiceInterface;
@@ -24,6 +25,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class EmailChangeRequestService implements EmailChangeRequestServiceInterface {
 
     private static final int RATE_LIMIT_MAX_REQUESTS = 3;
@@ -37,7 +39,8 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
     private final EmailChangeRequestRepository emailChangeRequestRepository;
     private final EmailServiceInterface emailService;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
+    private final UserContextService userContextService;
+    private final AdminRepository adminRepository;
 
     @Value("${app.verification.token.expiry-hours}")
     private long tokenExpiryHours;
@@ -47,14 +50,14 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
             VerificationTokenRepository verificationTokenRepository,
             EmailChangeRequestRepository emailChangeRequestRepository,
             EmailServiceInterface emailService,
-            LoggingServiceInterface loggingService,
-            AuditContextService auditContextService) {
+            LoggingServiceInterface loggingService, UserContextService userContextService, AdminRepository adminRepository) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.emailChangeRequestRepository = emailChangeRequestRepository;
         this.emailService = emailService;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
+        this.userContextService = userContextService;
+        this.adminRepository = adminRepository;
     }
 
     @Override
@@ -67,16 +70,14 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
             if (newEmail == null || newEmail.trim().isEmpty()) {
                 response.put("success", false);
                 response.put("message", "Email is required");
-                loggingService.logAction(null, auditContextService.getCurrentUser(),
-                        "Email change failed: Missing email");
+                loggingService.logAction("Email change failed: Missing email");
                 return response;
             }
 
             if (!EMAIL_PATTERN.matcher(newEmail).matches()) {
                 response.put("success", false);
                 response.put("message", "Please enter a valid email address");
-                loggingService.logAction(null, auditContextService.getCurrentUser(),
-                        "Email change failed: Invalid email format");
+                loggingService.logAction("Email change failed: Invalid email format");
                 return response;
             }
 
@@ -86,23 +87,28 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
             if (userOpt.isEmpty()) {
                 response.put("success", false);
                 response.put("message", "User not found");
-                loggingService.logAction(null, auditContextService.getCurrentUser(),
-                        "Email change failed: User not found");
+                loggingService.logAction("Email change failed: User not found");
                 return response;
             }
 
             User user = userOpt.get();
-            String userIdStr = String.valueOf(user.getUserId());
 
             // Set audit context
-            auditContextService.setCurrentUser(userIdStr);
+            boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+
+            // Create roles list based on user status
+            String role = "USER"; // All authenticated users have USER role
+
+            if (isAdmin) {
+                role = "ADMIN"; // Add ADMIN role if user is in Admin table
+            }
+            userContextService.setUser(String.valueOf(user.getUserId()), role);
 
             // Check if account is active
             if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
                 response.put("success", false);
                 response.put("message", "Your account is not active");
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Email change failed: Account not active, status=" + user.getAccountStatus());
+                loggingService.logAction("Email change failed: Account not active, status=" + user.getAccountStatus());
                 return response;
             }
 
@@ -110,8 +116,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
             if (user.getEmail().equals(newEmail)) {
                 response.put("success", false);
                 response.put("message", "The new email is the same as your current email");
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Email change failed: New email is the same as current");
+                loggingService.logAction("Email change failed: New email is the same as current");
                 return response;
             }
 
@@ -120,8 +125,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
             if (existingUserWithEmail.isPresent() && !existingUserWithEmail.get().getUserId().equals(user.getUserId())) {
                 response.put("success", false);
                 response.put("message", "This email is already in use by another account");
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Email change failed: Email already in use");
+                loggingService.logAction("Email change failed: Email already in use");
                 return response;
             }
 
@@ -134,8 +138,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
                 response.put("success", false);
                 response.put("message", "Too many email change requests. Please wait " +
                         RATE_LIMIT_MINUTES + " minutes before trying again.");
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Email change rate limit hit");
+                loggingService.logAction("Email change rate limit hit");
                 response.put("showResendButton", true);
                 return response;
             }
@@ -151,8 +154,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
 
             if (!tokensToUpdate.isEmpty()) {
                 verificationTokenRepository.saveAll(tokensToUpdate);
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Invalidated " + tokensToUpdate.size() + " previous active email change token(s)");
+                loggingService.logAction("Invalidated " + tokensToUpdate.size() + " previous active email change token(s)");
             }
 
             // Create new token
@@ -166,8 +168,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
             EmailChangeRequest emailChangeRequest = new EmailChangeRequest(newToken, newEmail);
             emailChangeRequestRepository.save(emailChangeRequest);
 
-            loggingService.logAction(user.getUserId(), userIdStr,
-                    "Generated new email change token and request");
+            loggingService.logAction("Generated new email change token and request");
 
             // Send email with verification link
             try {
@@ -179,14 +180,12 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
                 return response;
             } catch (Exception e) {
                 // Log failure
-                loggingService.logError(user.getUserId(), userIdStr,
-                        "Failed to send email change verification email", e);
+                loggingService.logError("Failed to send email change verification email", e);
                 // Throw to trigger transaction rollback
                 throw e;
             }
         } catch (Exception e) {
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error during email change request: " + e.getMessage(), e);
+            loggingService.logError("Error during email change request: " + e.getMessage(), e);
             response.put("success", false);
             response.put("message", "An error occurred. Please try again later.");
             return response;

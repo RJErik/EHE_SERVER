@@ -6,6 +6,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -19,6 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service
+@Transactional
 public class BinanceAccountService {
 
     private final RestTemplate restTemplate;
@@ -63,7 +65,7 @@ public class BinanceAccountService {
 
             return response.getBody();
         } catch (Exception e) {
-            loggingService.logError(null, null, "Error getting account info from Binance: " + e.getMessage(), e);
+            loggingService.logError("Error getting account info from Binance: " + e.getMessage(), e);
             Map<String, Object> errorResult = new HashMap<>();
             errorResult.put("success", false);
             errorResult.put("message", "Failed to connect to Binance API: " + e.getMessage());
@@ -130,7 +132,7 @@ public class BinanceAccountService {
 
             return response.getBody();
         } catch (Exception e) {
-            loggingService.logError(null, null, "Error placing order on Binance: " + e.getMessage(), e);
+            loggingService.logError("Error placing order on Binance: " + e.getMessage(), e);
             Map<String, Object> errorResult = new HashMap<>();
             errorResult.put("success", false);
             errorResult.put("message", "Failed to place order via Binance API: " + e.getMessage());

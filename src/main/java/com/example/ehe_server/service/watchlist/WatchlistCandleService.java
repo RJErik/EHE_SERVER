@@ -5,41 +5,38 @@ import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.Watchlist;
 import com.example.ehe_server.entity.WatchlistItem;
 import com.example.ehe_server.repository.MarketCandleRepository;
-import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.WatchlistItemRepository;
 import com.example.ehe_server.repository.WatchlistRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.watchlist.WatchlistCandleServiceInterface;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
+@Transactional
 public class WatchlistCandleService implements WatchlistCandleServiceInterface {
 
     private final WatchlistRepository watchlistRepository;
     private final WatchlistItemRepository watchlistItemRepository;
-    private final UserRepository userRepository;
     private final MarketCandleRepository marketCandleRepository;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private final UserContextService userContextService;
 
     public WatchlistCandleService(
             WatchlistRepository watchlistRepository,
             WatchlistItemRepository watchlistItemRepository,
-            UserRepository userRepository,
             MarketCandleRepository marketCandleRepository,
-            LoggingServiceInterface loggingService,
-            AuditContextService auditContextService) {
+            LoggingServiceInterface loggingService, UserContextService userContextService) {
         this.watchlistRepository = watchlistRepository;
         this.watchlistItemRepository = watchlistItemRepository;
-        this.userRepository = userRepository;
         this.marketCandleRepository = marketCandleRepository;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -47,27 +44,9 @@ public class WatchlistCandleService implements WatchlistCandleServiceInterface {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            // Get current user ID from audit context
-            String userIdStr = auditContextService.getCurrentUser();
-            Integer userId = Integer.parseInt(userIdStr);
+            // Get current user ID from user context
+            User user = userContextService.getCurrentHumanUser();
 
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Watchlist candles failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Watchlist candles failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
 
             // Get watchlist for the user
             Optional<Watchlist> watchlistOptional = watchlistRepository.findByUser(user);
@@ -75,7 +54,7 @@ public class WatchlistCandleService implements WatchlistCandleServiceInterface {
                 // No watchlist found, return empty list
                 result.put("success", true);
                 result.put("candles", Collections.emptyList());
-                loggingService.logAction(userId, userIdStr, "Watchlist candles: No watchlist found for user");
+                loggingService.logAction("Watchlist candles: No watchlist found for user");
                 return result;
             }
 
@@ -110,13 +89,11 @@ public class WatchlistCandleService implements WatchlistCandleServiceInterface {
             result.put("candles", candles);
 
             // Log success
-            loggingService.logAction(userId, userIdStr,
-                    "Retrieved latest daily candles for " + candles.size() + " watchlist items");
+            loggingService.logAction("Retrieved latest daily candles for " + candles.size() + " watchlist items");
 
         } catch (Exception e) {
             // Log error
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error retrieving watchlist candles: " + e.getMessage(), e);
+            loggingService.logError("Error retrieving watchlist candles: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);

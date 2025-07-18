@@ -2,7 +2,7 @@ package com.example.ehe_server.service.portfolio;
 
 import com.example.ehe_server.entity.*;
 import com.example.ehe_server.repository.*;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.binance.BinanceAccountService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioValueServiceInterface;
@@ -11,38 +11,34 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
+@Transactional
 public class PortfolioValueService implements PortfolioValueServiceInterface {
 
     private final PortfolioRepository portfolioRepository;
-    private final UserRepository userRepository;
     private final HoldingRepository holdingRepository;
     private final PlatformStockRepository platformStockRepository;
     private final MarketCandleRepository marketCandleRepository;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
     private final BinanceAccountService binanceAccountService;
+    private final UserContextService userContextService;
 
     public PortfolioValueService(
             PortfolioRepository portfolioRepository,
-            UserRepository userRepository,
             HoldingRepository holdingRepository,
             PlatformStockRepository platformStockRepository,
             MarketCandleRepository marketCandleRepository,
             LoggingServiceInterface loggingService,
-            AuditContextService auditContextService,
-            BinanceAccountService binanceAccountService) {
+            BinanceAccountService binanceAccountService, UserContextService userContextService) {
         this.portfolioRepository = portfolioRepository;
-        this.userRepository = userRepository;
         this.holdingRepository = holdingRepository;
         this.platformStockRepository = platformStockRepository;
         this.marketCandleRepository = marketCandleRepository;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
         this.binanceAccountService = binanceAccountService;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -52,30 +48,9 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
         try {
             System.out.println("Starting portfolio value calculation for portfolioId: " + portfolioId);
 
-            // Get current user ID from audit context
-            String userIdStr = auditContextService.getCurrentUser();
-            Integer userId = Integer.parseInt(userIdStr);
+            // Get current user ID from user context
+            Integer userId = Integer.parseInt(userContextService.getCurrentUserIdAsString());
             System.out.println("User ID from audit context: " + userId);
-
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                System.out.println("User not found for ID: " + userId);
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Portfolio value calculation failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                System.out.println("User account not active. Status: " + user.getAccountStatus());
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Portfolio value calculation failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
 
             // Check if portfolio exists and belongs to the user
             Optional<Portfolio> portfolioOptional = portfolioRepository.findByPortfolioIdAndUser_UserId(portfolioId, userId);
@@ -83,8 +58,7 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
                 System.out.println("Portfolio not found or doesn't belong to user. PortfolioId: " + portfolioId + ", UserId: " + userId);
                 result.put("success", false);
                 result.put("message", "Portfolio not found or doesn't belong to the user");
-                loggingService.logAction(userId, userIdStr,
-                        "Portfolio value calculation failed: Portfolio not found or doesn't belong to user, portfolioId=" + portfolioId);
+                loggingService.logAction("Portfolio value calculation failed: Portfolio not found or doesn't belong to user, portfolioId=" + portfolioId);
                 return result;
             }
 
@@ -185,16 +159,14 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
                     portfolio.getReservedCash().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(2));
 
             // Log success
-            loggingService.logAction(userId, userIdStr,
-                    "Calculated portfolio value for " + portfolio.getPortfolioName() + ": " + totalValue + " USDT");
+            loggingService.logAction("Calculated portfolio value for " + portfolio.getPortfolioName() + ": " + totalValue + " USDT");
 
         } catch (Exception e) {
             System.out.println("Error calculating portfolio value: " + e.getMessage());
             e.printStackTrace();
 
             // Log error
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error calculating portfolio value: " + e.getMessage(), e);
+            loggingService.logError("Error calculating portfolio value: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);
@@ -212,30 +184,9 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
         try {
             System.out.println("Starting updateHoldings method for portfolioId: " + portfolioId);
 
-            // Get current user ID from audit context
-            String userIdStr = auditContextService.getCurrentUser();
-            Integer userId = Integer.parseInt(userIdStr);
+            // Get current user ID from user context
+            Integer userId = Integer.parseInt(userContextService.getCurrentUserIdAsString());
             System.out.println("User ID from audit context: " + userId);
-
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                System.out.println("User not found for ID: " + userId);
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Holdings update failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                System.out.println("User account not active. Status: " + user.getAccountStatus());
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Holdings update failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
 
             // Check if portfolio exists and belongs to the user
             Optional<Portfolio> portfolioOptional = portfolioRepository.findByPortfolioIdAndUser_UserId(portfolioId, userId);
@@ -243,8 +194,7 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
                 System.out.println("Portfolio not found or doesn't belong to user. PortfolioId: " + portfolioId + ", UserId: " + userId);
                 result.put("success", false);
                 result.put("message", "Portfolio not found or doesn't belong to the user");
-                loggingService.logAction(userId, userIdStr,
-                        "Holdings update failed: Portfolio not found or doesn't belong to user, portfolioId=" + portfolioId);
+                loggingService.logAction("Holdings update failed: Portfolio not found or doesn't belong to user, portfolioId=" + portfolioId);
                 return result;
             }
 
@@ -256,8 +206,7 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
                 System.out.println("No API key associated with portfolio. Cannot update holdings.");
                 result.put("success", false);
                 result.put("message", "No API key associated with portfolio. Cannot update holdings.");
-                loggingService.logAction(userId, userIdStr,
-                        "Holdings update failed: No API key associated with portfolio: " + portfolioId);
+                loggingService.logAction("Holdings update failed: No API key associated with portfolio: " + portfolioId);
                 return result;
             }
 
@@ -385,23 +334,20 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
                     System.out.println("Successfully updated " + addedCount + " holdings");
 
                     // Log success
-                    loggingService.logAction(userId, userIdStr,
-                            "Updated holdings for portfolio " + portfolio.getPortfolioName() + ", added " + addedCount +
-                                    " holdings, reserved cash: " + reservedCash);
+                    loggingService.logAction("Updated holdings for portfolio " + portfolio.getPortfolioName() +
+                            ", added " + addedCount + " holdings, reserved cash: " + reservedCash);
                 } else {
                     System.out.println("No balances found in Binance response");
                     result.put("success", false);
                     result.put("message", "Failed to retrieve balances from Binance");
-                    loggingService.logAction(userId, userIdStr,
-                            "Holdings update failed: No balances in Binance response");
+                    loggingService.logAction("Holdings update failed: No balances in Binance response");
                 }
             } else {
                 // API call was not successful, don't modify existing holdings
                 System.out.println("Error in Binance API response. Keeping existing holdings.");
                 result.put("success", false);
                 result.put("message", "Failed to connect to Binance API. Using existing holdings.");
-                loggingService.logAction(userId, userIdStr,
-                        "Holdings update failed: Binance API error. Using existing holdings.");
+                loggingService.logAction("Holdings update failed: Binance API error. Using existing holdings.");
             }
 
         } catch (Exception e) {
@@ -409,8 +355,7 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
             System.out.println("Error updating holdings: " + e.getMessage());
             e.printStackTrace();
 
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error updating holdings: " + e.getMessage(), e);
+            loggingService.logError("Error updating holdings: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);

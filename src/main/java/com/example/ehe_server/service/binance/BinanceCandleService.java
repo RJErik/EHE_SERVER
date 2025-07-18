@@ -4,7 +4,7 @@ import com.example.ehe_server.entity.MarketCandle;
 import com.example.ehe_server.entity.PlatformStock;
 import com.example.ehe_server.repository.MarketCandleRepository;
 import com.example.ehe_server.repository.PlatformStockRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +17,7 @@ import java.time.*;
 import java.util.*;
 
 @Service
+@Transactional
 public class BinanceCandleService {
     private static final String PLATFORM_NAME = "Binance";
     private static final int MAX_CANDLES_PER_REQUEST = 1000;
@@ -31,26 +32,26 @@ public class BinanceCandleService {
     private final MarketCandleRepository candleRepository;
     private final PlatformStockRepository stockRepository;
     private final ObjectMapper objectMapper;
-    private final AuditContextService auditContextService;
     private final LoggingServiceInterface loggingService;
+    private final UserContextService userContextService;
 
     public BinanceCandleService(
             BinanceApiClient apiClient,
             MarketCandleRepository candleRepository,
             PlatformStockRepository stockRepository,
             ObjectMapper objectMapper,
-            AuditContextService auditContextService,
-            LoggingServiceInterface loggingService) {
+            LoggingServiceInterface loggingService, UserContextService userContextService) {
         this.apiClient = apiClient;
         this.candleRepository = candleRepository;
         this.stockRepository = stockRepository;
         this.objectMapper = objectMapper;
-        this.auditContextService = auditContextService;
         this.loggingService = loggingService;
+        this.userContextService = userContextService;
     }
 
     @Transactional
     public void syncHistoricalData(String symbol) {
+        userContextService.setUser("SYSTEM", "SYSTEM");
         PlatformStock stock = getOrCreateStock(symbol);
 
         // Find latest existing candle
@@ -60,24 +61,24 @@ public class BinanceCandleService {
 
         if (latestCandle != null) {
             // We have existing data, start from the latest candle
-            loggingService.logAction(null, "System", "Found existing candles for " + symbol +
-                    ". Latest candle at " + latestCandle.getTimestamp());
+            //SYSTEM SET HERE
+            loggingService.logAction("Found existing candles for " + symbol +  ". Latest candle at " + latestCandle.getTimestamp());
 
             // Start from the next minute after latest candle
             Instant startInstant = latestCandle.getTimestamp()
                     .plusMinutes(1)
                     .toInstant(ZoneOffset.UTC);
 
-            loggingService.logAction(null, "System", "Updating candles for " + symbol +
-                    " from " + startInstant.atZone(ZoneOffset.UTC) +
+            //SYSTEM SET HERE
+            loggingService.logAction("Updating candles for " + symbol +  " from " + startInstant.atZone(ZoneOffset.UTC) +
                     " to present (with periodic target time updates)");
 
             // Fetch with dynamic end time updates (null means use current time with updates)
             fetchCandlesInRange(stock, symbol, startInstant, null);
         } else {
             // No existing data, need to find how far back data is available
-            loggingService.logAction(null, "System", "No existing candles for " + symbol +
-                    ". Finding earliest available data...");
+            //SYSTEM SET HERE
+            loggingService.logAction("No existing candles for " + symbol +  ". Finding earliest available data...");
 
             // Find the earliest available data using the backward search strategy
             Instant firstCheckpoint = Instant.now();
@@ -85,16 +86,19 @@ public class BinanceCandleService {
 
             if (earliestDataPoint.isPresent()) {
                 // We found a starting point, fetch from there to current time
-                loggingService.logAction(null, "System", "Found earliest data point for " + symbol +
+                //SYSTEM SET HERE
+                loggingService.logAction("Found earliest data point for " + symbol +
                         " at " + earliestDataPoint.get().atZone(ZoneOffset.UTC));
 
-                loggingService.logAction(null, "System", "Fetching all historical data for " +
+                //SYSTEM SET HERE
+                loggingService.logAction("Fetching all historical data for " +
                         symbol + " with periodic target time updates");
 
                 // Fetch with dynamic end time updates (null means use current time with updates)
                 fetchCandlesInRange(stock, symbol, earliestDataPoint.get(), null);
             } else {
-                loggingService.logAction(null, "System", "Could not find any historical data for " + symbol);
+                //SYSTEM SET HERE
+                loggingService.logAction("Could not find any historical data for " + symbol);
             }
         }
     }
@@ -118,7 +122,8 @@ public class BinanceCandleService {
             // Move back one week
             checkPoint = checkPoint.minus(Duration.ofMinutes(WEEK_IN_MINUTES));
 
-            loggingService.logAction(null, "System", "Checking if data exists for " + symbol +
+            //SYSTEM SET HERE
+            loggingService.logAction("Checking if data exists for " + symbol +
                     " at week starting " + checkPoint.atZone(ZoneOffset.UTC));
 
             // Check if there are any candles in this week
@@ -133,7 +138,8 @@ public class BinanceCandleService {
                 Instant expandedStart = checkPoint.minus(Duration.ofMinutes(HALF_WEEK_IN_MINUTES));
                 Instant expandedEnd = checkPoint.plus(Duration.ofMinutes(WEEK_IN_MINUTES + HALF_WEEK_IN_MINUTES));
 
-                loggingService.logAction(null, "System", "No data found in week. Checking expanded range from " +
+                //SYSTEM SET HERE
+                loggingService.logAction("No data found in week. Checking expanded range from " +
                         expandedStart.atZone(ZoneOffset.UTC) + " to " +
                         expandedEnd.atZone(ZoneOffset.UTC));
 
@@ -141,15 +147,17 @@ public class BinanceCandleService {
 
                 if (hasExpandedCandles) {
                     // Found candles in the expanded range, need to narrow down
-                    loggingService.logAction(null, "System", "Found data in expanded range. Narrowing down...");
+                    //SYSTEM SET HERE
+                    loggingService.logAction("Found data in expanded range. Narrowing down...");
 
                     // Binary search to find the exact starting point would be ideal here
                     // For simplicity, we'll use the expanded start for now
                     lastDataPoint = expandedStart;
                 } else {
                     // No candles even in expanded range, we've found our gap
+                    //SYSTEM SET HERE
                     foundGap = true;
-                    loggingService.logAction(null, "System", "Found data gap. Earliest data appears to be after " +
+                    loggingService.logAction("Found data gap. Earliest data appears to be after " +
                             checkPoint.plus(Duration.ofMinutes(WEEK_IN_MINUTES + HALF_WEEK_IN_MINUTES))
                                     .atZone(ZoneOffset.UTC));
                 }
@@ -188,9 +196,10 @@ public class BinanceCandleService {
             JsonNode candlesArray = objectMapper.readTree(response.getBody());
 
             // If the array is not empty, candles exist in this range
-            return candlesArray.size() > 0;
+            return !candlesArray.isEmpty();
         } catch (Exception e) {
-            loggingService.logError(null, "System", "Error checking for candles: " + e.getMessage(), e);
+            //SYSTEM SET HERE
+            loggingService.logError("Error checking for candles: " + e.getMessage(), e);
             return false;
         }
     }
@@ -214,8 +223,8 @@ public class BinanceCandleService {
         long endTime = targetEndTime.toEpochMilli();
         long currentStartTime = startTime;
 
-        loggingService.logAction(null, "System", "Starting data fetch for " + symbol +
-                " from " + startInstant.atZone(ZoneOffset.UTC) +
+        //SYSTEM SET HERE
+        loggingService.logAction("Starting data fetch for " + symbol + " from " + startInstant.atZone(ZoneOffset.UTC) +
                 " to " + targetEndTime.atZone(ZoneOffset.UTC) +
                 (useDynamicEnd ? " (with dynamic end time)" : ""));
 
@@ -234,7 +243,8 @@ public class BinanceCandleService {
                     endTime = targetEndTime.toEpochMilli();
                     lastTimeUpdate = Instant.now();
 
-                    loggingService.logAction(null, "System", "Updated target end time to " +
+                    //SYSTEM SET HERE
+                    loggingService.logAction("Updated target end time to " +
                             targetEndTime.atZone(ZoneOffset.UTC) + " after fetching " + batchesFetched + " batches");
                 }
 
@@ -246,7 +256,8 @@ public class BinanceCandleService {
                 batchesFetched++;
 
                 if (candles.isEmpty()) {
-                    loggingService.logAction(null, "System", "No more candles found for " + symbol +
+                    //SYSTEM SET HERE
+                    loggingService.logAction("No more candles found for " + symbol +
                             " after " + Instant.ofEpochMilli(currentStartTime).atZone(ZoneOffset.UTC));
                     break;
                 }
@@ -256,8 +267,8 @@ public class BinanceCandleService {
 
                 // Log progress periodically
                 if (totalCandlesFetched % 5000 == 0) {
-                    loggingService.logAction(null, "System", "Fetched " + totalCandlesFetched +
-                            " candles so far for " + symbol);
+                    //SYSTEM SET HERE
+                    loggingService.logAction("Fetched " + totalCandlesFetched +  " candles so far for " + symbol);
                 }
 
                 // Aggregate this batch of candles
@@ -272,7 +283,8 @@ public class BinanceCandleService {
 
                 // If we didn't get a full batch, we've reached the end of available data
                 if (candles.size() < MAX_CANDLES_PER_REQUEST) {
-                    loggingService.logAction(null, "System", "Received partial batch of candles (" +
+                    //SYSTEM SET HERE
+                    loggingService.logAction("Received partial batch of candles (" +
                             candles.size() + "). Likely reached the end of available data.");
 
                     // If using dynamic end time, do one final check with a fresh end time
@@ -281,7 +293,8 @@ public class BinanceCandleService {
 
                         // If we're still not at the updated current time, continue fetching
                         if (currentStartTime < targetEndTime.toEpochMilli()) {
-                            loggingService.logAction(null, "System", "Still need to fetch more recent data up to " +
+                            //SYSTEM SET HERE
+                            loggingService.logAction("Still need to fetch more recent data up to " +
                                     targetEndTime.atZone(ZoneOffset.UTC));
                             endTime = targetEndTime.toEpochMilli();
                             continue;
@@ -290,7 +303,8 @@ public class BinanceCandleService {
                     break;
                 }
             } catch (Exception e) {
-                loggingService.logError(null, "System", "Error fetching candles: " + e.getMessage(), e);
+                //SYSTEM SET HERE
+                loggingService.logError("Error fetching candles: " + e.getMessage(), e);
                 // Add a small delay before retrying
                 try {
                     Thread.sleep(2000);
@@ -300,12 +314,11 @@ public class BinanceCandleService {
             }
         }
 
-        loggingService.logAction(null, "System", "Completed data fetch for " + symbol +
-                ". Total candles fetched: " + totalCandlesFetched);
+        //SYSTEM SET HERE
+        loggingService.logAction("Completed data fetch for " + symbol +  ". Total candles fetched: " + totalCandlesFetched);
     }
 
     private List<MarketCandle> parseCandles(String responseBody, PlatformStock stock) {
-        auditContextService.setCurrentUser("System");
         List<MarketCandle> candles = new ArrayList<>();
 
         try {
@@ -337,7 +350,8 @@ public class BinanceCandleService {
                 candles.add(candle);
             }
         } catch (Exception e) {
-            loggingService.logError(null, "System", "Error parsing candle data: " + e.getMessage(), e);
+            //SYSTEM SET HERE
+            loggingService.logError("Error parsing candle data: " + e.getMessage(), e);
             throw new RuntimeException("Failed to parse candle data", e);
         }
 
@@ -345,7 +359,6 @@ public class BinanceCandleService {
     }
 
     private void aggregateCandles(PlatformStock stock, List<MarketCandle> minuteCandles) {
-        auditContextService.setCurrentUser("System");
         if (minuteCandles.isEmpty()) return;
 
         // Aggregate to 5m timeframe
@@ -366,7 +379,6 @@ public class BinanceCandleService {
 
     private void aggregateTimeframe(PlatformStock stock, List<MarketCandle> minuteCandles,
                                     MarketCandle.Timeframe timeframe, int minutes) {
-        auditContextService.setCurrentUser("System");
         try {
             // Group candles by timeframe boundary
             Map<LocalDateTime, List<MarketCandle>> groupedCandles = new HashMap<>();
@@ -412,11 +424,12 @@ public class BinanceCandleService {
             // Save all candles
             if (!candles.isEmpty()) {
                 candleRepository.saveAll(candles);
-                loggingService.logAction(null, "System", "Saved/updated " + candles.size() +
-                        " candles for timeframe " + timeframe);
+                //SYSTEM SET HERE
+                loggingService.logAction("Saved/updated " + candles.size() +  " candles for timeframe " + timeframe);
             }
         } catch (Exception e) {
-            loggingService.logError(null, "System", "Error aggregating candles to timeframe " +
+            //SYSTEM SET HERE
+            loggingService.logError("Error aggregating candles to timeframe " +
                     timeframe + ": " + e.getMessage(), e);
         }
     }
@@ -455,7 +468,6 @@ public class BinanceCandleService {
     }
 
     private LocalDateTime calculateTimeframeStart(LocalDateTime time, int minutes) {
-        auditContextService.setCurrentUser("System");
         // Calculate the start of the timeframe this minute belongs to
         int minuteOfDay = time.getHour() * 60 + time.getMinute();
         int timeframeIndex = minuteOfDay / minutes;
@@ -469,7 +481,6 @@ public class BinanceCandleService {
 
     private MarketCandle createAggregatedCandle(PlatformStock stock, MarketCandle.Timeframe timeframe,
                                                 LocalDateTime timeframeStart, List<MarketCandle> candles) {
-        auditContextService.setCurrentUser("System");
         // First candle's open is our open
         BigDecimal open = candles.get(0).getOpenPrice();
 
@@ -508,7 +519,10 @@ public class BinanceCandleService {
 
     @Transactional
     public void processRealtimeCandle(JsonNode candleData, PlatformStock stock) {
-        auditContextService.setCurrentUser("System");
+        //SYSTEM SET HERE
+        if (!userContextService.isAuthenticated()) {
+            userContextService.setUser("SYSTEM", "SYSTEM");
+        }
         try {
             // Extract candle fields from the websocket data
             JsonNode k = candleData.get("k");
@@ -553,12 +567,12 @@ public class BinanceCandleService {
                 aggregateCandles(stock, minuteCandles);
             }
         } catch (Exception e) {
-            loggingService.logError(null, "System", "Error processing realtime candle: " + e.getMessage(), e);
+            //SYSTEM SET HERE
+            loggingService.logError("Error processing realtime candle: " + e.getMessage(), e);
         }
     }
 
     private PlatformStock getOrCreateStock(String symbol) {
-        auditContextService.setCurrentUser("System");
         // Find existing stock or create a new one if needed
         List<PlatformStock> stocks = stockRepository.findByPlatformNameAndStockSymbol(
                 PLATFORM_NAME, symbol);

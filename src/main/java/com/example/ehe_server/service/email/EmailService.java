@@ -2,8 +2,9 @@ package com.example.ehe_server.service.email;
 
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
+import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,15 +23,17 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class EmailService implements EmailServiceInterface {
 
     private static final int RATE_LIMIT_MAX_REQUESTS = 5;
     private static final int RATE_LIMIT_MINUTES = 5;
 
     private final JavaMailSender mailSender;
-    private final AuditContextService auditContextService;
     private final LoggingServiceInterface loggingService;
     private final VerificationTokenRepository verificationTokenRepository;
+    private final AdminRepository adminRepository;
+    private final UserContextService userContextService;
 
     @Value("${spring.mail.username}")
     private String mailFrom;
@@ -43,18 +46,25 @@ public class EmailService implements EmailServiceInterface {
 
     public EmailService(JavaMailSender mailSender,
                         LoggingServiceInterface loggingService,
-                        AuditContextService auditContextService,
-                        VerificationTokenRepository verificationTokenRepository) {
+                        VerificationTokenRepository verificationTokenRepository, AdminRepository adminRepository, UserContextService userContextService) {
         this.mailSender = mailSender;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
         this.verificationTokenRepository = verificationTokenRepository;
+        this.adminRepository = adminRepository;
+        this.userContextService = userContextService;
     }
 
     @Override
     public void sendVerificationEmail(User user, String token, String recipientEmail) {
-        // Set audit context for this operation
-        auditContextService.setCurrentUser(Integer.toString(user.getUserId()));
+        boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+
+        // Create roles list based on user status
+        String role = "USER"; // All authenticated users have USER role
+
+        if (isAdmin) {
+            role = "ADMIN"; // Add ADMIN role if user is in Admin table
+        }
+        userContextService.setUser(String.valueOf(user.getUserId()), role);
 
         String subject = "Verify your Email for Event Horizon Exchange";
         String verificationUrl = frontendUrl + "/verify-registration?token=" + token; // Adjust path if needed
@@ -81,11 +91,17 @@ public class EmailService implements EmailServiceInterface {
     @Transactional
     public Map<String, Object> resendVerificationEmail(User user, String email) {
         Map<String, Object> response = new HashMap<>();
-        String userIdStr = String.valueOf(user.getUserId());
 
         // Set audit context
-        auditContextService.setCurrentUser(userIdStr);
-        auditContextService.setCurrentUserRole("USER"); // Assuming role context
+        boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+
+        // Create roles list based on user status
+        String role = "USER"; // All authenticated users have USER role
+
+        if (isAdmin) {
+            role = "ADMIN"; // Add ADMIN role if user is in Admin table
+        }
+        userContextService.setUser(String.valueOf(user.getUserId()), role);
 
         if (user.getAccountStatus() == User.AccountStatus.ACTIVE) {
             response.put("success", false);
@@ -94,14 +110,16 @@ public class EmailService implements EmailServiceInterface {
             actionLink.put("text", "log in.");
             actionLink.put("target", "login");
             response.put("actionLink", actionLink);
-            loggingService.logAction(user.getUserId(), userIdStr, "Attempted resend for already active account: " + email);
+            //SYSTEM SET HERE
+            loggingService.logAction("Attempted resend for already active account: " + email);
             return response;
         }
 
         if (user.getAccountStatus() == User.AccountStatus.SUSPENDED) {
             response.put("success", false);
             response.put("message", "This account is suspended. Contact support for assistance.");
-            loggingService.logAction(user.getUserId(), userIdStr, "Attempted resend for suspended account: " + email);
+            //SYSTEM SET HERE
+            loggingService.logAction("Attempted resend for suspended account: " + email);
             return response;
         }
 
@@ -113,7 +131,8 @@ public class EmailService implements EmailServiceInterface {
         if (recentTokenCount >= RATE_LIMIT_MAX_REQUESTS) {
             response.put("success", false);
             response.put("message", "Too many verification requests. Please wait \" + RATE_LIMIT_MINUTES + \" minutes before trying again.");
-            loggingService.logAction(user.getUserId(), userIdStr, "Verification resend rate limit hit for: " + email);
+            //SYSTEM SET HERE
+            loggingService.logAction("Verification resend rate limit hit for: " + email);
             return response;
         }
 
@@ -128,7 +147,8 @@ public class EmailService implements EmailServiceInterface {
 
         if (!tokensToUpdate.isEmpty()) {
             verificationTokenRepository.saveAll(tokensToUpdate);
-            loggingService.logAction(user.getUserId(), userIdStr, "Invalidated " + tokensToUpdate.size() + " previous active verification token(s) for: " + email);
+            //SYSTEM SET HERE
+            loggingService.logAction("Invalidated " + tokensToUpdate.size() + " previous active verification token(s) for: " + email);
         }
 
         // --- Generate and Save New Token ---
@@ -136,7 +156,8 @@ public class EmailService implements EmailServiceInterface {
         LocalDateTime expiryDate = LocalDateTime.now().plusHours(tokenExpiryHours);
         VerificationToken newToken = new VerificationToken(user, token, VerificationToken.TokenType.REGISTRATION, expiryDate);
         verificationTokenRepository.save(newToken);
-        loggingService.logAction(user.getUserId(), userIdStr, "Generated new verification token for: " + email);
+        //SYSTEM SET HERE
+        loggingService.logAction("Generated new verification token for: " + email);
 
         // --- Send New Email ---
         try {
@@ -145,7 +166,8 @@ public class EmailService implements EmailServiceInterface {
             // Email service should log success/failure of sending internally
         } catch (Exception e) {
             // Log critical failure if exception bubbles up
-            loggingService.logError(user.getUserId(), userIdStr, "Critical failure attempting to send verification email for resend to " + email, e);
+            //SYSTEM SET HERE
+            loggingService.logError("Critical failure attempting to send verification email for resend to " + email, e);
             // Rollback should be handled by @Transactional. Return an error response.
             response.put("success", false);
             response.put("message", "Could not send verification email due to an internal error. Please try again later or contact support.");
@@ -160,8 +182,15 @@ public class EmailService implements EmailServiceInterface {
 
     @Override
     public void sendPasswordResetEmail(User user, String token, String recipientEmail) {
-        // Set audit context for this operation
-        auditContextService.setCurrentUser(Integer.toString(user.getUserId()));
+        boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+
+        // Create roles list based on user status
+        String role = "USER"; // All authenticated users have USER role
+
+        if (isAdmin) {
+            role = "ADMIN"; // Add ADMIN role if user is in Admin table
+        }
+        userContextService.setUser(String.valueOf(user.getUserId()), role);
 
         String subject = "Password Reset for Event Horizon Exchange";
         String resetUrl = frontendUrl + "/reset-password?token=" + token;
@@ -173,15 +202,21 @@ public class EmailService implements EmailServiceInterface {
                 + "Regards,\nThe Event Horizon Exchange Team";
         sendSimpleMessage(recipientEmail, subject, text);
 
-        loggingService.logAction(user.getUserId(),
-                auditContextService.getCurrentUser(),
-                "Password reset email sent to: " + recipientEmail);
+        //SYSTEM SET HERE
+        loggingService.logAction("Password reset email sent to: " + recipientEmail);
     }
 
     @Override
     public void sendEmailChangeVerificationEmail(User user, String token, String newEmail) {
-        // Set audit context for this operation
-        auditContextService.setCurrentUser(Integer.toString(user.getUserId()));
+        boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+
+        // Create roles list based on user status
+        String role = "USER"; // All authenticated users have USER role
+
+        if (isAdmin) {
+            role = "ADMIN"; // Add ADMIN role if user is in Admin table
+        }
+        userContextService.setUser(String.valueOf(user.getUserId()), role);
 
         String subject = "Verify Email Change for Event Horizon Exchange";
         String verificationUrl = frontendUrl + "/verify-email-change?token=" + token;
@@ -194,9 +229,8 @@ public class EmailService implements EmailServiceInterface {
                 + "Regards,\nThe Event Horizon Exchange Team";
         sendSimpleMessage(newEmail, subject, text);
 
-        loggingService.logAction(user.getUserId(),
-                auditContextService.getCurrentUser(),
-                "Email change verification email sent to: " + newEmail);
+        //SYSTEM SET HERE
+        loggingService.logAction("Email change verification email sent to: " + newEmail);
     }
 
 

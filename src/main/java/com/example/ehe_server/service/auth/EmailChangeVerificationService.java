@@ -3,10 +3,11 @@ package com.example.ehe_server.service.auth;
 import com.example.ehe_server.entity.EmailChangeRequest;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
+import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.EmailChangeRequestRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.auth.EmailChangeVerificationServiceInterface;
 import org.springframework.stereotype.Service;
@@ -17,25 +18,27 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
+@Transactional
 public class EmailChangeVerificationService implements EmailChangeVerificationServiceInterface {
 
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailChangeRequestRepository emailChangeRequestRepository;
     private final UserRepository userRepository;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
+    private final UserContextService userContextService;
+    private final AdminRepository adminRepository;
 
     public EmailChangeVerificationService(
             VerificationTokenRepository verificationTokenRepository,
             EmailChangeRequestRepository emailChangeRequestRepository,
             UserRepository userRepository,
-            LoggingServiceInterface loggingService,
-            AuditContextService auditContextService) {
+            LoggingServiceInterface loggingService, UserContextService userContextService, AdminRepository adminRepository) {
         this.verificationTokenRepository = verificationTokenRepository;
         this.emailChangeRequestRepository = emailChangeRequestRepository;
         this.userRepository = userRepository;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
+        this.userContextService = userContextService;
+        this.adminRepository = adminRepository;
     }
 
     @Override
@@ -50,8 +53,7 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
             if (tokenOpt.isEmpty()) {
                 response.put("success", false);
                 response.put("message", "Invalid verification token");
-                loggingService.logAction(null, auditContextService.getCurrentUser(),
-                        "Email change verification failed: Invalid token");
+                loggingService.logAction("Email change verification failed: Invalid token");
                 return response;
             }
 
@@ -60,14 +62,22 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
             String userIdStr = String.valueOf(user.getUserId());
 
             // Set audit context
-            auditContextService.setCurrentUser(userIdStr);
+            // Check if user is an admin
+            boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+
+            // Create roles list based on user status
+            String role = "USER"; // All authenticated users have USER role
+
+            if (isAdmin) {
+                role = "ADMIN"; // Add ADMIN role if user is in Admin table
+            }
+            userContextService.setUser(userIdStr, role);
 
             // Check token status
             if (verificationToken.getStatus() != VerificationToken.TokenStatus.ACTIVE) {
                 response.put("success", false);
                 response.put("message", "This verification link has already been used or invalidated");
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Email change verification failed: Token not active, status=" + verificationToken.getStatus());
+                loggingService.logAction("Email change verification failed: Token not active, status=" + verificationToken.getStatus());
                 return response;
             }
 
@@ -75,8 +85,7 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
             if (verificationToken.getTokenType() != VerificationToken.TokenType.EMAIL_CHANGE) {
                 response.put("success", false);
                 response.put("message", "Invalid token type");
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Email change verification failed: Wrong token type");
+                loggingService.logAction("Email change verification failed: Wrong token type");
                 return response;
             }
 
@@ -87,8 +96,7 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
 
                 response.put("success", false);
                 response.put("message", "This verification link has expired. Please request a new email change.");
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Email change verification failed: Token expired");
+                loggingService.logAction("Email change verification failed: Token expired");
                 return response;
             }
 
@@ -96,8 +104,7 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
             if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
                 response.put("success", false);
                 response.put("message", "Your account is not active");
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Email change verification failed: Account not active, status=" + user.getAccountStatus());
+                loggingService.logAction("Email change verification failed: Account not active, status=" + user.getAccountStatus());
                 return response;
             }
 
@@ -107,8 +114,7 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
             if (requestOpt.isEmpty()) {
                 response.put("success", false);
                 response.put("message", "Email change request not found");
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Email change verification failed: Request not found for token");
+                loggingService.logAction("Email change verification failed: Request not found for token");
                 return response;
             }
 
@@ -120,8 +126,7 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
             if (existingUserWithEmail.isPresent() && !existingUserWithEmail.get().getUserId().equals(user.getUserId())) {
                 response.put("success", false);
                 response.put("message", "This email is already in use by another account");
-                loggingService.logAction(user.getUserId(), userIdStr,
-                        "Email change verification failed: Email already in use");
+                loggingService.logAction("Email change verification failed: Email already in use");
                 return response;
             }
 
@@ -133,16 +138,14 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
             verificationToken.setStatus(VerificationToken.TokenStatus.USED);
             verificationTokenRepository.save(verificationToken);
 
-            loggingService.logAction(user.getUserId(), userIdStr,
-                    "Email successfully changed to: " + newEmail);
+            loggingService.logAction("Email successfully changed to: " + newEmail);
 
             response.put("success", true);
             response.put("message", "Your email has been successfully updated to " + newEmail);
             return response;
 
         } catch (Exception e) {
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error during email change verification: " + e.getMessage(), e);
+            loggingService.logError("Error during email change verification: " + e.getMessage(), e);
             response.put("success", false);
             response.put("message", "An error occurred. Please try again later.");
             return response;

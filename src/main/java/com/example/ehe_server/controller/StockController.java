@@ -3,7 +3,6 @@ package com.example.ehe_server.controller;
 import com.example.ehe_server.dto.PlatformRequest;
 import com.example.ehe_server.dto.TradeRequest;
 import com.example.ehe_server.dto.TradingCapacityRequest;
-import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.stock.PlatformServiceInterface;
 import com.example.ehe_server.service.intf.stock.StockServiceInterface;
 import com.example.ehe_server.service.intf.trade.TradingCapacityServiceInterface;
@@ -19,19 +18,16 @@ public class StockController {
 
     private final PlatformServiceInterface platformService;
     private final StockServiceInterface stockService;
-    private final UserContextServiceInterface userContextService;
     private final TradingCapacityServiceInterface tradingCapacityService;
     private final TradingServiceInterface tradingService;
 
     public StockController(
             PlatformServiceInterface platformService,
             StockServiceInterface stockService,
-            UserContextServiceInterface userContextService,
             TradingCapacityServiceInterface tradingCapacityService,
             TradingServiceInterface tradingService) {
         this.platformService = platformService;
         this.stockService = stockService;
-        this.userContextService = userContextService;
         this.tradingCapacityService = tradingCapacityService;
         this.tradingService = tradingService;
     }
@@ -43,9 +39,6 @@ public class StockController {
      */
     @GetMapping("/platforms")
     public ResponseEntity<Map<String, Object>> getPlatforms() {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call platform service
         Map<String, Object> responseBody = platformService.getAllPlatforms();
 
@@ -63,9 +56,6 @@ public class StockController {
      */
     @PostMapping("/stocks")
     public ResponseEntity<Map<String, Object>> getStocksByPlatform(@RequestBody PlatformRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call stock service with the platform from request body
         Map<String, Object> responseBody = stockService.getStocksByPlatform(request.getPlatform());
 
@@ -83,9 +73,6 @@ public class StockController {
      */
     @PostMapping("/trading-capacity")
     public ResponseEntity<Map<String, Object>> getTradingCapacity(@RequestBody TradingCapacityRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call the trading capacity service
         Map<String, Object> responseBody = tradingCapacityService.getTradingCapacity(
                 request.getPortfolioId(), request.getStockSymbol());
@@ -103,9 +90,6 @@ public class StockController {
      */
     @PostMapping("/trade")
     public ResponseEntity<Map<String, Object>> executeMarketOrder(@RequestBody TradeRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call the trading service
         Map<String, Object> responseBody = tradingService.executeMarketOrder(
                 request.getPortfolioId(),

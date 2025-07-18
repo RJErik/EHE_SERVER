@@ -2,7 +2,7 @@ package com.example.ehe_server.filter;
 
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtTokenValidatorInterface;
 import jakarta.servlet.FilterChain;
@@ -12,14 +12,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,7 +26,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenValidatorInterface jwtTokenValidator;
     private final LoggingServiceInterface loggingService;
     private final UserRepository userRepository;
-    private final AuditContextService auditContextService;
+    private final UserContextService userContextService;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -43,15 +39,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // Add other protected paths
     );
 
+    // Public endpoints that don't require authentication
+    private static final List<String> PUBLIC_PATHS = List.of(
+            "/api/auth/"
+    );
+
     public JwtAuthenticationFilter(
             JwtTokenValidatorInterface jwtTokenValidator,
             LoggingServiceInterface loggingService,
             UserRepository userRepository,
-            AuditContextService auditContextService) {
+            UserContextService userContextService) {
         this.jwtTokenValidator = jwtTokenValidator;
         this.loggingService = loggingService;
         this.userRepository = userRepository;
-        this.auditContextService = auditContextService;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -60,11 +61,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // Set the request path in audit context (still useful)
-        auditContextService.setRequestPath(request.getRequestURI());
+        // Set the request path in audit context
+        userContextService.setRequestPath(request.getRequestURI());
 
-        // Skip filter for public endpoints
-        if (path.startsWith("/api/auth/")) {
+        // Check if this is a public endpoint
+        boolean isPublicEndpoint = PUBLIC_PATHS.stream().anyMatch(path::startsWith);
+
+        // Skip authentication for public endpoints
+        if (isPublicEndpoint) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -81,41 +85,50 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         boolean isAuthenticated = false;
+
         try {
-            // Validate token and set Spring Security context if valid
+            // First validate the JWT token
             if (token != null && jwtTokenValidator.validateToken(token)) {
                 Long userId = jwtTokenValidator.getUserIdFromToken(token);
                 String role = jwtTokenValidator.getRoleFromToken(token);
 
                 // Check if both userId and role are valid
                 if (userId != null && role != null && !role.trim().isEmpty()) {
-                    // Convert role to Spring Security authority
-                    String prefixedRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
 
-                    List<SimpleGrantedAuthority> authorities = Collections.singletonList(
-                            new SimpleGrantedAuthority(prefixedRole)
-                    );
+                    // Now check if user exists and is active in the database
+                    Optional<User> userOpt = userRepository.findById(userId.intValue());
 
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(
-                                    userId,
-                                    null,
-                                    authorities
-                            );
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    if (userOpt.isPresent()) {
+                        User user = userOpt.get();
 
-                    // IMPORTANT: No longer setting PostgreSQL context here
-                    // This will be handled by UserContextService at the controller level
+                        // Check if account is active
+                        if (user.getAccountStatus() == User.AccountStatus.ACTIVE) {
+                            userContextService.setUser(String.valueOf(user.getUserId()), role);
+                            isAuthenticated = true;
 
-                    isAuthenticated = true;
-
-                    // Log access to significant endpoints
-                    if (isSignificantEndpoint(path)) {
-                        Optional<User> userOpt = userRepository.findById(userId.intValue());
-                        if (userOpt.isPresent()) {
-                            loggingService.logAction(userId.intValue(), userId.toString(), "Accessed " + path);
+                            // Log access to significant endpoints
+                            if (isSignificantEndpoint(path)) {
+                                loggingService.logAction(user.getUserId(), userId.toString(), "Accessed " + path);
+                            }
+                        } else {
+                            // User exists but is not active
+                            loggingService.logAction(userId.intValue(), userId.toString(),
+                                    "Authentication failed: User account status is " + user.getAccountStatus());
                         }
+                    } else {
+                        // User doesn't exist in database
+                        loggingService.logAction(null, userId.toString(),
+                                "Authentication failed: User not found in database");
                     }
+                } else {
+                    // Invalid userId or role in token
+                    loggingService.logAction(null, "system",
+                            "Authentication failed: Invalid userId or role in JWT token");
+                }
+            } else {
+                // Invalid or missing token
+                if (token != null) {
+                    loggingService.logAction(null, "system", "Authentication failed: Invalid JWT token");
                 }
             }
         } catch (Exception e) {

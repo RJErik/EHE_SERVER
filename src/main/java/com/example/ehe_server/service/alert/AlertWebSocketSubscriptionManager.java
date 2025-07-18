@@ -6,7 +6,9 @@ import com.example.ehe_server.entity.MarketCandle;
 import com.example.ehe_server.entity.PlatformStock;
 import com.example.ehe_server.repository.AlertRepository;
 import com.example.ehe_server.repository.MarketCandleRepository;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
+import jakarta.transaction.Transactional;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -18,7 +20,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@Transactional
 public class AlertWebSocketSubscriptionManager {
+
+    private final UserContextService userContextService;
 
     private static class AlertSubscription {
         private final String id;
@@ -61,12 +66,13 @@ public class AlertWebSocketSubscriptionManager {
             AlertRepository alertRepository,
             MarketCandleRepository marketCandleRepository,
             SimpMessagingTemplate messagingTemplate,
-            LoggingServiceInterface loggingService) {
+            LoggingServiceInterface loggingService, UserContextService userContextService) {
         this.alertRepository = alertRepository;
         this.marketCandleRepository = marketCandleRepository;
         this.messagingTemplate = messagingTemplate;
         this.loggingService = loggingService;
 //        System.out.println("===== AlertWebSocketSubscriptionManager initialized =====");
+        this.userContextService = userContextService;
     }
 
     /**
@@ -88,8 +94,7 @@ public class AlertWebSocketSubscriptionManager {
 //        System.out.println("Subscription ID: " + subscriptionId);
 //        System.out.println("Destination: " + destination);
 
-        loggingService.logAction(userId, userId.toString(),
-                "Created alert subscription: " + subscriptionId);
+        loggingService.logAction("Created alert subscription: " + subscriptionId);
 
         // Start the initial check process asynchronously
         new Thread(() -> performInitialAlertCheck(subscription)).start();
@@ -107,8 +112,7 @@ public class AlertWebSocketSubscriptionManager {
 //            System.out.println("User ID: " + removed.getUserId());
 //            System.out.println("Subscription ID: " + subscriptionId);
 
-            loggingService.logAction(removed.getUserId(), removed.getUserId().toString(),
-                    "Cancelled alert subscription: " + subscriptionId);
+            loggingService.logAction("Cancelled alert subscription: " + subscriptionId);
             return true;
         }
         return false;
@@ -128,15 +132,13 @@ public class AlertWebSocketSubscriptionManager {
 
             if (userAlerts.isEmpty()) {
 //                System.out.println("No active alerts found for initial check");
-                loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                        "No active alerts found for initial check");
+                loggingService.logAction("No active alerts found for initial check");
                 subscription.setInitialCheckCompleted(true);
                 return;
             }
 
 //            System.out.println("Found " + userAlerts.size() + " active alerts to check");
-            loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                    "Starting initial check for " + userAlerts.size() + " alerts");
+            loggingService.logAction("Starting initial check for " + userAlerts.size() + " alerts");
 
             // Process each alert
             for (Alert alert : userAlerts) {
@@ -154,8 +156,7 @@ public class AlertWebSocketSubscriptionManager {
                 PlatformStock platformStock = alert.getPlatformStock();
 
 //                System.out.println("Check start time: " + checkStartTime);
-                loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                        "Checking alert #" + alert.getAlertId() + " for " +
+                loggingService.logAction("Checking alert #" + alert.getAlertId() + " for " +
                                 platformStock.getPlatformName() + ":" + platformStock.getStockSymbol() +
                                 " starting from " + checkStartTime);
 
@@ -175,8 +176,7 @@ public class AlertWebSocketSubscriptionManager {
 //            System.out.println("Subscription ID: " + subscription.getId());
 //            System.out.println("Last checked candle time: " + subscription.getLastCheckedMinuteCandle());
 
-            loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                    "Completed initial alert check for subscription: " + subscription.getId());
+            loggingService.logAction("Completed initial alert check for subscription: " + subscription.getId());
 
         } catch (Exception e) {
 //            System.out.println("\n===== ERROR DURING INITIAL ALERT CHECK =====");
@@ -185,8 +185,7 @@ public class AlertWebSocketSubscriptionManager {
 //            System.out.println("Error: " + e.getMessage());
             e.printStackTrace();
 
-            loggingService.logError(subscription.getUserId(), subscription.getUserId().toString(),
-                    "Error during initial alert check: " + e.getMessage(), e);
+            loggingService.logError("Error during initial alert check: " + e.getMessage(), e);
         }
     }
 
@@ -206,8 +205,7 @@ public class AlertWebSocketSubscriptionManager {
 //            System.out.println("Alert ID: " + alert.getAlertId());
 //            System.out.println("Period: " + startTime + " to " + endTime);
 
-            loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                    "Checking " + timeframe + " candles for alert #" + alert.getAlertId() +
+            loggingService.logAction("Checking " + timeframe + " candles for alert #" + alert.getAlertId() +
                             " from " + startTime + " to " + endTime);
 
             List<MarketCandle> candles = marketCandleRepository.findByPlatformStockAndTimeframeAndTimestampBetweenOrderByTimestampAsc(
@@ -215,14 +213,12 @@ public class AlertWebSocketSubscriptionManager {
 
             if (candles.isEmpty()) {
 //                System.out.println("No " + timeframe + " candles found for the specified period");
-                loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                        "No " + timeframe + " candles found for the specified period");
+                loggingService.logAction("No " + timeframe + " candles found for the specified period");
                 return;
             }
 
 //            System.out.println("Found " + candles.size() + " " + timeframe + " candles to check");
-            loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                    "Found " + candles.size() + " " + timeframe + " candles to check");
+            loggingService.logAction("Found " + candles.size() + " " + timeframe + " candles to check");
 
             for (MarketCandle candle : candles) {
 //                System.out.println("\nChecking candle at time: " + candle.getTimestamp());
@@ -240,8 +236,7 @@ public class AlertWebSocketSubscriptionManager {
 //                    System.out.println("Candle time: " + candle.getTimestamp());
 //                    System.out.println("Stock: " + platformStock.getStockSymbol());
 
-                    loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                            "Alert #" + alert.getAlertId() + " triggered on " + timeframe +
+                    loggingService.logAction("Alert #" + alert.getAlertId() + " triggered on " + timeframe +
                                     " candle at " + candle.getTimestamp());
 
                     // Send alert notification
@@ -252,8 +247,7 @@ public class AlertWebSocketSubscriptionManager {
                     alertRepository.save(alert);
 
 //                    System.out.println("Alert deactivated after triggering");
-                    loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                            "Alert #" + alert.getAlertId() + " deactivated after triggering");
+                    loggingService.logAction("Alert #" + alert.getAlertId() + " deactivated after triggering");
 
                     // Once triggered, no need to check further candles for this alert
                     return;
@@ -269,8 +263,7 @@ public class AlertWebSocketSubscriptionManager {
                     MarketCandle.Timeframe nextTimeframe = getNextTimeframe(timeframe);
                     if (nextTimeframe != null) {
 //                        System.out.println("Moving to higher timeframe " + nextTimeframe + " from " + lastCandleTime);
-                        loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                                "Moving to higher timeframe " + nextTimeframe + " from " + lastCandleTime);
+                        loggingService.logAction("Moving to higher timeframe " + nextTimeframe + " from " + lastCandleTime);
 
                         // Continue checking with the next higher timeframe
                         checkAlertAgainstTimeframe(alert, platformStock, nextTimeframe, lastCandleTime, endTime, subscription);
@@ -281,8 +274,7 @@ public class AlertWebSocketSubscriptionManager {
         } catch (Exception e) {
 //            System.out.println("ERROR checking alert against timeframe " + timeframe + ": " + e.getMessage());
             e.printStackTrace();
-            loggingService.logError(subscription.getUserId(), subscription.getUserId().toString(),
-                    "Error checking alert against timeframe " + timeframe + ": " + e.getMessage(), e);
+            loggingService.logError("Error checking alert against timeframe " + timeframe + ": " + e.getMessage(), e);
         }
     }
 
@@ -420,6 +412,7 @@ public class AlertWebSocketSubscriptionManager {
      */
     @Scheduled(fixedRate = 60000) // Run every minute
     public void checkForNewAlerts() {
+        userContextService.setUser("SYSTEM", "SYSTEM");
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime currentMinute = now.truncatedTo(ChronoUnit.MINUTES);
 
@@ -447,8 +440,7 @@ public class AlertWebSocketSubscriptionManager {
                 // If this is the first check after initialization or we have a new minute
                 if (lastChecked == null || currentMinute.isAfter(lastChecked)) {
 //                    System.out.println("Performing minute alert check at " + currentMinute);
-                    loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                            "Performing minute alert check at " + currentMinute);
+                    loggingService.logAction("Performing minute alert check at " + currentMinute);
 
                     // Get user's active alerts
                     List<Alert> activeAlerts = alertRepository.findByUser_UserIdAndActiveTrue(subscription.getUserId());
@@ -456,8 +448,7 @@ public class AlertWebSocketSubscriptionManager {
 
                     if (!activeAlerts.isEmpty()) {
 //                        System.out.println("Checking " + activeAlerts.size() + " active alerts for latest minute");
-                        loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                                "Checking " + activeAlerts.size() + " active alerts for latest minute");
+                        loggingService.logAction("Checking " + activeAlerts.size() + " active alerts for latest minute");
 
                         // For each active alert, check only the latest minute candle
                         for (Alert alert : activeAlerts) {
@@ -481,16 +472,14 @@ public class AlertWebSocketSubscriptionManager {
 
                                 if (lastChecked == null || latestCandle.getTimestamp().isAfter(lastChecked.minusHours(2))) {
 //                                    System.out.println("Found new candle at " + latestCandle.getTimestamp() + " for alert #" + alert.getAlertId());
-                                    loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                                            "Found new candle at " + latestCandle.getTimestamp() + " for alert #" + alert.getAlertId());
+                                    loggingService.logAction("Found new candle at " + latestCandle.getTimestamp() + " for alert #" + alert.getAlertId());
 
                                     // Check if alert condition is met
                                     boolean alertTriggered = checkAlertCondition(alert, latestCandle);
 
                                     if (alertTriggered) {
 //                                        System.out.println("ALERT TRIGGERED on latest candle!");
-                                        loggingService.logAction(subscription.getUserId(), subscription.getUserId().toString(),
-                                                "Alert #" + alert.getAlertId() + " triggered on latest candle");
+                                        loggingService.logAction("Alert #" + alert.getAlertId() + " triggered on latest candle");
 
                                         // Send alert notification
                                         sendAlertNotification(alert, latestCandle, subscription);
@@ -520,8 +509,7 @@ public class AlertWebSocketSubscriptionManager {
             } catch (Exception e) {
 //                System.out.println("ERROR during periodic alert check: " + e.getMessage());
                 e.printStackTrace();
-                loggingService.logError(subscription.getUserId(), subscription.getUserId().toString(),
-                        "Error during periodic alert check: " + e.getMessage(), e);
+                loggingService.logError("Error during periodic alert check: " + e.getMessage(), e);
             }
         }
 //        System.out.println("===== SCHEDULED ALERT CHECK COMPLETED =====\n");

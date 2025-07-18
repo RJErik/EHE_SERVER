@@ -4,35 +4,31 @@ import com.example.ehe_server.dto.ApiKeyDto;
 import com.example.ehe_server.entity.ApiKey;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.ApiKeyRepository;
-import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.user.ApiKeyListServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
+@Transactional
 public class ApiKeyListService implements ApiKeyListServiceInterface {
 
-    private final UserRepository userRepository;
     private final ApiKeyRepository apiKeyRepository;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
+    private final UserContextService userContextService;
 
     public ApiKeyListService(
-            UserRepository userRepository,
             ApiKeyRepository apiKeyRepository,
-            LoggingServiceInterface loggingService,
-            AuditContextService auditContextService) {
-        this.userRepository = userRepository;
+            LoggingServiceInterface loggingService, UserContextService userContextService) {
         this.apiKeyRepository = apiKeyRepository;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -40,26 +36,8 @@ public class ApiKeyListService implements ApiKeyListServiceInterface {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // Check if user exists and is active
-            Optional<User> userOpt = userRepository.findById(userId.intValue());
-
-            if (userOpt.isEmpty()) {
-                response.put("success", false);
-                response.put("message", "User not found");
-                loggingService.logAction(null, userId.toString(), "API Key listing failed: User not found");
-                return response;
-            }
-
-            User user = userOpt.get();
-
-            // Check if account is active
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                response.put("success", false);
-                response.put("message", "Your account is not active");
-                loggingService.logAction(user.getUserId(), userId.toString(),
-                        "API Key listing failed: Account not active, status=" + user.getAccountStatus());
-                return response;
-            }
+            // Get current user ID from user context
+            User user = userContextService.getCurrentHumanUser();
 
             // Retrieve API keys for the user
             List<ApiKey> userApiKeys = apiKeyRepository.findByUser_UserId(user.getUserId());
@@ -88,12 +66,10 @@ public class ApiKeyListService implements ApiKeyListServiceInterface {
             response.put("success", true);
             response.put("apiKeys", apiKeyDtos);
 
-            loggingService.logAction(user.getUserId(), userId.toString(),
-                    "Retrieved " + apiKeyDtos.size() + " API keys successfully");
+            loggingService.logAction("Retrieved " + apiKeyDtos.size() + " API keys successfully");
 
         } catch (Exception e) {
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error listing API keys: " + e.getMessage(), e);
+            loggingService.logError("Error listing API keys: " + e.getMessage(), e);
             response.put("success", false);
             response.put("message", "An error occurred while retrieving API keys. Please try again.");
         }
@@ -105,7 +81,7 @@ public class ApiKeyListService implements ApiKeyListServiceInterface {
     private String maskApiKeyValue(String apiKeyValue) {
         if (apiKeyValue == null || apiKeyValue.length() <= 10) {
             // If key is too short, just show a few characters
-            return apiKeyValue != null && apiKeyValue.length() > 0
+            return apiKeyValue != null && !apiKeyValue.isEmpty()
                     ? apiKeyValue.substring(0, Math.min(3, apiKeyValue.length())) + "****"
                     : "";
         }
@@ -121,6 +97,6 @@ public class ApiKeyListService implements ApiKeyListServiceInterface {
             maskedMiddle.append("*");
         }
 
-        return firstPart + maskedMiddle.toString() + lastPart;
+        return firstPart + maskedMiddle + lastPart;
     }
 }

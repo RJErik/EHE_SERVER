@@ -1,17 +1,16 @@
 package com.example.ehe_server.service.watchlist;
 
 import com.example.ehe_server.entity.PlatformStock;
-import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.Watchlist;
 import com.example.ehe_server.entity.WatchlistItem;
 import com.example.ehe_server.repository.PlatformStockRepository;
-import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.WatchlistItemRepository;
 import com.example.ehe_server.repository.WatchlistRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.watchlist.WatchlistServiceInterface;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -19,29 +18,26 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class WatchlistService implements WatchlistServiceInterface {
 
     private final WatchlistRepository watchlistRepository;
     private final WatchlistItemRepository watchlistItemRepository;
-    private final UserRepository userRepository;
     private final PlatformStockRepository platformStockRepository;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private final UserContextService userContextService;
 
     public WatchlistService(
             WatchlistRepository watchlistRepository,
             WatchlistItemRepository watchlistItemRepository,
-            UserRepository userRepository,
             PlatformStockRepository platformStockRepository,
-            LoggingServiceInterface loggingService,
-            AuditContextService auditContextService) {
+            LoggingServiceInterface loggingService, UserContextService userContextService) {
         this.watchlistRepository = watchlistRepository;
         this.watchlistItemRepository = watchlistItemRepository;
-        this.userRepository = userRepository;
         this.platformStockRepository = platformStockRepository;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -49,33 +45,11 @@ public class WatchlistService implements WatchlistServiceInterface {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            // Get current user ID from audit context
-            String userIdStr = auditContextService.getCurrentUser();
-            Integer userId = Integer.parseInt(userIdStr);
-
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Watchlist retrieval failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Watchlist retrieval failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
-
             // Get or create watchlist for the user
-            Watchlist watchlist = watchlistRepository.findByUser(user)
+            Watchlist watchlist = watchlistRepository.findByUser(userContextService.getCurrentHumanUser())
                     .orElseGet(() -> {
                         Watchlist newWatchlist = new Watchlist();
-                        newWatchlist.setUser(user);
+                        newWatchlist.setUser(userContextService.getCurrentHumanUser());
                         return watchlistRepository.save(newWatchlist);
                     });
 
@@ -99,12 +73,11 @@ public class WatchlistService implements WatchlistServiceInterface {
             result.put("items", items);
 
             // Log success
-            loggingService.logAction(userId, userIdStr, "Watchlist items retrieved successfully");
+            loggingService.logAction("Watchlist items retrieved successfully");
 
         } catch (Exception e) {
             // Log error
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error retrieving watchlist items: " + e.getMessage(), e);
+            loggingService.logError("Error retrieving watchlist items: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);
@@ -119,45 +92,22 @@ public class WatchlistService implements WatchlistServiceInterface {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            // Get current user ID from audit context
-            String userIdStr = auditContextService.getCurrentUser();
-            Integer userId = Integer.parseInt(userIdStr);
-
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Watchlist add failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Watchlist add failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
-
             // Check if platform and symbol combination exists
             List<PlatformStock> platformStocks = platformStockRepository.findByPlatformNameAndStockSymbol(platform, symbol);
             if (platformStocks.isEmpty()) {
                 result.put("success", false);
                 result.put("message", "Platform and symbol combination does not exist");
-                loggingService.logAction(userId, userIdStr,
-                        "Watchlist add failed: Platform/symbol combination not found: " + platform + "/" + symbol);
+                loggingService.logAction("Watchlist add failed: Platform/symbol combination not found: " + platform + "/" + symbol);
                 return result;
             }
 
             PlatformStock platformStock = platformStocks.get(0);
 
             // Get or create watchlist for the user
-            Watchlist watchlist = watchlistRepository.findByUser(user)
+            Watchlist watchlist = watchlistRepository.findByUser(userContextService.getCurrentHumanUser())
                     .orElseGet(() -> {
                         Watchlist newWatchlist = new Watchlist();
-                        newWatchlist.setUser(user);
+                        newWatchlist.setUser(userContextService.getCurrentHumanUser());
                         return watchlistRepository.save(newWatchlist);
                     });
 
@@ -166,8 +116,7 @@ public class WatchlistService implements WatchlistServiceInterface {
             if (existingItem.isPresent()) {
                 result.put("success", false);
                 result.put("message", "Item already exists in watchlist");
-                loggingService.logAction(userId, userIdStr,
-                        "Watchlist add failed: Item already exists: " + platform + "/" + symbol);
+                loggingService.logAction("Watchlist add failed: Item already exists: " + platform + "/" + symbol);
                 return result;
             }
 
@@ -190,13 +139,11 @@ public class WatchlistService implements WatchlistServiceInterface {
             result.put("item", itemMap);
 
             // Log success
-            loggingService.logAction(userId, userIdStr,
-                    "Added item to watchlist: " + platform + "/" + symbol);
+            loggingService.logAction("Added item to watchlist: " + platform + "/" + symbol);
 
         } catch (Exception e) {
             // Log error
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error adding watchlist item: " + e.getMessage(), e);
+            loggingService.logError("Error adding watchlist item: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);
@@ -211,35 +158,16 @@ public class WatchlistService implements WatchlistServiceInterface {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            // Get current user ID from audit context
-            String userIdStr = auditContextService.getCurrentUser();
+            // Get current user ID from user context
+            String userIdStr = userContextService.getCurrentUserIdAsString();
             Integer userId = Integer.parseInt(userIdStr);
-
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Watchlist remove failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Watchlist remove failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
 
             // Check if the watchlist item exists
             Optional<WatchlistItem> watchlistItemOptional = watchlistItemRepository.findById(watchlistItemId);
             if (watchlistItemOptional.isEmpty()) {
                 result.put("success", false);
                 result.put("message", "Watchlist item not found");
-                loggingService.logAction(userId, userIdStr,
-                        "Watchlist remove failed: Item not found with ID: " + watchlistItemId);
+                loggingService.logAction("Watchlist remove failed: Item not found with ID: " + watchlistItemId);
                 return result;
             }
 
@@ -249,8 +177,7 @@ public class WatchlistService implements WatchlistServiceInterface {
             if (!watchlistItem.getWatchlist().getUser().getUserId().equals(userId)) {
                 result.put("success", false);
                 result.put("message", "Not authorized to remove this watchlist item");
-                loggingService.logAction(userId, userIdStr,
-                        "Watchlist remove failed: Unauthorized access to item ID: " + watchlistItemId);
+                loggingService.logAction("Watchlist remove failed: Unauthorized access to item ID: " + watchlistItemId);
                 return result;
             }
 
@@ -264,13 +191,11 @@ public class WatchlistService implements WatchlistServiceInterface {
             result.put("message", "Item removed from watchlist successfully");
 
             // Log success
-            loggingService.logAction(userId, userIdStr,
-                    "Removed item from watchlist: " + platform + "/" + symbol + " (ID: " + watchlistItemId + ")");
+            loggingService.logAction("Removed item from watchlist: " + platform + "/" + symbol + " (ID: " + watchlistItemId + ")");
 
         } catch (Exception e) {
             // Log error
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error removing watchlist item: " + e.getMessage(), e);
+            loggingService.logError("Error removing watchlist item: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);

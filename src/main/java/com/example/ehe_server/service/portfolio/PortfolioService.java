@@ -3,12 +3,10 @@ package com.example.ehe_server.service.portfolio;
 import com.example.ehe_server.entity.ApiKey;
 import com.example.ehe_server.entity.Holding;
 import com.example.ehe_server.entity.Portfolio;
-import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.ApiKeyRepository;
 import com.example.ehe_server.repository.HoldingRepository;
 import com.example.ehe_server.repository.PortfolioRepository;
-import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.audit.AuditContextService;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioValueServiceInterface;
@@ -20,32 +18,29 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
+@Transactional
 public class PortfolioService implements PortfolioServiceInterface {
 
     private final PortfolioRepository portfolioRepository;
-    private final UserRepository userRepository;
     private final ApiKeyRepository apiKeyRepository;
     private final HoldingRepository holdingRepository;
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
     private final PortfolioValueServiceInterface portfolioValueService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private final UserContextService userContextService;
 
     public PortfolioService(
             PortfolioRepository portfolioRepository,
-            UserRepository userRepository,
             ApiKeyRepository apiKeyRepository,
             HoldingRepository holdingRepository,
             LoggingServiceInterface loggingService,
-            AuditContextService auditContextService,
-            PortfolioValueServiceInterface portfolioValueService) {
+            PortfolioValueServiceInterface portfolioValueService, UserContextService userContextService) {
         this.portfolioRepository = portfolioRepository;
-        this.userRepository = userRepository;
         this.apiKeyRepository = apiKeyRepository;
         this.holdingRepository = holdingRepository;
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
         this.portfolioValueService = portfolioValueService;
+        this.userContextService = userContextService;
     }
 
     @Override
@@ -53,35 +48,15 @@ public class PortfolioService implements PortfolioServiceInterface {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            // Get current user ID from audit context
-            String userIdStr = auditContextService.getCurrentUser();
-            Integer userId = Integer.parseInt(userIdStr);
-
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Portfolio creation failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Portfolio creation failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
+            // Get current user ID from user context
+            Integer userId = Integer.parseInt(userContextService.getCurrentUserIdAsString());
 
             // Check if API key exists and belongs to the user
             Optional<ApiKey> apiKeyOptional = apiKeyRepository.findByApiKeyIdAndUser_UserId(apiKeyId, userId);
             if (apiKeyOptional.isEmpty()) {
                 result.put("success", false);
                 result.put("message", "API key not found or doesn't belong to the user");
-                loggingService.logAction(userId, userIdStr,
-                        "Portfolio creation failed: API key not found or doesn't belong to user, keyId=" + apiKeyId);
+                loggingService.logAction("Portfolio creation failed: API key not found or doesn't belong to user, keyId=" + apiKeyId);
                 return result;
             }
 
@@ -89,7 +64,7 @@ public class PortfolioService implements PortfolioServiceInterface {
 
             // Create a new portfolio (Real type only as specified)
             Portfolio portfolio = new Portfolio();
-            portfolio.setUser(user);
+            portfolio.setUser(userContextService.getCurrentHumanUser());
             portfolio.setApiKey(apiKey);
             portfolio.setPortfolioName(portfolioName);
             portfolio.setPortfolioType(Portfolio.PortfolioType.Real);
@@ -118,13 +93,11 @@ public class PortfolioService implements PortfolioServiceInterface {
             result.put("portfolio", portfolioMap);
 
             // Log success
-            loggingService.logAction(userId, userIdStr,
-                    "Created portfolio: " + portfolioName + " with API key from platform " + apiKey.getPlatformName());
+            loggingService.logAction("Created portfolio: " + portfolioName + " with API key from platform " + apiKey.getPlatformName());
 
         } catch (Exception e) {
             // Log error
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error creating portfolio: " + e.getMessage(), e);
+            loggingService.logError("Error creating portfolio: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);
@@ -141,33 +114,12 @@ public class PortfolioService implements PortfolioServiceInterface {
         try {
             System.out.println("Starting getPortfolios method");
 
-            // Get current user ID from audit context
-            String userIdStr = auditContextService.getCurrentUser();
-            Integer userId = Integer.parseInt(userIdStr);
+            // Get current user ID from user context
+            int userId = Integer.parseInt(userContextService.getCurrentUserIdAsString());
             System.out.println("User ID from audit context: " + userId);
 
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                System.out.println("User not found for ID: " + userId);
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Portfolio retrieval failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                System.out.println("User account not active. Status: " + user.getAccountStatus());
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Portfolio retrieval failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
-
             // Get portfolios for the user
-            List<Portfolio> portfolios = portfolioRepository.findByUser(user);
+            List<Portfolio> portfolios = portfolioRepository.findByUser(userContextService.getCurrentHumanUser());
             System.out.println("Found " + portfolios.size() + " portfolios for user");
 
             // Transform to response format
@@ -199,16 +151,14 @@ public class PortfolioService implements PortfolioServiceInterface {
             result.put("portfolios", portfoliosList);
 
             // Log success
-            loggingService.logAction(userId, userIdStr,
-                    "Retrieved " + portfoliosList.size() + " portfolios");
+            loggingService.logAction("Retrieved " + portfoliosList.size() + " portfolios");
 
         } catch (Exception e) {
             System.out.println("Error retrieving portfolios: " + e.getMessage());
             e.printStackTrace();
 
             // Log error
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error retrieving portfolios: " + e.getMessage(), e);
+            loggingService.logError("Error retrieving portfolios: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);
@@ -224,35 +174,15 @@ public class PortfolioService implements PortfolioServiceInterface {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            // Get current user ID from audit context
-            String userIdStr = auditContextService.getCurrentUser();
-            Integer userId = Integer.parseInt(userIdStr);
-
-            // Check if user exists and is active
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "User not found");
-                loggingService.logAction(null, userIdStr, "Portfolio deletion failed: User not found");
-                return result;
-            }
-
-            User user = userOptional.get();
-            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-                result.put("success", false);
-                result.put("message", "Account is not active");
-                loggingService.logAction(userId, userIdStr,
-                        "Portfolio deletion failed: Account not active, status=" + user.getAccountStatus());
-                return result;
-            }
+            // Get current user ID from user context
+            Integer userId = Integer.parseInt(userContextService.getCurrentUserIdAsString());
 
             // Check if portfolio exists and belongs to the user
             Optional<Portfolio> portfolioOptional = portfolioRepository.findByPortfolioIdAndUser_UserId(portfolioId, userId);
             if (portfolioOptional.isEmpty()) {
                 result.put("success", false);
                 result.put("message", "Portfolio not found or doesn't belong to the user");
-                loggingService.logAction(userId, userIdStr,
-                        "Portfolio deletion failed: Portfolio not found or doesn't belong to user, portfolioId=" + portfolioId);
+                loggingService.logAction("Portfolio deletion failed: Portfolio not found or doesn't belong to user, portfolioId=" + portfolioId);
                 return result;
             }
 
@@ -270,13 +200,11 @@ public class PortfolioService implements PortfolioServiceInterface {
             result.put("message", "Portfolio and its holdings deleted successfully");
 
             // Log success
-            loggingService.logAction(userId, userIdStr,
-                    "Deleted portfolio: " + portfolio.getPortfolioName() + " and " + holdings.size() + " holdings");
+            loggingService.logAction("Deleted portfolio: " + portfolio.getPortfolioName() + " and " + holdings.size() + " holdings");
 
         } catch (Exception e) {
             // Log error
-            loggingService.logError(null, auditContextService.getCurrentUser(),
-                    "Error deleting portfolio: " + e.getMessage(), e);
+            loggingService.logError("Error deleting portfolio: " + e.getMessage(), e);
 
             // Return error response
             result.put("success", false);

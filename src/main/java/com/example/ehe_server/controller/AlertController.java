@@ -5,7 +5,6 @@ import com.example.ehe_server.dto.AlertDeleteRequest;
 import com.example.ehe_server.dto.AlertSearchRequest;
 import com.example.ehe_server.service.intf.alert.AlertSearchServiceInterface;
 import com.example.ehe_server.service.intf.alert.AlertServiceInterface;
-import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,15 +16,12 @@ public class AlertController {
 
     private final AlertServiceInterface alertService;
     private final AlertSearchServiceInterface alertSearchService;
-    private final UserContextServiceInterface userContextService;
 
     public AlertController(
             AlertServiceInterface alertService,
-            AlertSearchServiceInterface alertSearchService,
-            UserContextServiceInterface userContextService) {
+            AlertSearchServiceInterface alertSearchService) {
         this.alertService = alertService;
         this.alertSearchService = alertSearchService;
-        this.userContextService = userContextService;
     }
 
     /**
@@ -35,9 +31,6 @@ public class AlertController {
      */
     @GetMapping("/alerts")
     public ResponseEntity<Map<String, Object>> getAlerts() {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call alert service
         Map<String, Object> responseBody = alertService.getAlerts();
 
@@ -54,9 +47,6 @@ public class AlertController {
      */
     @PostMapping("/alerts/add")
     public ResponseEntity<Map<String, Object>> addAlert(@RequestBody AlertAddRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call alert service to add item
         Map<String, Object> responseBody = alertService.addAlert(
                 request.getPlatform(),
@@ -77,9 +67,6 @@ public class AlertController {
      */
     @DeleteMapping("/alerts/remove")
     public ResponseEntity<Map<String, Object>> removeAlert(@RequestBody AlertDeleteRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call alert service to remove item
         Map<String, Object> responseBody = alertService.removeAlert(request.getId());
 
@@ -96,9 +83,6 @@ public class AlertController {
      */
     @PostMapping("/alerts/search")
     public ResponseEntity<Map<String, Object>> searchAlerts(@RequestBody AlertSearchRequest request) {
-        // Setup the user context from Spring Security
-        userContextService.setupUserContext();
-
         // Call alert search service
         Map<String, Object> responseBody = alertSearchService.searchAlerts(
                 request.getPlatform(),

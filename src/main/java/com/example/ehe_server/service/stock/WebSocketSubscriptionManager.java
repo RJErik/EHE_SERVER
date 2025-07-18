@@ -3,11 +3,13 @@ package com.example.ehe_server.service.stock;
 import com.example.ehe_server.dto.websocket.CandleDataResponse;
 import com.example.ehe_server.dto.websocket.CandleDataResponse.CandleData;
 import com.example.ehe_server.dto.websocket.CandleUpdateMessage;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.stock.MarketCandleServiceInterface;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -18,7 +20,10 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@Transactional
 public class WebSocketSubscriptionManager {
+
+    private final UserContextService userContextService;
 
     private static class Subscription {
         private final String id;
@@ -116,10 +121,11 @@ public class WebSocketSubscriptionManager {
     public WebSocketSubscriptionManager(
             MarketCandleServiceInterface marketCandleService,
             SimpMessagingTemplate messagingTemplate,
-            LoggingServiceInterface loggingService) {
+            LoggingServiceInterface loggingService, UserContextService userContextService) {
         this.marketCandleService = marketCandleService;
         this.messagingTemplate = messagingTemplate;
         this.loggingService = loggingService;
+        this.userContextService = userContextService;
     }
 
     /**
@@ -133,6 +139,7 @@ public class WebSocketSubscriptionManager {
             LocalDateTime endDate,
             String destination,
             String subscriptionType) {
+        userContextService.setUser("SYSTEM", "SYSTEM");
 
         String subscriptionId = UUID.randomUUID().toString();
 
@@ -149,8 +156,7 @@ public class WebSocketSubscriptionManager {
         activeSubscriptions.put(subscriptionId, subscription);
 
         // Log subscription creation
-        loggingService.logAction(null, "system",
-                "Created candle data subscription: " + subscriptionId +
+        loggingService.logAction("Created candle data subscription: " + subscriptionId +
                         " for " + platformName + ":" + stockSymbol + " " + timeframe +
                         (subscriptionType != null ? " (Type: " + subscriptionType + ")" : ""));
 
@@ -164,10 +170,10 @@ public class WebSocketSubscriptionManager {
      * Cancel a subscription
      */
     public boolean cancelSubscription(String subscriptionId) {
+        userContextService.setUser("SYSTEM", "SYSTEM");
         Subscription removed = activeSubscriptions.remove(subscriptionId);
         if (removed != null) {
-            loggingService.logAction(null, "system",
-                    "Cancelled candle data subscription: " + subscriptionId);
+            loggingService.logAction("Cancelled candle data subscription: " + subscriptionId);
             return true;
         }
         return false;
@@ -182,6 +188,7 @@ public class WebSocketSubscriptionManager {
             LocalDateTime newEndDate,
             boolean resetData,
             String newSubscriptionType) { // Added parameter
+        userContextService.setUser("SYSTEM", "SYSTEM");
 
         Subscription subscription = activeSubscriptions.get(subscriptionId);
         if (subscription == null) {
@@ -197,8 +204,7 @@ public class WebSocketSubscriptionManager {
         }
 
         // Log update
-        loggingService.logAction(null, "system",
-                "Updated subscription " + subscriptionId + " time range to " +
+        loggingService.logAction("Updated subscription " + subscriptionId + " time range to " +
                         subscription.getStartDate() + " - " + subscription.getEndDate() +
                         (newSubscriptionType != null ? " and type to " + newSubscriptionType : ""));
 
@@ -256,8 +262,7 @@ public class WebSocketSubscriptionManager {
             messagingTemplate.convertAndSend(subscription.getDestination(), response);
 
         } catch (Exception e) {
-            loggingService.logError(null, "system",
-                    "Error sending initial data for subscription " +
+            loggingService.logError("Error sending initial data for subscription " +
                             subscription.getId() + ": " + e.getMessage(), e);
         }
     }
@@ -268,6 +273,7 @@ public class WebSocketSubscriptionManager {
      */
     @Scheduled(fixedRate = 10000)
     public void checkForUpdatesAndSendHeartbeats() {
+        userContextService.setUser("SYSTEM", "SYSTEM");
         LocalDateTime now = LocalDateTime.now();
 
         activeSubscriptions.values().forEach(subscription -> {
@@ -334,8 +340,7 @@ public class WebSocketSubscriptionManager {
                     messagingTemplate.convertAndSend(subscription.getDestination(), updateMessage);
                     subscription.setLastUpdateTime(now);
 
-                    loggingService.logAction(null, "system",
-                            "Sent " + updatedCandles.size() + " candle updates for subscription " +
+                    loggingService.logAction("Sent " + updatedCandles.size() + " candle updates for subscription " +
                                     subscription.getId() +
                                     (subscription.getSubscriptionType() != null ?
                                             " (Type: " + subscription.getSubscriptionType() + ")" : ""));
@@ -347,8 +352,7 @@ public class WebSocketSubscriptionManager {
                 }
 
             } catch (Exception e) {
-                loggingService.logError(null, "system",
-                        "Error checking updates for subscription " +
+                loggingService.logError("Error checking updates for subscription " +
                                 subscription.getId() + ": " + e.getMessage(), e);
             }
         });

@@ -3,10 +3,11 @@ package com.example.ehe_server.service.auth;
 import com.example.ehe_server.dto.RegistrationRequest;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
+import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository; // Import new repository
-import com.example.ehe_server.service.audit.AuditContextService;
 // Removed unused cookie/jwt imports for registration
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.RegistrationServiceInterface;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface; // Import email service
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
@@ -25,13 +26,15 @@ import java.util.UUID; // For token generation
 import java.util.regex.Pattern;
 
 @Service
+@Transactional
 public class RegistrationService implements RegistrationServiceInterface {
 
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository; // Inject token repo
     private final EmailServiceInterface emailService; // Inject email service
     private final LoggingServiceInterface loggingService;
-    private final AuditContextService auditContextService;
+    private final UserContextService userContextService;
+    private final AdminRepository adminRepository;
 
     @Value("${app.verification.token.expiry-hours}") // Get expiry from config
     private long tokenExpiryHours;
@@ -46,13 +49,13 @@ public class RegistrationService implements RegistrationServiceInterface {
             UserRepository userRepository,
             VerificationTokenRepository verificationTokenRepository, // Add to constructor
             EmailServiceInterface emailService, // Add to constructor
-            LoggingServiceInterface loggingService,
-            AuditContextService auditContextService) {
+            LoggingServiceInterface loggingService, UserContextService userContextService, AdminRepository adminRepository) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository; // Assign
         this.emailService = emailService; // Assign
         this.loggingService = loggingService;
-        this.auditContextService = auditContextService;
+        this.userContextService = userContextService;
+        this.adminRepository = adminRepository;
     }
 
     @Override
@@ -67,28 +70,28 @@ public class RegistrationService implements RegistrationServiceInterface {
                     request.getUsername().isBlank() || request.getEmail().isBlank() || request.getPassword().isBlank()) { // Added isBlank checks
                 responseBody.put("success", false);
                 responseBody.put("message", "All fields are required");
-                loggingService.logAction(null, auditContextService.getCurrentUser(), "Registration failed: Missing required fields");
+                loggingService.logAction("Registration failed: Missing required fields");
                 return responseBody;
             }
             // Validate username format
             if (!USERNAME_PATTERN.matcher(request.getUsername()).matches()) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Username must be at least 3 characters and contain only letters, numbers, and underscores");
-                loggingService.logAction(null, auditContextService.getCurrentUser(), "Registration failed: Invalid username format");
+                loggingService.logAction("Registration failed: Invalid username format");
                 return responseBody;
             }
             // Validate email format
             if (!EMAIL_PATTERN.matcher(request.getEmail()).matches()) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Please enter a valid email address");
-                loggingService.logAction(null, auditContextService.getCurrentUser(), "Registration failed: Invalid email format");
+                loggingService.logAction("Registration failed: Invalid email format");
                 return responseBody;
             }
             // Validate password strength
             if (!PASSWORD_PATTERN.matcher(request.getPassword()).matches()) {
                 responseBody.put("success", false);
                 responseBody.put("message", "Password must be at least 8 characters with at least one letter and one number");
-                loggingService.logAction(null, auditContextService.getCurrentUser(), "Registration failed: Password does not meet strength requirements");
+                loggingService.logAction("Registration failed: Password does not meet strength requirements");
                 return responseBody;
             }
 
@@ -102,7 +105,7 @@ public class RegistrationService implements RegistrationServiceInterface {
                 actionLink.put("text", "log in.");
                 actionLink.put("target", "login");
                 responseBody.put("actionLink", actionLink);
-                loggingService.logAction(null, auditContextService.getCurrentUser(), "Registration failed: Email already exists");
+                loggingService.logAction("Registration failed: Email already exists");
                 return responseBody;
             }
 
@@ -118,9 +121,17 @@ public class RegistrationService implements RegistrationServiceInterface {
             User savedUser = userRepository.save(newUser);
 
             // Now that user is created, update the audit context for subsequent actions in this transaction
-            auditContextService.setCurrentUser(String.valueOf(savedUser.getUserId()));
-            // Role is not fully established yet, could set to 'NONVERIFIED' or keep as 'USER' contextually
-            auditContextService.setCurrentUserRole("NONVERIFIED");
+            // Update audit context
+            String userIdStr = String.valueOf(savedUser.getUserId());
+            boolean isAdmin = adminRepository.existsByAdminId(savedUser.getUserId());
+
+            // Set audit context
+            String role = "USER"; // All authenticated users have USER role
+
+            if (isAdmin) {
+                role = "ADMIN"; // Add ADMIN role if user is in Admin table
+            }
+            userContextService.setUser(userIdStr, role);
 
             // --- NEW: Generate and save verification token ---
             String token = UUID.randomUUID().toString();
@@ -130,7 +141,7 @@ public class RegistrationService implements RegistrationServiceInterface {
             // -------------------------------------------------
 
             // Log successful registration attempt (pending verification)
-            loggingService.logAction(null, String.valueOf(savedUser.getUserId()), "User registered successfully (pending verification). Token generated.");
+            loggingService.logAction("User registered successfully (pending verification). Token generated.");
 
             // --- REMOVED: JWT Generation and Cookie Setting ---
             // No automatic login on registration anymore
@@ -144,7 +155,7 @@ public class RegistrationService implements RegistrationServiceInterface {
                 responseBody.put("success", true);
                 responseBody.put("message", "Registration successful. Please check your email (" + request.getEmail() + ") to verify your account. It may be in spam.");
                 responseBody.put("showResendButton", true);
-                loggingService.logAction(null, auditContextService.getCurrentUser(), "Sent verification email to " + request.getEmail());
+                loggingService.logAction("Sent verification email to " + request.getEmail());
 
             } catch (MailException e) {
                 // Set the response to indicate failure *because* the email couldn't be sent
@@ -154,17 +165,14 @@ public class RegistrationService implements RegistrationServiceInterface {
 
                 // IMPORTANT: Throw a runtime exception to trigger Transaction rollback.
                 // The user record created above should be rolled back if we can't send the email.
-                loggingService.logError(null, auditContextService.getCurrentUser(), "Failed to send verification email to " + request.getEmail(), e);
+                loggingService.logError("Failed to send verification email to " + request.getEmail(), e);
             }
 
             return responseBody;
 
         } catch (Exception e) {
             // Log the error with potentially available audit context
-            String currentUserCtx = "unknown";
-            try { currentUserCtx = auditContextService.getCurrentUser(); } catch (Exception ignored) {}
-
-            loggingService.logError(null, currentUserCtx, "Error during registration: " + e.getMessage(), e);
+            loggingService.logError("Error during registration: " + e.getMessage(), e);
 
             responseBody.put("success", false);
             responseBody.put("message", "An error occurred during registration. Please try again later.");

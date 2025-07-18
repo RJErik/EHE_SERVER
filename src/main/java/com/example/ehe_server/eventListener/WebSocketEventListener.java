@@ -20,11 +20,9 @@ public class WebSocketEventListener {
     @EventListener
     public void handleWebSocketConnectListener(SessionConnectedEvent event) {
         StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
-        if (headerAccessor.getUser() instanceof Authentication) {
-            Authentication auth = (Authentication) headerAccessor.getUser();
+        if (headerAccessor.getUser() instanceof Authentication auth) {
             if (auth.getPrincipal() instanceof Long) {
-                Long userId = (Long) auth.getPrincipal();
-                loggingService.logAction(userId.intValue(), userId.toString(), "WebSocket connected");
+                loggingService.logAction("WebSocket connected");
             }
         }
     }
@@ -32,11 +30,9 @@ public class WebSocketEventListener {
     @EventListener
     public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
         StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
-        if (headerAccessor.getUser() instanceof Authentication) {
-            Authentication auth = (Authentication) headerAccessor.getUser();
+        if (headerAccessor.getUser() instanceof Authentication auth) {
             if (auth.getPrincipal() instanceof Long) {
-                Long userId = (Long) auth.getPrincipal();
-                loggingService.logAction(userId.intValue(), userId.toString(), "WebSocket disconnected");
+                loggingService.logAction("WebSocket disconnected");
             }
         }
     }
