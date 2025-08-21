@@ -1,5 +1,7 @@
 package com.example.ehe_server.service.intf.user;
 
+import com.example.ehe_server.dto.UserInfoResponse;
+
 import java.util.Map;
 
 public interface UserInfoServiceInterface {
@@ -8,5 +10,5 @@ public interface UserInfoServiceInterface {
      * @param userId The ID of the user whose information should be retrieved
      * @return A map containing the operation result and user information if successful
      */
-    Map<String, Object> getUserInfo(Long userId);
+    UserInfoResponse getUserInfo(Long userId);
 }

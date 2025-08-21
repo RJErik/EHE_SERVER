@@ -1,8 +1,9 @@
 package com.example.ehe_server.service.intf.portfolio;
 
-import java.util.Map;
+import com.example.ehe_server.dto.HoldingsUpdateResponse;
+import com.example.ehe_server.dto.PortfolioValueResponse;
 
 public interface PortfolioValueServiceInterface {
-    Map<String, Object> calculatePortfolioValue(Integer portfolioId);
-    Map<String, Object> updateHoldings(Integer portfolioId);
+    PortfolioValueResponse calculatePortfolioValue(Integer userId, Integer portfolioId);
+    HoldingsUpdateResponse updateHoldings(Integer userId, Integer portfolioId);
 }

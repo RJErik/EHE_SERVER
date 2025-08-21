@@ -7,9 +7,7 @@ import com.example.ehe_server.service.intf.stock.PlatformServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,35 +25,20 @@ public class PlatformService implements PlatformServiceInterface {
     }
 
     @Override
-    public Map<String, Object> getAllPlatforms() {
-        Map<String, Object> result = new HashMap<>();
+    public List<String> getAllPlatforms() {
+        // Get all platform stock records
+        List<PlatformStock> platformStocks = platformStockRepository.findAll();
 
-        try {
-            // Get all platform stock records
-            List<PlatformStock> platformStocks = platformStockRepository.findAll();
+        // Extract unique platform names
+        List<String> platforms = platformStocks.stream()
+                .map(PlatformStock::getPlatformName)
+                .distinct()
+                .collect(Collectors.toList());
 
-            // Extract unique platform names
-            List<String> platforms = platformStocks.stream()
-                    .map(PlatformStock::getPlatformName)
-                    .distinct()
-                    .collect(Collectors.toList());
+        // Log success
+        loggingService.logAction("Platforms retrieved successfully");
 
-            // Prepare success response
-            result.put("success", true);
-            result.put("platforms", platforms);
+        return platforms;
 
-            // Log success
-            loggingService.logAction("Platforms retrieved successfully");
-
-        } catch (Exception e) {
-            // Log error
-            loggingService.logError("Error retrieving platforms: " + e.getMessage(), e);
-
-            // Return error response
-            result.put("success", false);
-            result.put("message", "An error occurred while retrieving platforms");
-        }
-
-        return result;
     }
 }

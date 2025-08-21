@@ -3,6 +3,7 @@ package com.example.ehe_server.service.audit;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -23,12 +24,12 @@ public class UserContextService implements UserContextServiceInterface {
     private static final ThreadLocal<String> requestPath = new ThreadLocal<>();
     private final UserRepository userRepository;
 
-    public UserContextService(UserRepository userRepository) {
+    public UserContextService(@Lazy UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
     /**
-     *  Set the current user
+     * Set the current user
      */
     public void setUser(String userId, String role) {
         // Convert role to Spring Security authority
@@ -65,6 +66,7 @@ public class UserContextService implements UserContextServiceInterface {
 
     /**
      * Get the current authenticated user ID
+     *
      * @return User ID if authenticated, null otherwise
      */
     public Long getCurrentUserId() {
@@ -80,6 +82,7 @@ public class UserContextService implements UserContextServiceInterface {
 
     /**
      * Get the current user's username for PostgreSQL audit context
+     *
      * @return Username string, "UNKNOWN" if not authenticated
      */
     public String getCurrentUserIdAsString() {
@@ -92,6 +95,7 @@ public class UserContextService implements UserContextServiceInterface {
 
     /**
      * Check if there is an authenticated user
+     *
      * @return true if authenticated, false otherwise
      */
     public boolean isAuthenticated() {
@@ -101,6 +105,7 @@ public class UserContextService implements UserContextServiceInterface {
 
     /**
      * Check if the current user is a human user (has numeric ID)
+     *
      * @return true if current user has numeric ID, false for system users or if not authenticated
      */
     public boolean isHumanUser() {
@@ -119,6 +124,7 @@ public class UserContextService implements UserContextServiceInterface {
 
     /**
      * Gets the human user if the user is human (has an id)
+     *
      * @return with the user attribute, otherwise return null
      */
     public User getCurrentHumanUser() {
@@ -136,6 +142,7 @@ public class UserContextService implements UserContextServiceInterface {
 
     /**
      * Get the current user's role
+     *
      * @return Role string if authenticated, null otherwise
      */
     public String getCurrentUserRole() {

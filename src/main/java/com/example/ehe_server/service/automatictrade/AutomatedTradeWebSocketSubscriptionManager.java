@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.automatictrade;
 
+import com.example.ehe_server.dto.TradeExecutionResponse;
 import com.example.ehe_server.dto.websocket.AutomatedTradeNotificationResponse;
 import com.example.ehe_server.entity.*;
 import com.example.ehe_server.repository.AutomatedTradeRuleRepository;
@@ -37,14 +38,22 @@ public class AutomatedTradeWebSocketSubscriptionManager {
         }
 
         // Getters
-        public String getId() { return id; }
-        public Integer getUserId() { return userId; }
-        public String getDestination() { return destination; }
+        public String getId() {
+            return id;
+        }
+
+        public Integer getUserId() {
+            return userId;
+        }
+
+        public String getDestination() {
+            return destination;
+        }
     }
 
     private final AutomatedTradeRuleRepository automatedTradeRuleRepository;
     private final MarketCandleRepository marketCandleRepository;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate simpMessagingTemplate;
     private final LoggingServiceInterface loggingService;
     private final TradingServiceInterface tradingService;
     private final TransactionRepository transactionRepository;
@@ -53,13 +62,14 @@ public class AutomatedTradeWebSocketSubscriptionManager {
     public AutomatedTradeWebSocketSubscriptionManager(
             AutomatedTradeRuleRepository automatedTradeRuleRepository,
             MarketCandleRepository marketCandleRepository,
-            SimpMessagingTemplate messagingTemplate,
+            SimpMessagingTemplate simpMessagingTemplate,
             LoggingServiceInterface loggingService,
             TradingServiceInterface tradingService,
-            TransactionRepository transactionRepository, UserContextService userContextService) {
+            TransactionRepository transactionRepository,
+            UserContextService userContextService) {
         this.automatedTradeRuleRepository = automatedTradeRuleRepository;
         this.marketCandleRepository = marketCandleRepository;
-        this.messagingTemplate = messagingTemplate;
+        this.simpMessagingTemplate = simpMessagingTemplate;
         this.loggingService = loggingService;
         this.tradingService = tradingService;
         this.transactionRepository = transactionRepository;
@@ -116,7 +126,7 @@ public class AutomatedTradeWebSocketSubscriptionManager {
             }
 
             for (AutomatedTradeRule rule : activeRules) {
-                processRule(rule, currentMinute);
+                processRule(rule);
             }
         } catch (Exception e) {
             loggingService.logError("Error in automated trade rule check: " + e.getMessage(), e);
@@ -126,7 +136,7 @@ public class AutomatedTradeWebSocketSubscriptionManager {
     /**
      * Process a single automated trade rule
      */
-    private void processRule(AutomatedTradeRule rule, LocalDateTime currentTime) {
+    private void processRule(AutomatedTradeRule rule) {
         try {
             PlatformStock platformStock = rule.getPlatformStock();
 
@@ -177,7 +187,6 @@ public class AutomatedTradeWebSocketSubscriptionManager {
      */
     private void executeAutomatedTrade(AutomatedTradeRule rule, MarketCandle triggeringCandle) {
         int userId = rule.getUser().getUserId();
-        String userIdStr = String.valueOf(userId);
 
         try {
             loggingService.logAction("Executing automated trade for rule #" + rule.getAutomatedTradeRuleId());
@@ -190,26 +199,21 @@ public class AutomatedTradeWebSocketSubscriptionManager {
             String quantityType = rule.getQuantityType().toString();
 
             // Execute the market order
-            Map<String, Object> tradingResult = tradingService.executeMarketOrder(
-                    portfolioId, stockSymbol, action, quantity, quantityType, rule.getUser().getUserId());
+            TradeExecutionResponse tradeResult = tradingService.executeTrade(
+                    userId, portfolioId, stockSymbol, action, quantity, quantityType);
 
-            boolean success = (boolean) tradingResult.getOrDefault("success", false);
+            boolean success = tradeResult != null && "FILLED".equals(tradeResult.getStatus());
 
             // Extract transaction ID if available
             Integer transactionId = null;
-            if (success && tradingResult.get("order") instanceof Map) {
-                Map<String, Object> orderDetails = (Map<String, Object>) tradingResult.get("order");
-                if (orderDetails.containsKey("orderId")) {
-                    // This is just the exchange order ID, not our internal transaction ID
-                    // We would need to find our transaction based on other criteria
-
-                    // For this example, we'll just use the latest transaction for this portfolio
-                    List<Transaction> transactions = transactionRepository.findByPortfolio_PortfolioId(portfolioId);
-                    if (!transactions.isEmpty()) {
-                        // Sort by transaction date descending to get the most recent
-                        transactions.sort((t1, t2) -> t2.getTransactionDate().compareTo(t1.getTransactionDate()));
-                        transactionId = transactions.get(0).getTransactionId();
-                    }
+            if (success && tradeResult.getOrderId() != null) {
+                // Find our transaction based on the order ID or other criteria
+                // For this example, we'll use the latest transaction for this portfolio
+                List<Transaction> transactions = transactionRepository.findByPortfolio_PortfolioId(portfolioId);
+                if (!transactions.isEmpty()) {
+                    // Sort by transaction date descending to get the most recent
+                    transactions.sort((t1, t2) -> t2.getTransactionDate().compareTo(t1.getTransactionDate()));
+                    transactionId = transactions.get(0).getTransactionId();
                 }
             }
 
@@ -218,10 +222,10 @@ public class AutomatedTradeWebSocketSubscriptionManager {
             automatedTradeRuleRepository.save(rule);
 
             loggingService.logAction("Automated trade rule #" + rule.getAutomatedTradeRuleId() +
-                            " executed and deactivated. Trade success: " + success);
+                    " executed and deactivated. Trade success: ");
 
             // Send notification to all active subscriptions for this user
-            sendAutomatedTradeNotification(rule, triggeringCandle, success, tradingResult, transactionId);
+            sendAutomatedTradeNotification(rule, triggeringCandle, success, tradeResult, transactionId);
 
         } catch (Exception e) {
             loggingService.logError("Error executing automated trade for rule #" + rule.getAutomatedTradeRuleId() +
@@ -229,8 +233,7 @@ public class AutomatedTradeWebSocketSubscriptionManager {
 
             // Send failure notification
             try {
-                sendAutomatedTradeNotification(rule, triggeringCandle, false,
-                        Map.of("success", false, "message", e.getMessage()), null);
+                sendAutomatedTradeNotification(rule, triggeringCandle, false, null, null);
             } catch (Exception ne) {
                 loggingService.logError("Error sending failure notification: " + ne.getMessage(), ne);
             }
@@ -248,7 +251,7 @@ public class AutomatedTradeWebSocketSubscriptionManager {
             AutomatedTradeRule rule,
             MarketCandle triggeringCandle,
             boolean success,
-            Map<String, Object> tradingResult,
+            TradeExecutionResponse tradeResult,
             Integer transactionId) {
 
         Integer userId = rule.getUser().getUserId();
@@ -283,11 +286,11 @@ public class AutomatedTradeWebSocketSubscriptionManager {
                 }
 
                 // Create a descriptive message
-                String message = formatAutomatedTradeMessage(rule, triggeringCandle, success, tradingResult);
+                String message = formatAutomatedTradeMessage(rule, triggeringCandle, success, tradeResult);
                 notification.setMessage(message);
 
                 // Send the notification to the user
-                messagingTemplate.convertAndSendToUser(
+                simpMessagingTemplate.convertAndSendToUser(
                         userId.toString(),
                         "/queue/automated-trades",
                         notification
@@ -305,7 +308,7 @@ public class AutomatedTradeWebSocketSubscriptionManager {
             AutomatedTradeRule rule,
             MarketCandle candle,
             boolean success,
-            Map<String, Object> tradingResult) {
+            TradeExecutionResponse tradeResult) {
 
         StringBuilder message = new StringBuilder();
         message.append("AUTOMATED TRADE ");
@@ -336,21 +339,21 @@ public class AutomatedTradeWebSocketSubscriptionManager {
                 .append(rule.getQuantityType())
                 .append(")");
 
-        if (success) {
+        if (success && tradeResult != null) {
             message.append(" - Order executed successfully");
-            if (tradingResult.containsKey("order")) {
-                Map<String, Object> orderDetails = (Map<String, Object>) tradingResult.get("order");
-                if (orderDetails.containsKey("executedQty")) {
-                    message.append(", executed quantity: ").append(orderDetails.get("executedQty"));
-                }
-                if (orderDetails.containsKey("cummulativeQuoteQty")) {
-                    message.append(", total cost: ").append(orderDetails.get("cummulativeQuoteQty"));
-                }
+            if (tradeResult.getExecutedQty() != null) {
+                message.append(", executed quantity: ").append(tradeResult.getExecutedQty());
+            }
+            if (tradeResult.getCummulativeQuoteQty() != null) {
+                message.append(", total cost: ").append(tradeResult.getCummulativeQuoteQty());
+            }
+            if (tradeResult.getOrderId() != null) {
+                message.append(", order ID: ").append(tradeResult.getOrderId());
             }
         } else {
             message.append(" - Failed to execute order");
-            if (tradingResult.containsKey("message")) {
-                message.append(": ").append(tradingResult.get("message"));
+            if (tradeResult != null && tradeResult.getStatus() != null) {
+                message.append(" (Status: ").append(tradeResult.getStatus()).append(")");
             }
         }
 

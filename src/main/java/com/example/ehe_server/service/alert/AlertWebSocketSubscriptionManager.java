@@ -41,11 +41,25 @@ public class AlertWebSocketSubscriptionManager {
         }
 
         // Getters and setters
-        public String getId() { return id; }
-        public Integer getUserId() { return userId; }
-        public String getDestination() { return destination; }
-        public boolean isInitialCheckCompleted() { return initialCheckCompleted; }
-        public LocalDateTime getLastCheckedMinuteCandle() { return lastCheckedMinuteCandle; }
+        public String getId() {
+            return id;
+        }
+
+        public Integer getUserId() {
+            return userId;
+        }
+
+        public String getDestination() {
+            return destination;
+        }
+
+        public boolean isInitialCheckCompleted() {
+            return initialCheckCompleted;
+        }
+
+        public LocalDateTime getLastCheckedMinuteCandle() {
+            return lastCheckedMinuteCandle;
+        }
 
         public void setInitialCheckCompleted(boolean initialCheckCompleted) {
             this.initialCheckCompleted = initialCheckCompleted;
@@ -157,8 +171,8 @@ public class AlertWebSocketSubscriptionManager {
 
 //                System.out.println("Check start time: " + checkStartTime);
                 loggingService.logAction("Checking alert #" + alert.getAlertId() + " for " +
-                                platformStock.getPlatformName() + ":" + platformStock.getStockSymbol() +
-                                " starting from " + checkStartTime);
+                        platformStock.getPlatformName() + ":" + platformStock.getStockSymbol() +
+                        " starting from " + checkStartTime);
 
                 // Start checking with 1-minute candles
                 checkAlertAgainstTimeframe(alert, platformStock, MarketCandle.Timeframe.M1,
@@ -206,7 +220,7 @@ public class AlertWebSocketSubscriptionManager {
 //            System.out.println("Period: " + startTime + " to " + endTime);
 
             loggingService.logAction("Checking " + timeframe + " candles for alert #" + alert.getAlertId() +
-                            " from " + startTime + " to " + endTime);
+                    " from " + startTime + " to " + endTime);
 
             List<MarketCandle> candles = marketCandleRepository.findByPlatformStockAndTimeframeAndTimestampBetweenOrderByTimestampAsc(
                     platformStock, timeframe, startTime, endTime);
@@ -237,7 +251,7 @@ public class AlertWebSocketSubscriptionManager {
 //                    System.out.println("Stock: " + platformStock.getStockSymbol());
 
                     loggingService.logAction("Alert #" + alert.getAlertId() + " triggered on " + timeframe +
-                                    " candle at " + candle.getTimestamp());
+                            " candle at " + candle.getTimestamp());
 
                     // Send alert notification
                     sendAlertNotification(alert, candle, subscription);
@@ -398,12 +412,18 @@ public class AlertWebSocketSubscriptionManager {
      */
     private MarketCandle.Timeframe getNextTimeframe(MarketCandle.Timeframe current) {
         switch (current) {
-            case M1: return MarketCandle.Timeframe.M5;
-            case M5: return MarketCandle.Timeframe.M15;
-            case M15: return MarketCandle.Timeframe.H1;
-            case H1: return MarketCandle.Timeframe.H4;
-            case H4: return MarketCandle.Timeframe.D1;
-            default: return null; // Already at highest timeframe
+            case M1:
+                return MarketCandle.Timeframe.M5;
+            case M5:
+                return MarketCandle.Timeframe.M15;
+            case M15:
+                return MarketCandle.Timeframe.H1;
+            case H1:
+                return MarketCandle.Timeframe.H4;
+            case H4:
+                return MarketCandle.Timeframe.D1;
+            default:
+                return null; // Already at highest timeframe
         }
     }
 

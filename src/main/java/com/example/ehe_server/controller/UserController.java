@@ -1,26 +1,23 @@
 package com.example.ehe_server.controller;
 
-import com.example.ehe_server.dto.ApiKeyAddRequest;
-import com.example.ehe_server.dto.ApiKeyDeleteRequest;
-import com.example.ehe_server.dto.ApiKeyUpdateRequest;
-import com.example.ehe_server.dto.EmailChangeRequest;
-import com.example.ehe_server.entity.User;
-import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.intf.user.ApiKeyAddServiceInterface;
-import com.example.ehe_server.service.intf.user.ApiKeyDeleteServiceInterface;
-import com.example.ehe_server.service.intf.user.ApiKeyListServiceInterface;
+import com.example.ehe_server.dto.*;
+import com.example.ehe_server.service.intf.user.ApiKeyCreationServiceInterface;
+import com.example.ehe_server.service.intf.user.ApiKeyRemovalServiceInterface;
+import com.example.ehe_server.service.intf.user.ApiKeyRetrievalServiceInterface;
 import com.example.ehe_server.service.intf.user.ApiKeyUpdateServiceInterface;
 import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.auth.PasswordResetRequestServiceInterface;
 import com.example.ehe_server.service.intf.user.*;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/user")
@@ -29,167 +26,288 @@ public class UserController {
     private final UserValidationServiceInterface userValidationService;
     private final UserLogoutServiceInterface userLogoutService;
     private final UserContextServiceInterface userContextService;
-    private final UserRepository userRepository;
     private final PasswordResetRequestServiceInterface passwordResetRequestService;
     private final JwtTokenRenewalServiceInterface jwtTokenRenewalService;
     private final UserInfoServiceInterface userInfoService;
     private final UserDeactivationServiceInterface userDeactivationService;
     private final EmailChangeRequestServiceInterface emailChangeRequestService;
-    private final ApiKeyAddServiceInterface apiKeyAddService;
+    private final ApiKeyCreationServiceInterface apiKeyCreationService;
     private final ApiKeyUpdateServiceInterface apiKeyUpdateService;
-    private final ApiKeyDeleteServiceInterface apiKeyDeleteService;
-    private final ApiKeyListServiceInterface apiKeyListService;
+    private final ApiKeyRemovalServiceInterface apiKeyRemovalService;
+    private final ApiKeyRetrievalServiceInterface apiKeyRetrievalService;
+    private final MessageSource messageSource;
 
     public UserController(
             UserValidationServiceInterface userValidationService,
             UserLogoutServiceInterface userLogoutService,
             UserContextServiceInterface userContextService,
-            UserRepository userRepository,
             PasswordResetRequestServiceInterface passwordResetRequestService,
             JwtTokenRenewalServiceInterface jwtTokenRenewalService,
             UserInfoServiceInterface userInfoService,
             UserDeactivationServiceInterface userDeactivationService,
             EmailChangeRequestServiceInterface emailChangeRequestService,
-            ApiKeyAddServiceInterface apiKeyAddService,
+            ApiKeyCreationServiceInterface apiKeyCreationService,
             ApiKeyUpdateServiceInterface apiKeyUpdateService,
-            ApiKeyDeleteServiceInterface apiKeyDeleteService,
-            ApiKeyListServiceInterface apiKeyListService) {
+            ApiKeyRemovalServiceInterface apiKeyRemovalService,
+            ApiKeyRetrievalServiceInterface apiKeyRetrievalService,
+            MessageSource messageSource) {
         this.userValidationService = userValidationService;
         this.userLogoutService = userLogoutService;
         this.userContextService = userContextService;
-        this.userRepository = userRepository;
         this.passwordResetRequestService = passwordResetRequestService;
         this.jwtTokenRenewalService = jwtTokenRenewalService;
         this.userInfoService = userInfoService;
         this.userDeactivationService = userDeactivationService;
         this.emailChangeRequestService = emailChangeRequestService;
-        this.apiKeyAddService = apiKeyAddService;
+        this.apiKeyCreationService = apiKeyCreationService;
         this.apiKeyUpdateService = apiKeyUpdateService;
-        this.apiKeyDeleteService = apiKeyDeleteService;
-        this.apiKeyListService = apiKeyListService;
+        this.apiKeyRemovalService = apiKeyRemovalService;
+        this.apiKeyRetrievalService = apiKeyRetrievalService;
+        this.messageSource = messageSource;
     }
 
-    @GetMapping("/verify")
+    @GetMapping("/verify-user")
     public ResponseEntity<Map<String, Object>> verifyUser() {
-        // Verify user status
-        Map<String, Object> response = userValidationService.verifyUser();
-        return ResponseEntity.ok(response);
+        // Call automated trade rule retrieval service
+        userValidationService.verifyUser();
+
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.user.verifyUser", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 
-    @GetMapping("/info")
+    //LOOK OUT!!!!!!!!!!!!!!!!! I think it is done
+    @GetMapping("/user-info")
     public ResponseEntity<Map<String, Object>> getUserInfo() {
-        // Call user info service
-        Map<String, Object> responseBody = userInfoService.getUserInfo(userContextService.getCurrentUserId());
+        // Call automated trade rule retrieval service
+        UserInfoResponse userInfoResponse = userInfoService.getUserInfo(userContextService.getCurrentUserId());
 
-        // Return appropriate response
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.user.userInfo.get", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+        responseBody.put("userInfo", userInfoResponse);
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(HttpServletResponse response) {
-        // Call logout service
-        Map<String, Object> responseBody = userLogoutService.logoutUser(response);
+        // Call automated trade rule retrieval service
+        userLogoutService.logoutUser(userContextService.getCurrentUserId().intValue(), response);
 
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.user.logout", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 
     @PostMapping("/request-password-reset")
     public ResponseEntity<Map<String, Object>> requestPasswordReset() {
-        // Find the user by ID
-        Optional<User> userOpt = userRepository.findById(Integer.parseInt(userContextService.getCurrentUserIdAsString()));
 
-        Map<String, Object> response = new HashMap<>();
+        passwordResetRequestService.requestPasswordResetForAuthenticatedUser(userContextService.getCurrentUserId());
 
-        if (userOpt.isEmpty()) {
-            response.put("success", false);
-            response.put("message", "User not found");
-            return ResponseEntity.ok(response);
-        }
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.auth.passwordResetRequest", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
 
-        User user = userOpt.get();
-        String email = user.getEmail();
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
 
-        // Call the password reset service with the user's email
-        Map<String, Object> responseBody = passwordResetRequestService.requestPasswordReset(email);
-
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 
     @PostMapping("/renew-token")
     public ResponseEntity<Map<String, Object>> renewToken(HttpServletResponse response) {
-        // Call token renewal service
-        Map<String, Object> responseBody = jwtTokenRenewalService.renewToken(userContextService.getCurrentUserId(), response);
+        // Call automated trade rule retrieval service
+        jwtTokenRenewalService.renewToken(userContextService.getCurrentUserId(), response);
 
-        // Return appropriate response
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.user.jwtTokenRenewal", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 
-    @PostMapping("/deactivate")
+    @PostMapping("/deactivate-account")
     public ResponseEntity<Map<String, Object>> deactivateAccount() {
-        // Call deactivation service
-        Map<String, Object> responseBody = userDeactivationService.deactivateUser(userContextService.getCurrentUserId());
+        // Call automated trade rule retrieval service
+        userDeactivationService.deactivateUser(userContextService.getCurrentUserId());
 
-        // Return appropriate response
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.user.userDeactivation", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 
     @PostMapping("/change-email")
     public ResponseEntity<Map<String, Object>> requestEmailChange(@Valid @RequestBody EmailChangeRequest request) {
-        // Call email change request service
-        Map<String, Object> responseBody = emailChangeRequestService.requestEmailChange(userContextService.getCurrentUserId(), request.getNewEmail());
+        // Call automated trade rule retrieval service
+        emailChangeRequestService.requestEmailChange(userContextService.getCurrentUserId(), request.getNewEmail());
 
-        // Return appropriate response
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.user.emailChangeRequest", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+        responseBody.put("showResendButton", true);
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 
     // API Key Management Endpoints
-
     @GetMapping("/api-keys")
-    public ResponseEntity<Map<String, Object>> listApiKeys() {
-        // Call API key list service
-        Map<String, Object> responseBody = apiKeyListService.listApiKeys(userContextService.getCurrentUserId());
+    public ResponseEntity<Map<String, Object>> getApiKeys() {
+        // Call automated trade rule retrieval service
+        List<ApiKeyRetrievalResponse> apiKeyRetrievalResponses = apiKeyRetrievalService.getApiKeys(userContextService.getCurrentUserId());
 
-        // Return appropriate response
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.user.apiKey.get", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+        responseBody.put("apiKeys", apiKeyRetrievalResponses);
+
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 
+    //LOOK OVER!!!!!!!!!!!!!!!!!!
     @PostMapping("/api-keys")
-    public ResponseEntity<Map<String, Object>> addApiKey(@Valid @RequestBody ApiKeyAddRequest request) {
-        // Call API key add service with secret key
-        Map<String, Object> responseBody = apiKeyAddService.addApiKey(
+    public ResponseEntity<Map<String, Object>> createApiKey(@Valid @RequestBody ApiKeyCreationRequest request) {
+        // Call automated trade rule retrieval service
+        ApiKeyCreationResponse apiKeyCreationResponse = apiKeyCreationService.createApiKey(
                 userContextService.getCurrentUserId(), request.getPlatformName(), request.getApiKeyValue(), request.getSecretKey());
 
-        // Return appropriate response
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.user.apiKey.add", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+        responseBody.put("apiKey", apiKeyCreationResponse);
+
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 
     @PutMapping("/api-keys")
     public ResponseEntity<Map<String, Object>> updateApiKey(@Valid @RequestBody ApiKeyUpdateRequest request) {
-        // Call API key update service with secret key
-        Map<String, Object> responseBody = apiKeyUpdateService.updateApiKey(
+        // Call automated trade rule retrieval service
+        ApiKeyUpdateResponse apiKeyUpdateResponse = apiKeyUpdateService.updateApiKey(
                 userContextService.getCurrentUserId(), request.getApiKeyId(), request.getPlatformName(),
                 request.getApiKeyValue(), request.getSecretKey());
 
-        // Return appropriate response
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.user.apiKey.update", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+        responseBody.put("apiKey", apiKeyUpdateResponse);
+
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 
     @DeleteMapping("/api-keys")
-    public ResponseEntity<Map<String, Object>> deleteApiKey(@Valid @RequestBody ApiKeyDeleteRequest request) {
-        // Call API key delete service
-        Map<String, Object> responseBody = apiKeyDeleteService.deleteApiKey(userContextService.getCurrentUserId(), request.getApiKeyId());
+    public ResponseEntity<Map<String, Object>> removeApiKey(@Valid @RequestBody ApiKeyRemoveRequest request) {
+        // Call automated trade rule retrieval service
+        apiKeyRemovalService.removeApiKey(userContextService.getCurrentUserId(), request.getApiKeyId());
 
-        // Return appropriate response
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.user.apiKey.remove", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 }

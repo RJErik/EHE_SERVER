@@ -1,7 +1,6 @@
 package com.example.ehe_server.service.intf.auth;
 
-import java.util.Map;
-
 public interface PasswordResetRequestServiceInterface {
-    Map<String, Object> requestPasswordReset(String email);
+    void requestPasswordResetForUnauthenticatedUser(String email);
+    void requestPasswordResetForAuthenticatedUser(Long userId);
 }

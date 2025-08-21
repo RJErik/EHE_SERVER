@@ -1,7 +1,5 @@
 package com.example.ehe_server.service.intf.user;
 
-import java.util.Map;
-
 public interface EmailChangeRequestServiceInterface {
     /**
      * Processes a request to change the user's email address
@@ -9,5 +7,5 @@ public interface EmailChangeRequestServiceInterface {
      * @param newEmail The new email address
      * @return A map containing the result of the operation
      */
-    Map<String, Object> requestEmailChange(Long userId, String newEmail);
+    void requestEmailChange(Long userId, String newEmail);
 }

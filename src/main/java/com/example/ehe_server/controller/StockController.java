@@ -1,15 +1,18 @@
 package com.example.ehe_server.controller;
 
-import com.example.ehe_server.dto.PlatformRequest;
-import com.example.ehe_server.dto.TradeRequest;
-import com.example.ehe_server.dto.TradingCapacityRequest;
+import com.example.ehe_server.dto.*;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.stock.PlatformServiceInterface;
 import com.example.ehe_server.service.intf.stock.StockServiceInterface;
 import com.example.ehe_server.service.intf.trade.TradingCapacityServiceInterface;
 import com.example.ehe_server.service.intf.trade.TradingServiceInterface;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -20,16 +23,22 @@ public class StockController {
     private final StockServiceInterface stockService;
     private final TradingCapacityServiceInterface tradingCapacityService;
     private final TradingServiceInterface tradingService;
+    private final UserContextService userContextService;
+    private final MessageSource messageSource;
 
     public StockController(
             PlatformServiceInterface platformService,
             StockServiceInterface stockService,
             TradingCapacityServiceInterface tradingCapacityService,
-            TradingServiceInterface tradingService) {
+            TradingServiceInterface tradingService,
+            UserContextService userContextService,
+            MessageSource messageSource) {
         this.platformService = platformService;
         this.stockService = stockService;
         this.tradingCapacityService = tradingCapacityService;
         this.tradingService = tradingService;
+        this.userContextService = userContextService;
+        this.messageSource = messageSource;
     }
 
     /**
@@ -39,13 +48,28 @@ public class StockController {
      */
     @GetMapping("/platforms")
     public ResponseEntity<Map<String, Object>> getPlatforms() {
-        // Call platform service
-        Map<String, Object> responseBody = platformService.getAllPlatforms();
+        // Call automated trade rule retrieval service
+        List<String> platforms = platformService.getAllPlatforms();
 
-        // Return appropriate response
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.stock.platform.get", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+        responseBody.put("platforms", platforms);
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
+
+
+    //LOOK OUT!!!!!!!!!!!!!!!!!4
 
     /**
      * Endpoint to retrieve all stocks for a specific platform
@@ -54,14 +78,26 @@ public class StockController {
      * @param request Contains the platform name
      * @return List of stock symbols and success status
      */
-    @PostMapping("/stocks")
-    public ResponseEntity<Map<String, Object>> getStocksByPlatform(@RequestBody PlatformRequest request) {
-        // Call stock service with the platform from request body
-        Map<String, Object> responseBody = stockService.getStocksByPlatform(request.getPlatform());
+    @PostMapping("/stocks-by-platform")
+    public ResponseEntity<Map<String, Object>> getStocksByPlatform(@RequestBody StockByPlatformRequest request) {
+        // Call automated trade rule retrieval service
+        StocksByPlatformResponse stocksByPlatformResponse = stockService.getStocksByPlatform(request.getPlatform());
 
-        // Return appropriate response
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.stock.stock.get", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+        responseBody.put("stocks", stocksByPlatformResponse);
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 
     /**
@@ -73,13 +109,25 @@ public class StockController {
      */
     @PostMapping("/trading-capacity")
     public ResponseEntity<Map<String, Object>> getTradingCapacity(@RequestBody TradingCapacityRequest request) {
-        // Call the trading capacity service
-        Map<String, Object> responseBody = tradingCapacityService.getTradingCapacity(
-                request.getPortfolioId(), request.getStockSymbol());
+        // Call automated trade rule retrieval service
+        TradingCapacityResponse tradingCapacityResponse = tradingCapacityService.getTradingCapacity(
+                userContextService.getCurrentUserId().intValue(), request.getPortfolioId(), request.getStockSymbol());
 
-        // Return appropriate response
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.stock.tradeCapacity.get", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+        responseBody.put("capacity", tradingCapacityResponse);
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 
     /**
@@ -89,18 +137,30 @@ public class StockController {
      * @return Order details and success status
      */
     @PostMapping("/trade")
-    public ResponseEntity<Map<String, Object>> executeMarketOrder(@RequestBody TradeRequest request) {
-        // Call the trading service
-        Map<String, Object> responseBody = tradingService.executeMarketOrder(
+    public ResponseEntity<Map<String, Object>> executeTrade(@RequestBody TradeRequest request) {
+        // Call automated trade rule retrieval service
+        TradeExecutionResponse tradeExecutionResponse = tradingService.executeTrade(
+                userContextService.getCurrentUserId().intValue(),
                 request.getPortfolioId(),
                 request.getStockSymbol(),
                 request.getAction(),
                 request.getAmount(),
-                request.getQuantityType(),
-                null);
+                request.getQuantityType());
 
-        // Return appropriate response
-        boolean success = (boolean) responseBody.getOrDefault("success", false);
-        return success ? ResponseEntity.ok(responseBody) : ResponseEntity.badRequest().body(responseBody);
+        // 2. Fetch the success message from messages.properties
+        String successMessage = messageSource.getMessage(
+                "success.message.stock.trade", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
+
+        // 3. Build the final response body
+        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+        responseBody.put("order", tradeExecutionResponse);
+
+        // 4. Return the successful response
+        return ResponseEntity.ok(responseBody);
     }
 }

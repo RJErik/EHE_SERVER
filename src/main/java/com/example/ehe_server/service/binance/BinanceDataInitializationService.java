@@ -1,7 +1,9 @@
 package com.example.ehe_server.service.binance;
 
+import com.example.ehe_server.dto.StocksByPlatformResponse;
 import com.example.ehe_server.entity.PlatformStock;
 import com.example.ehe_server.repository.PlatformStockRepository;
+import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.stock.StockServiceInterface;
 import jakarta.annotation.PostConstruct;
@@ -26,23 +28,26 @@ public class BinanceDataInitializationService {
 
     // Track active websocket subscriptions
     private final Map<String, Boolean> activeSubscriptions = new HashMap<>();
+    private final UserContextService userContextService;
 
     public BinanceDataInitializationService(
             BinanceCandleService candleService,
             BinanceWebSocketClient webSocketClient,
             PlatformStockRepository stockRepository,
             StockServiceInterface stockService,
-            LoggingServiceInterface loggingService) {
+            LoggingServiceInterface loggingService, UserContextService userContextService) {
         this.candleService = candleService;
         this.webSocketClient = webSocketClient;
         this.stockRepository = stockRepository;
         this.stockService = stockService;
         this.loggingService = loggingService;
+        this.userContextService = userContextService;
     }
 
     @PostConstruct
     public void initialize() {
         //SYSTEM SET HERE
+        userContextService.setUser("SYSTEM", "SYSTEM");
         loggingService.logAction("Initializing Binance data synchronization");
 
         // Check if we need to do initialization as system user
@@ -75,21 +80,14 @@ public class BinanceDataInitializationService {
         try {
             // Note: stockService.getStocksByPlatform requires a user context
             // You may need to handle this differently in your actual implementation
-            Map<String, Object> stocksResponse = stockService.getStocksByPlatform(PLATFORM_NAME);
+            StocksByPlatformResponse stocksResponse = stockService.getStocksByPlatform(PLATFORM_NAME);
 
-            if ((boolean) stocksResponse.getOrDefault("success", false)) {
-                @SuppressWarnings("unchecked")
-                List<String> stocks = (List<String>) stocksResponse.get("stocks");
+            List<String> stocks = stocksResponse.getStocks();
 
-                if (stocks != null && !stocks.isEmpty()) {
-                    for (String symbol : stocks) {
-                        setupSymbol(symbol);
-                    }
+            if (stocks != null && !stocks.isEmpty()) {
+                for (String symbol : stocks) {
+                    setupSymbol(symbol);
                 }
-            } else {
-                //SYSTEM SET HERE
-                loggingService.logAction("Failed to get stocks from StockService: " +
-                        stocksResponse.getOrDefault("message", "Unknown error"));
             }
         } catch (Exception e) {
             //SYSTEM SET HERE

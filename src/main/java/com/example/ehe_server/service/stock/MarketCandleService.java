@@ -120,9 +120,9 @@ public class MarketCandleService implements MarketCandleServiceInterface {
                         " L:" + candles.get(0).getLowPrice() + " C:" + candles.get(0).getClosePrice());
 
                 System.out.println("Last candle: " +
-                        candles.get(candles.size()-1).getTimestamp().format(formatter) + " | O:" +
-                        candles.get(candles.size()-1).getOpenPrice() + " H:" + candles.get(candles.size()-1).getHighPrice() +
-                        " L:" + candles.get(candles.size()-1).getLowPrice() + " C:" + candles.get(candles.size()-1).getClosePrice());
+                        candles.get(candles.size() - 1).getTimestamp().format(formatter) + " | O:" +
+                        candles.get(candles.size() - 1).getOpenPrice() + " H:" + candles.get(candles.size() - 1).getHighPrice() +
+                        " L:" + candles.get(candles.size() - 1).getLowPrice() + " C:" + candles.get(candles.size() - 1).getClosePrice());
             }
 
             // Convert to DTO
@@ -154,7 +154,7 @@ public class MarketCandleService implements MarketCandleServiceInterface {
             System.out.println(">>> DATA RANGE: " +
                     (response.getCandles().isEmpty() ? "EMPTY" :
                             response.getCandles().get(0).getTimestamp().format(formatter) + " to " +
-                                    response.getCandles().get(response.getCandles().size()-1).getTimestamp().format(formatter)) + " <<<");
+                                    response.getCandles().get(response.getCandles().size() - 1).getTimestamp().format(formatter)) + " <<<");
         } else {
             System.out.println(">>> SENT ERROR RESPONSE: " + response.getMessage() + " <<<");
         }

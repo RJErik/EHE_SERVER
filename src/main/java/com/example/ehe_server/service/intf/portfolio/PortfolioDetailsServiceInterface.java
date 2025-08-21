@@ -1,7 +1,9 @@
 package com.example.ehe_server.service.intf.portfolio;
 
+import com.example.ehe_server.dto.PortfolioDetailsResponse;
+
 import java.util.Map;
 
 public interface PortfolioDetailsServiceInterface {
-    Map<String, Object> getPortfolioDetails(Integer portfolioId);
+    PortfolioDetailsResponse getPortfolioDetails(Integer userId, Integer portfolioId);
 }

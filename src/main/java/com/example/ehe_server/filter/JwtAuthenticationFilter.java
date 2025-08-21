@@ -108,31 +108,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                             // Log access to significant endpoints
                             if (isSignificantEndpoint(path)) {
-                                loggingService.logAction(user.getUserId(), userId.toString(), "Accessed " + path);
+                                loggingService.logAction("Accessed " + path);
                             }
                         } else {
                             // User exists but is not active
-                            loggingService.logAction(userId.intValue(), userId.toString(),
-                                    "Authentication failed: User account status is " + user.getAccountStatus());
+                            loggingService.logAction("Authentication failed: User account status is " + user.getAccountStatus());
                         }
                     } else {
                         // User doesn't exist in database
-                        loggingService.logAction(null, userId.toString(),
-                                "Authentication failed: User not found in database");
+                        loggingService.logAction("Authentication failed: User not found in database");
                     }
                 } else {
                     // Invalid userId or role in token
-                    loggingService.logAction(null, "system",
-                            "Authentication failed: Invalid userId or role in JWT token");
+                    loggingService.logAction("Authentication failed: Invalid userId or role in JWT token");
                 }
             } else {
                 // Invalid or missing token
                 if (token != null) {
-                    loggingService.logAction(null, "system", "Authentication failed: Invalid JWT token");
+                    loggingService.logAction("Authentication failed: Invalid JWT token");
                 }
             }
         } catch (Exception e) {
-            loggingService.logError(null, "system", "Exception during authentication: " + e.getMessage(), e);
+            loggingService.logError("Exception during authentication: " + e.getMessage(), e);
         }
 
         // Check if this is a protected path
@@ -149,7 +146,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // If protected path and not authenticated, redirect to login
         if (needsAuthentication && !isAuthenticated) {
-            loggingService.logAction(null, "system", "Redirecting unauthenticated user from " + path + " to login page");
+            loggingService.logAction("Redirecting unauthenticated user from " + path + " to login page");
             response.setStatus(HttpServletResponse.SC_FOUND); // 302 Found
             response.setHeader("Location", frontendUrl);
             return;

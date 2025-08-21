@@ -1,9 +1,12 @@
 package com.example.ehe_server.service.portfolio;
 
+import com.example.ehe_server.dto.PortfolioSearchResponse;
+import com.example.ehe_server.dto.PortfolioValueResponse;
 import com.example.ehe_server.entity.Portfolio;
 import com.example.ehe_server.entity.Portfolio.PortfolioType;
+import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.PortfolioRepository;
-import com.example.ehe_server.service.audit.UserContextService;
+import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioSearchServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioValueServiceInterface;
@@ -23,77 +26,63 @@ public class PortfolioSearchService implements PortfolioSearchServiceInterface {
     private final LoggingServiceInterface loggingService;
     private final PortfolioValueServiceInterface portfolioValueService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private final UserContextService userContextService;
+    private final UserRepository userRepository;
 
     public PortfolioSearchService(
             PortfolioRepository portfolioRepository,
             LoggingServiceInterface loggingService,
-            PortfolioValueServiceInterface portfolioValueService, UserContextService userContextService) {
+            PortfolioValueServiceInterface portfolioValueService,
+            UserRepository userRepository) {
         this.portfolioRepository = portfolioRepository;
         this.loggingService = loggingService;
         this.portfolioValueService = portfolioValueService;
-        this.userContextService = userContextService;
+        this.userRepository = userRepository;
     }
 
     @Override
-    public Map<String, Object> searchPortfolios(PortfolioType type, String platform,
-                                                BigDecimal minValue, BigDecimal maxValue) {
-        Map<String, Object> result = new HashMap<>();
+    public List<PortfolioSearchResponse> searchPortfolios(Integer userId, PortfolioType type, String platform,
+                                                          BigDecimal minValue, BigDecimal maxValue) {
 
-        try {
-            // Get all user's portfolios
-            List<Portfolio> allPortfolios = portfolioRepository.findByUser(userContextService.getCurrentHumanUser());
-
-            // Filter portfolios based on search criteria
-            List<Portfolio> filteredPortfolios = allPortfolios.stream()
-                    .filter(p -> type == null || p.getPortfolioType() == type)
-                    .filter(p -> platform == null || p.getApiKey().getPlatformName().equals(platform))
-                    .collect(Collectors.toList());
-
-            // Calculate values and apply min/max value filters
-            List<Map<String, Object>> portfoliosList = new ArrayList<>();
-
-            for (Portfolio portfolio : filteredPortfolios) {
-                // Calculate portfolio value
-                Map<String, Object> valueResult = portfolioValueService.calculatePortfolioValue(portfolio.getPortfolioId());
-                BigDecimal value = new BigDecimal(valueResult.getOrDefault("totalValue", "0").toString());
-
-                // Apply min/max value filters
-                if ((minValue == null || value.compareTo(minValue) >= 0) &&
-                        (maxValue == null || value.compareTo(maxValue) <= 0)) {
-
-                    Map<String, Object> portfolioMap = new HashMap<>();
-                    portfolioMap.put("id", portfolio.getPortfolioId());
-                    portfolioMap.put("name", portfolio.getPortfolioName());
-                    portfolioMap.put("platform", portfolio.getApiKey().getPlatformName());
-                    portfolioMap.put("type", portfolio.getPortfolioType().toString());
-                    portfolioMap.put("creationDate", portfolio.getCreationDate().format(DATE_FORMATTER));
-                    portfolioMap.put("value", value);
-
-                    portfoliosList.add(portfolioMap);
-                }
-            }
-
-            // Prepare success response
-            result.put("success", true);
-            result.put("portfolios", portfoliosList);
-
-            // Log success
-            loggingService.logAction("Searched portfolios with criteria - type: " + type +
-                            ", platform: " + platform +
-                            ", minValue: " + minValue +
-                            ", maxValue: " + maxValue +
-                            ". Found " + portfoliosList.size() + " results.");
-
-        } catch (Exception e) {
-            // Log error
-            loggingService.logError("Error searching portfolios: " + e.getMessage(), e);
-
-            // Return error response
-            result.put("success", false);
-            result.put("message", "An error occurred while searching portfolios: " + e.getMessage());
+        // Get all user's portfolios
+        User user;
+        List<Portfolio> allPortfolios;
+        if (userRepository.existsById(userId)) {
+            user = userRepository.findById(userId).get();
+            allPortfolios = portfolioRepository.findByUser(user);
+        } else {
+            return null;
         }
 
-        return result;
+        // Filter, calculate value, and map to DTOs in a single stream pipeline
+        List<PortfolioSearchResponse> portfoliosList = allPortfolios.stream()
+                .filter(p -> type == null || p.getPortfolioType() == type)
+                .filter(p -> platform == null || (p.getApiKey() != null && p.getApiKey().getPlatformName().equals(platform)))
+                .map(portfolio -> {
+                    // Assuming a refactored portfolioValueService returns a DTO or BigDecimal directly
+                    // For now, we'll extract from the map, but this is a nested code smell
+                    PortfolioValueResponse valueResult = portfolioValueService.calculatePortfolioValue(userId, portfolio.getPortfolioId());
+                    BigDecimal value = valueResult.getTotalValue();
+
+                    return new PortfolioSearchResponse(
+                            portfolio.getPortfolioId(),
+                            portfolio.getPortfolioName(),
+                            portfolio.getApiKey() != null ? portfolio.getApiKey().getPlatformName() : null,
+                            portfolio.getPortfolioType().toString(),
+                            portfolio.getCreationDate().format(DATE_FORMATTER),
+                            value
+                    );
+                })
+                .filter(p -> (minValue == null || p.getValue().compareTo(minValue) >= 0) &&
+                        (maxValue == null || p.getValue().compareTo(maxValue) <= 0))
+                .collect(Collectors.toList());
+
+        // Log success
+        loggingService.logAction("Searched portfolios with criteria - type: " + type +
+                ", platform: " + platform +
+                ", minValue: " + minValue +
+                ", maxValue: " + maxValue +
+                ". Found " + portfoliosList.size() + " results.");
+
+        return portfoliosList;
     }
 }

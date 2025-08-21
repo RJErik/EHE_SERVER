@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Primary;
 
 import javax.sql.DataSource;
@@ -33,6 +34,7 @@ public class DatabaseConfig {
     private String driverClassName;
 
     @Autowired
+    @Lazy
     private UserContextService userContextHolder;
 
     @Bean
@@ -90,7 +92,7 @@ public class DatabaseConfig {
          */
         private void setUserContext(Connection connection) {
             try {
-                String currentUser = userContextHolder.getCurrentUserAsString();
+                String currentUser = userContextHolder.getCurrentUserIdAsString();
 
                 // Set the PostgreSQL session variable for audit purposes
                 try (PreparedStatement statement = connection.prepareStatement(

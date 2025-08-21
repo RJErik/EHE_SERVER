@@ -1,8 +1,10 @@
 package com.example.ehe_server.service.portfolio;
 
+import com.example.ehe_server.dto.PortfolioByPlatformResponse;
 import com.example.ehe_server.entity.Portfolio;
+import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.PortfolioRepository;
-import com.example.ehe_server.service.audit.UserContextService;
+import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioByPlatformServiceInterface;
 import org.springframework.stereotype.Service;
@@ -17,55 +19,40 @@ public class PortfolioByPlatformService implements PortfolioByPlatformServiceInt
 
     private final PortfolioRepository portfolioRepository;
     private final LoggingServiceInterface loggingService;
-    private final UserContextService userContextService;
+    private final UserRepository userRepository;
 
     public PortfolioByPlatformService(
             PortfolioRepository portfolioRepository,
-            LoggingServiceInterface loggingService, UserContextService userContextService) {
+            LoggingServiceInterface loggingService,
+            UserRepository userRepository) {
         this.portfolioRepository = portfolioRepository;
         this.loggingService = loggingService;
-        this.userContextService = userContextService;
+        this.userRepository = userRepository;
     }
 
 
     @Override
-    public Map<String, Object> getPortfoliosByPlatform(String platform) {
-        Map<String, Object> result = new HashMap<>();
-
-        try {
-            // Get all portfolios for the user
-            List<Portfolio> allPortfolios = portfolioRepository.findByUser(userContextService.getCurrentHumanUser());
-
-            // Filter portfolios by platform
-            List<Portfolio> filteredPortfolios = allPortfolios.stream()
-                    .filter(p -> p.getApiKey().getPlatformName().equalsIgnoreCase(platform))
-                    .collect(Collectors.toList());
-
-            // Transform to response format (only id and name as requested)
-            List<Map<String, Object>> portfoliosList = new ArrayList<>();
-            for (Portfolio portfolio : filteredPortfolios) {
-                Map<String, Object> portfolioMap = new HashMap<>();
-                portfolioMap.put("id", portfolio.getPortfolioId());
-                portfolioMap.put("name", portfolio.getPortfolioName());
-                portfoliosList.add(portfolioMap);
-            }
-
-            // Prepare success response
-            result.put("success", true);
-            result.put("portfolios", portfoliosList);
-
-            // Log success
-            loggingService.logAction("Retrieved " + portfoliosList.size() + " portfolios for platform: " + platform);
-
-        } catch (Exception e) {
-            // Log error
-            loggingService.logError("Error retrieving portfolios by platform: " + e.getMessage(), e);
-
-            // Return error response
-            result.put("success", false);
-            result.put("message", "An error occurred while retrieving portfolios by platform: " + e.getMessage());
+    public List<PortfolioByPlatformResponse> getPortfoliosByPlatform(Integer userId, String platform) {
+        // Get all portfolios for the user
+        User user;
+        List<Portfolio> allPortfolios;
+        if (userRepository.existsById(userId)) {
+            user = userRepository.findById(userId).get();
+            allPortfolios = portfolioRepository.findByUser(user);
+        } else {
+            return null;
         }
 
-        return result;
+        // Transform to response format (only id and name as requested)
+        // Filter portfolios by platform and map to DTOs
+        List<PortfolioByPlatformResponse> filteredPortfolios = allPortfolios.stream()
+                .filter(p -> p.getApiKey() != null && p.getApiKey().getPlatformName().equalsIgnoreCase(platform))
+                .map(p -> new PortfolioByPlatformResponse(p.getPortfolioId(), p.getPortfolioName()))
+                .collect(Collectors.toList());
+
+        // Log success
+        loggingService.logAction("Retrieved " + filteredPortfolios.size() + " portfolios for platform: " + platform);
+
+        return filteredPortfolios;
     }
 }

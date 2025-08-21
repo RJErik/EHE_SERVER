@@ -62,7 +62,7 @@ public class BinanceCandleService {
         if (latestCandle != null) {
             // We have existing data, start from the latest candle
             //SYSTEM SET HERE
-            loggingService.logAction("Found existing candles for " + symbol +  ". Latest candle at " + latestCandle.getTimestamp());
+            loggingService.logAction("Found existing candles for " + symbol + ". Latest candle at " + latestCandle.getTimestamp());
 
             // Start from the next minute after latest candle
             Instant startInstant = latestCandle.getTimestamp()
@@ -70,7 +70,7 @@ public class BinanceCandleService {
                     .toInstant(ZoneOffset.UTC);
 
             //SYSTEM SET HERE
-            loggingService.logAction("Updating candles for " + symbol +  " from " + startInstant.atZone(ZoneOffset.UTC) +
+            loggingService.logAction("Updating candles for " + symbol + " from " + startInstant.atZone(ZoneOffset.UTC) +
                     " to present (with periodic target time updates)");
 
             // Fetch with dynamic end time updates (null means use current time with updates)
@@ -78,7 +78,7 @@ public class BinanceCandleService {
         } else {
             // No existing data, need to find how far back data is available
             //SYSTEM SET HERE
-            loggingService.logAction("No existing candles for " + symbol +  ". Finding earliest available data...");
+            loggingService.logAction("No existing candles for " + symbol + ". Finding earliest available data...");
 
             // Find the earliest available data using the backward search strategy
             Instant firstCheckpoint = Instant.now();
@@ -105,7 +105,8 @@ public class BinanceCandleService {
 
     /**
      * Finds the earliest available data point for a symbol using the week-by-week strategy
-     * @param symbol The trading pair symbol
+     *
+     * @param symbol          The trading pair symbol
      * @param firstCheckpoint The current time when we started searching
      * @return Optional containing the earliest timestamp when data is available, or empty if none found
      */
@@ -178,9 +179,10 @@ public class BinanceCandleService {
 
     /**
      * Checks if there are any candles in a given time range
-     * @param symbol The trading pair symbol
+     *
+     * @param symbol    The trading pair symbol
      * @param startTime The start of the time range
-     * @param endTime The end of the time range
+     * @param endTime   The end of the time range
      * @return true if candles exist in this range, false otherwise
      */
     private boolean checkForCandles(String symbol, Instant startTime, Instant endTime) {
@@ -208,10 +210,10 @@ public class BinanceCandleService {
      * Fetches all candles in a given time range, handling pagination automatically
      * Updates the target end time periodically to ensure we get all the latest data
      *
-     * @param stock The platform stock entity
-     * @param symbol The trading pair symbol
+     * @param stock        The platform stock entity
+     * @param symbol       The trading pair symbol
      * @param startInstant The start time
-     * @param endInstant The end time (can be null to use current time with periodic updates)
+     * @param endInstant   The end time (can be null to use current time with periodic updates)
      */
     private void fetchCandlesInRange(PlatformStock stock, String symbol,
                                      Instant startInstant, Instant endInstant) {
@@ -268,7 +270,7 @@ public class BinanceCandleService {
                 // Log progress periodically
                 if (totalCandlesFetched % 5000 == 0) {
                     //SYSTEM SET HERE
-                    loggingService.logAction("Fetched " + totalCandlesFetched +  " candles so far for " + symbol);
+                    loggingService.logAction("Fetched " + totalCandlesFetched + " candles so far for " + symbol);
                 }
 
                 // Aggregate this batch of candles
@@ -315,7 +317,7 @@ public class BinanceCandleService {
         }
 
         //SYSTEM SET HERE
-        loggingService.logAction("Completed data fetch for " + symbol +  ". Total candles fetched: " + totalCandlesFetched);
+        loggingService.logAction("Completed data fetch for " + symbol + ". Total candles fetched: " + totalCandlesFetched);
     }
 
     private List<MarketCandle> parseCandles(String responseBody, PlatformStock stock) {
@@ -425,7 +427,7 @@ public class BinanceCandleService {
             if (!candles.isEmpty()) {
                 candleRepository.saveAll(candles);
                 //SYSTEM SET HERE
-                loggingService.logAction("Saved/updated " + candles.size() +  " candles for timeframe " + timeframe);
+                loggingService.logAction("Saved/updated " + candles.size() + " candles for timeframe " + timeframe);
             }
         } catch (Exception e) {
             //SYSTEM SET HERE

@@ -1,7 +1,6 @@
 package com.example.ehe_server.service.intf.user;
 
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.Map;
 
 public interface JwtTokenRenewalServiceInterface {
     /**
@@ -11,5 +10,5 @@ public interface JwtTokenRenewalServiceInterface {
      * @param response HTTP response to set the new cookie
      * @return A map containing success status and messages
      */
-    Map<String, Object> renewToken(Long userId, HttpServletResponse response);
+    void renewToken(Long userId, HttpServletResponse response);
 }

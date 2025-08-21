@@ -40,45 +40,41 @@ public class LoggingService implements LoggingServiceInterface {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logAction(String action) {
         // Create log entry
-        if (!userContextService.isAuthenticated() || userContextService.isHumanUser()) {
-            Log log = new Log();
-            log.setLogDescription(action);
-            logRepository.save(log);
-        } else if (userContextService.isHumanUser()) {
+        Log log = new Log();
+        log.setLogDescription(action);
+
+        // Set user if it's a human user
+        if (userContextService.isHumanUser()) {
             Optional<User> user = userRepository.findById(userContextService.getCurrentUserId().intValue());
-            Log log = new Log();
             if (user.isPresent()) {
                 log.setUser(user.get());
             }
-            log.setLogDescription(action);
         }
+
+        logRepository.save(log);
     }
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logError(String errorDescription, Throwable throwable) {
-
         // Convert throwable to stack trace string
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);
         throwable.printStackTrace(pw);
         String stackTrace = sw.toString();
 
-        // Create error log entry
-        if (!userContextService.isAuthenticated() || userContextService.isHumanUser()) {
-            ErrorLog errorLog = new ErrorLog();
-            errorLog.setErrorDescription(errorDescription);
-            errorLog.setStackTrace(stackTrace != null ? stackTrace : "No stack trace available");
-            errorLogRepository.save(errorLog);
-        } else if (userContextService.isHumanUser()) {
+        ErrorLog errorLog = new ErrorLog();
+        errorLog.setErrorDescription(errorDescription);
+        errorLog.setStackTrace(stackTrace != null ? stackTrace : "No stack trace available");
+
+        // Set user if it's a human user
+        if (userContextService.isHumanUser()) {
             Optional<User> user = userRepository.findById(userContextService.getCurrentUserId().intValue());
-            ErrorLog errorLog = new ErrorLog();
             if (user.isPresent()) {
                 errorLog.setUser(user.get());
             }
-            errorLog.setErrorDescription(errorDescription);
-            errorLog.setStackTrace(stackTrace != null ? stackTrace : "No stack trace available");
-            errorLogRepository.save(errorLog);
         }
+
+        errorLogRepository.save(errorLog);
     }
 }

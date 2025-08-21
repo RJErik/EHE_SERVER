@@ -76,12 +76,12 @@ public class BinanceAccountService {
     /**
      * Places a market order on Binance
      *
-     * @param apiKey The API key
-     * @param secretKey The secret key
-     * @param symbol The trading pair symbol (e.g., "BTCUSDT")
-     * @param side "BUY" or "SELL"
-     * @param type Order type (e.g., "MARKET")
-     * @param quantity The quantity to trade (for SELL orders)
+     * @param apiKey        The API key
+     * @param secretKey     The secret key
+     * @param symbol        The trading pair symbol (e.g., "BTCUSDT")
+     * @param side          "BUY" or "SELL"
+     * @param type          Order type (e.g., "MARKET")
+     * @param quantity      The quantity to trade (for SELL orders)
      * @param quoteOrderQty The quote currency amount to spend (for BUY orders)
      * @return Response from Binance API
      */

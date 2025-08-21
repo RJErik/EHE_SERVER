@@ -14,14 +14,15 @@ import java.util.Map;
 @Controller
 public class AutomatedTradeWebSocketController {
 
-    private final AutomatedTradeWebSocketSubscriptionManager subscriptionManager;
+    private final AutomatedTradeWebSocketSubscriptionManager automatedTradeWebSocketSubscriptionManager;
     private final LoggingServiceInterface loggingService;
     private final UserContextService userContextService;
 
     public AutomatedTradeWebSocketController(
-            AutomatedTradeWebSocketSubscriptionManager subscriptionManager,
-            LoggingServiceInterface loggingService, UserContextService userContextService) {
-        this.subscriptionManager = subscriptionManager;
+            AutomatedTradeWebSocketSubscriptionManager automatedTradeWebSocketSubscriptionManager,
+            LoggingServiceInterface loggingService,
+            UserContextService userContextService) {
+        this.automatedTradeWebSocketSubscriptionManager = automatedTradeWebSocketSubscriptionManager;
         this.loggingService = loggingService;
         this.userContextService = userContextService;
     }
@@ -37,7 +38,7 @@ public class AutomatedTradeWebSocketController {
             loggingService.logAction("WebSocket subscription request for automated trades");
 
             // Create subscription for this user
-            String subscriptionId = subscriptionManager.createSubscription(
+            String subscriptionId = automatedTradeWebSocketSubscriptionManager.createSubscription(
                     userContextService.getCurrentUserId().intValue(),
                     "/user/queue/automated-trades");
 
@@ -73,7 +74,7 @@ public class AutomatedTradeWebSocketController {
 
             loggingService.logAction("WebSocket unsubscribe request for automated trade subscription " + subscriptionId);
 
-            boolean cancelled = subscriptionManager.cancelSubscription(subscriptionId);
+            boolean cancelled = automatedTradeWebSocketSubscriptionManager.cancelSubscription(subscriptionId);
 
             if (cancelled) {
                 response.put("success", true);

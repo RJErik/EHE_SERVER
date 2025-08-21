@@ -14,14 +14,15 @@ import java.util.Map;
 @Controller
 public class AlertWebSocketController {
 
-    private final AlertWebSocketSubscriptionManager subscriptionManager;
+    private final AlertWebSocketSubscriptionManager alertWebSocketSubscriptionManager;
     private final LoggingServiceInterface loggingService;
     private final UserContextService userContextService;
 
     public AlertWebSocketController(
-            AlertWebSocketSubscriptionManager subscriptionManager,
-            LoggingServiceInterface loggingService, UserContextService userContextService) {
-        this.subscriptionManager = subscriptionManager;
+            AlertWebSocketSubscriptionManager alertWebSocketSubscriptionManager,
+            LoggingServiceInterface loggingService,
+            UserContextService userContextService) {
+        this.alertWebSocketSubscriptionManager = alertWebSocketSubscriptionManager;
         this.loggingService = loggingService;
         this.userContextService = userContextService;
     }
@@ -37,7 +38,7 @@ public class AlertWebSocketController {
             loggingService.logAction("WebSocket subscription request for alerts");
 
             // Create subscription for this user
-            String subscriptionId = subscriptionManager.createSubscription(
+            String subscriptionId = alertWebSocketSubscriptionManager.createSubscription(
                     userContextService.getCurrentUserId().intValue(),
                     "/user/queue/alerts");
 
@@ -73,7 +74,7 @@ public class AlertWebSocketController {
 
             loggingService.logAction("WebSocket unsubscribe request for alert subscription " + subscriptionId);
 
-            boolean cancelled = subscriptionManager.cancelSubscription(subscriptionId);
+            boolean cancelled = alertWebSocketSubscriptionManager.cancelSubscription(subscriptionId);
 
             if (cancelled) {
                 response.put("success", true);

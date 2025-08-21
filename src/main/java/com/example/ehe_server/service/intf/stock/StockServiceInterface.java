@@ -1,5 +1,7 @@
 package com.example.ehe_server.service.intf.stock;
 
+import com.example.ehe_server.dto.StocksByPlatformResponse;
+
 import java.util.Map;
 
 public interface StockServiceInterface {
@@ -8,5 +10,5 @@ public interface StockServiceInterface {
      * @param platformName The name of the platform
      * @return Map containing success status, message and stocks list
      */
-    Map<String, Object> getStocksByPlatform(String platformName);
+    StocksByPlatformResponse getStocksByPlatform(String platformName);
 }

@@ -3,26 +3,23 @@ package com.example.ehe_server.service.auth;
 import com.example.ehe_server.dto.RegistrationRequest;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
+import com.example.ehe_server.exception.custom.*;
 import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.repository.VerificationTokenRepository; // Import new repository
-// Removed unused cookie/jwt imports for registration
+import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.RegistrationServiceInterface;
-import com.example.ehe_server.service.intf.email.EmailServiceInterface; // Import email service
+import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-// Import JWT if needed elsewhere, but not for register response anymore
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value; // For expiry config
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID; // For token generation
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 @Service
@@ -49,7 +46,9 @@ public class RegistrationService implements RegistrationServiceInterface {
             UserRepository userRepository,
             VerificationTokenRepository verificationTokenRepository, // Add to constructor
             EmailServiceInterface emailService, // Add to constructor
-            LoggingServiceInterface loggingService, UserContextService userContextService, AdminRepository adminRepository) {
+            LoggingServiceInterface loggingService,
+            UserContextService userContextService,
+            AdminRepository adminRepository) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository; // Assign
         this.emailService = emailService; // Assign
@@ -60,123 +59,85 @@ public class RegistrationService implements RegistrationServiceInterface {
 
     @Override
     @Transactional
-    public Map<String, Object> registerUser(RegistrationRequest request, HttpServletResponse response) {
-        Map<String, Object> responseBody = new HashMap<>();
-
+    public void registerUser(RegistrationRequest request, HttpServletResponse response) {
         // Validation logic remains the same...
+        // Validate input fields
+        if (request.getUsername() == null || request.getEmail() == null || request.getPassword() == null ||
+                request.getUsername().isBlank() || request.getEmail().isBlank() || request.getPassword().isBlank()) { // Added isBlank checks
+            throw new MissingRegistrationFieldsException();
+        }
+        // Validate username format
+        if (!USERNAME_PATTERN.matcher(request.getUsername()).matches()) {
+            throw new InvalidUsernameFormatException(request.getUsername());
+        }
+        // Validate email format
+        if (!EMAIL_PATTERN.matcher(request.getEmail()).matches()) {
+            throw new InvalidEmailFormatException(request.getEmail());
+        }
+        // Validate password strength
+        if (!PASSWORD_PATTERN.matcher(request.getPassword()).matches()) {
+            throw new InvalidPasswordFormatException();
+        }
+
+
+        // Check if email already exists
+        String email = request.getEmail();
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new EmailAlreadyRegisteredException(email).withActionLink("log in.", "login");
+        }
+
+        // Create new user entity
+        User newUser = new User();
+        newUser.setUserName(request.getUsername());
+        newUser.setEmail(email);
+        newUser.setPasswordHash(BCrypt.hashpw(request.getPassword(), BCrypt.gensalt()));
+        newUser.setAccountStatus(User.AccountStatus.NONVERIFIED); // <<<--- SET STATUS TO NONVERIFIED
+        newUser.setRegistrationDate(LocalDateTime.now());
+
+        // Save the user (audit columns like created_by will be set by trigger)
+        User savedUser = userRepository.save(newUser);
+
+        // Now that user is created, update the audit context for subsequent actions in this transaction
+        // Update audit context
+        String userIdStr = String.valueOf(savedUser.getUserId());
+        boolean isAdmin = adminRepository.existsByAdminId(savedUser.getUserId());
+
+        // Set audit context
+        String role = "USER"; // All authenticated users have USER role
+
+        if (isAdmin) {
+            role = "ADMIN"; // Add ADMIN role if user is in Admin table
+        }
+        userContextService.setUser(userIdStr, role);
+
+        // --- NEW: Generate and save verification token ---
+        String token = UUID.randomUUID().toString();
+        LocalDateTime expiryDate = LocalDateTime.now().plusHours(tokenExpiryHours);
+        VerificationToken verificationToken = new VerificationToken(savedUser, token, VerificationToken.TokenType.REGISTRATION, expiryDate);
+        verificationTokenRepository.save(verificationToken);
+        // -------------------------------------------------
+
+        // Log successful registration attempt (pending verification)
+        loggingService.logAction("User registered successfully (pending verification). Token generated.");
+
+        // --- REMOVED: JWT Generation and Cookie Setting ---
+        // No automatic login on registration anymore
+        // --------------------------------------------------
+
         try {
-            // Validate input fields
-            if (request.getUsername() == null || request.getEmail() == null || request.getPassword() == null ||
-                    request.getUsername().isBlank() || request.getEmail().isBlank() || request.getPassword().isBlank()) { // Added isBlank checks
-                responseBody.put("success", false);
-                responseBody.put("message", "All fields are required");
-                loggingService.logAction("Registration failed: Missing required fields");
-                return responseBody;
-            }
-            // Validate username format
-            if (!USERNAME_PATTERN.matcher(request.getUsername()).matches()) {
-                responseBody.put("success", false);
-                responseBody.put("message", "Username must be at least 3 characters and contain only letters, numbers, and underscores");
-                loggingService.logAction("Registration failed: Invalid username format");
-                return responseBody;
-            }
-            // Validate email format
-            if (!EMAIL_PATTERN.matcher(request.getEmail()).matches()) {
-                responseBody.put("success", false);
-                responseBody.put("message", "Please enter a valid email address");
-                loggingService.logAction("Registration failed: Invalid email format");
-                return responseBody;
-            }
-            // Validate password strength
-            if (!PASSWORD_PATTERN.matcher(request.getPassword()).matches()) {
-                responseBody.put("success", false);
-                responseBody.put("message", "Password must be at least 8 characters with at least one letter and one number");
-                loggingService.logAction("Registration failed: Password does not meet strength requirements");
-                return responseBody;
-            }
+            // Call the *synchronous* version of the email sending method
+            emailService.sendVerificationEmail(savedUser, token, request.getEmail());
 
+            // If email sending was successful (no exception thrown), set the success response for the controller
+            loggingService.logAction("Sent verification email to " + request.getEmail());
 
-            // Check if email already exists
-            String email = request.getEmail();
-            if (userRepository.findByEmail(email).isPresent()) {
-                responseBody.put("success", false);
-                responseBody.put("message", "Email is already registered. Try ");
-                Map<String, String> actionLink = new HashMap<>();
-                actionLink.put("text", "log in.");
-                actionLink.put("target", "login");
-                responseBody.put("actionLink", actionLink);
-                loggingService.logAction("Registration failed: Email already exists");
-                return responseBody;
-            }
+        } catch (MailException e) {
+            // Set the response to indicate failure *because* the email couldn't be sent
+            loggingService.logError("Failed to send verification email to " + request.getEmail(), e);
+            throw new EmailSendFailureException(request.getEmail(), e.getMessage()).withResendButton();
 
-            // Create new user entity
-            User newUser = new User();
-            newUser.setUserName(request.getUsername());
-            newUser.setEmail(email);
-            newUser.setPasswordHash(BCrypt.hashpw(request.getPassword(), BCrypt.gensalt()));
-            newUser.setAccountStatus(User.AccountStatus.NONVERIFIED); // <<<--- SET STATUS TO NONVERIFIED
-            newUser.setRegistrationDate(LocalDateTime.now());
-
-            // Save the user (audit columns like created_by will be set by trigger)
-            User savedUser = userRepository.save(newUser);
-
-            // Now that user is created, update the audit context for subsequent actions in this transaction
-            // Update audit context
-            String userIdStr = String.valueOf(savedUser.getUserId());
-            boolean isAdmin = adminRepository.existsByAdminId(savedUser.getUserId());
-
-            // Set audit context
-            String role = "USER"; // All authenticated users have USER role
-
-            if (isAdmin) {
-                role = "ADMIN"; // Add ADMIN role if user is in Admin table
-            }
-            userContextService.setUser(userIdStr, role);
-
-            // --- NEW: Generate and save verification token ---
-            String token = UUID.randomUUID().toString();
-            LocalDateTime expiryDate = LocalDateTime.now().plusHours(tokenExpiryHours);
-            VerificationToken verificationToken = new VerificationToken(savedUser, token, VerificationToken.TokenType.REGISTRATION, expiryDate);
-            verificationTokenRepository.save(verificationToken);
-            // -------------------------------------------------
-
-            // Log successful registration attempt (pending verification)
-            loggingService.logAction("User registered successfully (pending verification). Token generated.");
-
-            // --- REMOVED: JWT Generation and Cookie Setting ---
-            // No automatic login on registration anymore
-            // --------------------------------------------------
-
-            try {
-                // Call the *synchronous* version of the email sending method
-                emailService.sendVerificationEmail(savedUser, token, request.getEmail());
-
-                // If email sending was successful (no exception thrown), set the success response for the controller
-                responseBody.put("success", true);
-                responseBody.put("message", "Registration successful. Please check your email (" + request.getEmail() + ") to verify your account. It may be in spam.");
-                responseBody.put("showResendButton", true);
-                loggingService.logAction("Sent verification email to " + request.getEmail());
-
-            } catch (MailException e) {
-                // Set the response to indicate failure *because* the email couldn't be sent
-                responseBody.put("success", false);
-                responseBody.put("message", "Registration succeeded but failed to send verification email. Please try registering again later or contact support.");
-                responseBody.put("showResendButton", true);
-
-                // IMPORTANT: Throw a runtime exception to trigger Transaction rollback.
-                // The user record created above should be rolled back if we can't send the email.
-                loggingService.logError("Failed to send verification email to " + request.getEmail(), e);
-            }
-
-            return responseBody;
-
-        } catch (Exception e) {
-            // Log the error with potentially available audit context
-            loggingService.logError("Error during registration: " + e.getMessage(), e);
-
-            responseBody.put("success", false);
-            responseBody.put("message", "An error occurred during registration. Please try again later.");
-            return responseBody;
+            // IMPORTANT: Throw a runtime exception to trigger Transaction rollback.
+            // The user record created above should be rolled back if we can't send the email.
         }
     }
 }

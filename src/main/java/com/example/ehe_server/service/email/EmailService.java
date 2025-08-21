@@ -2,6 +2,10 @@ package com.example.ehe_server.service.email;
 
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
+import com.example.ehe_server.exception.custom.AccountAlreadyActiveException;
+import com.example.ehe_server.exception.custom.AccountSuspendedException;
+import com.example.ehe_server.exception.custom.EmailSendFailureException;
+import com.example.ehe_server.exception.custom.VerificationRateLimitExceededException;
 import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
@@ -16,9 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -29,7 +31,7 @@ public class EmailService implements EmailServiceInterface {
     private static final int RATE_LIMIT_MAX_REQUESTS = 5;
     private static final int RATE_LIMIT_MINUTES = 5;
 
-    private final JavaMailSender mailSender;
+    private final JavaMailSender javaMailSender;
     private final LoggingServiceInterface loggingService;
     private final VerificationTokenRepository verificationTokenRepository;
     private final AdminRepository adminRepository;
@@ -44,10 +46,12 @@ public class EmailService implements EmailServiceInterface {
     @Value("${app.verification.token.expiry-hours}")
     private long tokenExpiryHours;
 
-    public EmailService(JavaMailSender mailSender,
+    public EmailService(JavaMailSender javaMailSender,
                         LoggingServiceInterface loggingService,
-                        VerificationTokenRepository verificationTokenRepository, AdminRepository adminRepository, UserContextService userContextService) {
-        this.mailSender = mailSender;
+                        VerificationTokenRepository verificationTokenRepository,
+                        AdminRepository adminRepository,
+                        UserContextService userContextService) {
+        this.javaMailSender = javaMailSender;
         this.loggingService = loggingService;
         this.verificationTokenRepository = verificationTokenRepository;
         this.adminRepository = adminRepository;
@@ -84,14 +88,12 @@ public class EmailService implements EmailServiceInterface {
         message.setTo(to);
         message.setSubject(subject);
         message.setText(text);
-        mailSender.send(message);
+        javaMailSender.send(message);
         // Avoid logging here if called internally by other methods that already log
     }
 
     @Transactional
-    public Map<String, Object> resendVerificationEmail(User user, String email) {
-        Map<String, Object> response = new HashMap<>();
-
+    public void resendVerificationEmail(User user, String email) {
         // Set audit context
         boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
 
@@ -104,23 +106,13 @@ public class EmailService implements EmailServiceInterface {
         userContextService.setUser(String.valueOf(user.getUserId()), role);
 
         if (user.getAccountStatus() == User.AccountStatus.ACTIVE) {
-            response.put("success", false);
-            response.put("message", "This account is already verified. Try ");
-            Map<String, String> actionLink = new HashMap<>();
-            actionLink.put("text", "log in.");
-            actionLink.put("target", "login");
-            response.put("actionLink", actionLink);
             //SYSTEM SET HERE
-            loggingService.logAction("Attempted resend for already active account: " + email);
-            return response;
+            throw new AccountAlreadyActiveException(email).withActionLink("log in", "login");
         }
 
         if (user.getAccountStatus() == User.AccountStatus.SUSPENDED) {
-            response.put("success", false);
-            response.put("message", "This account is suspended. Contact support for assistance.");
             //SYSTEM SET HERE
-            loggingService.logAction("Attempted resend for suspended account: " + email);
-            return response;
+            throw new AccountSuspendedException(email);
         }
 
         // --- Rate Limiting Check ---
@@ -129,11 +121,8 @@ public class EmailService implements EmailServiceInterface {
                 user.getUserId(), VerificationToken.TokenType.REGISTRATION, rateLimitThreshold);
 
         if (recentTokenCount >= RATE_LIMIT_MAX_REQUESTS) {
-            response.put("success", false);
-            response.put("message", "Too many verification requests. Please wait \" + RATE_LIMIT_MINUTES + \" minutes before trying again.");
             //SYSTEM SET HERE
-            loggingService.logAction("Verification resend rate limit hit for: " + email);
-            return response;
+            throw new VerificationRateLimitExceededException(RATE_LIMIT_MINUTES);
         }
 
         // --- Invalidate Old ACTIVE Tokens ---
@@ -165,19 +154,9 @@ public class EmailService implements EmailServiceInterface {
             sendVerificationEmail(user, token, email);
             // Email service should log success/failure of sending internally
         } catch (Exception e) {
-            // Log critical failure if exception bubbles up
             //SYSTEM SET HERE
-            loggingService.logError("Critical failure attempting to send verification email for resend to " + email, e);
-            // Rollback should be handled by @Transactional. Return an error response.
-            response.put("success", false);
-            response.put("message", "Could not send verification email due to an internal error. Please try again later or contact support.");
-            return response; // Return error, transaction will likely rollback anyway if needed
+            throw new EmailSendFailureException(email, e.getMessage());
         }
-
-        // --- Return Success ---
-        response.put("success", true);
-        response.put("message", "Verification email resent successfully to " + email + ". Please check your inbox (and spam folder).");
-        return response;
     }
 
     @Override
@@ -197,7 +176,7 @@ public class EmailService implements EmailServiceInterface {
         String text = "Dear " + user.getUserName() + ",\n\n"
                 + "We received a request to reset your password. Please click the link below to reset your password:\n"
                 + resetUrl + "\n\n"
-                + "This link will expire in " + (tokenExpiryHours/2) + " hours.\n\n"
+                + "This link will expire in " + (tokenExpiryHours / 2) + " hours.\n\n"
                 + "If you did not request a password reset, please ignore this email or contact support if you have concerns.\n\n"
                 + "Regards,\nThe Event Horizon Exchange Team";
         sendSimpleMessage(recipientEmail, subject, text);

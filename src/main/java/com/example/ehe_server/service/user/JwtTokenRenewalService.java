@@ -11,9 +11,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.Map;
-
 @Service
 @Transactional
 public class JwtTokenRenewalService implements JwtTokenRenewalServiceInterface {
@@ -28,7 +25,8 @@ public class JwtTokenRenewalService implements JwtTokenRenewalServiceInterface {
             AdminRepository adminRepository,
             JwtTokenGeneratorInterface jwtTokenGenerator,
             CookieServiceInterface cookieService,
-            LoggingServiceInterface loggingService, UserContextService userContextService) {
+            LoggingServiceInterface loggingService,
+            UserContextService userContextService) {
         this.adminRepository = adminRepository;
         this.jwtTokenGenerator = jwtTokenGenerator;
         this.cookieService = cookieService;
@@ -37,48 +35,30 @@ public class JwtTokenRenewalService implements JwtTokenRenewalServiceInterface {
     }
 
     @Override
-    public Map<String, Object> renewToken(Long userId, HttpServletResponse response) {
-        Map<String, Object> result = new HashMap<>();
+    public void renewToken(Long userId, HttpServletResponse response) {
+        // Get current user ID from user context
+        User user = userContextService.getCurrentHumanUser();
 
-        try {
-            // Get current user ID from user context
-            User user = userContextService.getCurrentHumanUser();
+        // Get the user's role
+        boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
 
-            // Get the user's role
-            boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+        // Create roles list based on user status
+        String role = "USER"; // All authenticated users have USER role
 
-            // Create roles list based on user status
-            String role = "USER"; // All authenticated users have USER role
-
-            if (isAdmin) {
-                role = "ADMIN"; // Add ADMIN role if user is in Admin table
-            }
-
-            // Update audit context with authenticated user and roles
-            userContextService.setUser(String.valueOf(user.getUserId()), role);
-
-            // Generate a new token
-            String newToken = jwtTokenGenerator.generateToken(userId, role);
-
-            // Set the token as a cookie
-            cookieService.createJwtCookie(newToken, response);
-
-            // Log the successful token renewal
-            loggingService.logAction("JWT token renewed successfully");
-
-            // Return success response
-            result.put("success", true);
-            result.put("message", "Token renewed successfully");
-
-        } catch (Exception e) {
-            // Log any errors
-            loggingService.logError("Error renewing JWT token: " + e.getMessage(), e);
-
-            // Return error response
-            result.put("success", false);
-            result.put("message", "An error occurred while renewing the token");
+        if (isAdmin) {
+            role = "ADMIN"; // Add ADMIN role if user is in Admin table
         }
 
-        return result;
+        // Update audit context with authenticated user and roles
+        userContextService.setUser(String.valueOf(user.getUserId()), role);
+
+        // Generate a new token
+        String newToken = jwtTokenGenerator.generateToken(userId, role);
+
+        // Set the token as a cookie
+        cookieService.createJwtCookie(newToken, response);
+
+        // Log the successful token renewal
+        loggingService.logAction("JWT token renewed successfully");
     }
 }

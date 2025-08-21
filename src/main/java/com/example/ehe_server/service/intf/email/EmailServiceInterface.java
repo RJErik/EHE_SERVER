@@ -6,7 +6,7 @@ import java.util.Map;
 public interface EmailServiceInterface {
     void sendVerificationEmail(User user, String token, String recipientEmail);
     void sendSimpleMessage(String to, String subject, String text);
-    Map<String, Object> resendVerificationEmail(User user, String email);
+    void resendVerificationEmail(User user, String email);
     void sendPasswordResetEmail(User user, String token, String recipientEmail);
     // Add this new method
     void sendEmailChangeVerificationEmail(User user, String token, String newEmail);

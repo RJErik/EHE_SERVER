@@ -1,7 +1,9 @@
 package com.example.ehe_server.service.intf.alert;
 
-import java.util.Map;
+import com.example.ehe_server.dto.AlertSearchResponse;
+
+import java.util.List;
 
 public interface AlertSearchServiceInterface {
-    Map<String, Object> searchAlerts(String platform, String symbol, String conditionType);
+    List<AlertSearchResponse> searchAlerts(Integer userId, String platform, String symbol, String conditionType);
 }

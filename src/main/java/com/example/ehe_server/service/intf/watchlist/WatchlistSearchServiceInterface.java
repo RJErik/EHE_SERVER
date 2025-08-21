@@ -1,7 +1,10 @@
 package com.example.ehe_server.service.intf.watchlist;
 
+import com.example.ehe_server.dto.WatchlistSearchResponse;
+
+import java.util.List;
 import java.util.Map;
 
 public interface WatchlistSearchServiceInterface {
-    Map<String, Object> searchWatchlistItems(String platform, String symbol);
+    List<WatchlistSearchResponse> searchWatchlistItems(Integer userId, String platform, String symbol);
 }

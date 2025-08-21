@@ -4,7 +4,7 @@ import com.example.ehe_server.dto.websocket.CandleSubscriptionRequest;
 import com.example.ehe_server.dto.websocket.SubscriptionUpdateRequest;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-import com.example.ehe_server.service.stock.WebSocketSubscriptionManager;
+import com.example.ehe_server.service.stock.StockWebSocketSubscriptionManager;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.annotation.SendToUser;
@@ -16,14 +16,15 @@ import java.util.Map;
 @Controller
 public class StockCandleWebSocketController {
 
-    private final WebSocketSubscriptionManager subscriptionManager;
+    private final StockWebSocketSubscriptionManager stockWebSocketSubscriptionManager;
     private final LoggingServiceInterface loggingService;
     private final UserContextService userContextService;
 
     public StockCandleWebSocketController(
-            WebSocketSubscriptionManager subscriptionManager,
-            LoggingServiceInterface loggingService, UserContextService userContextService) {
-        this.subscriptionManager = subscriptionManager;
+            StockWebSocketSubscriptionManager stockWebSocketSubscriptionManager,
+            LoggingServiceInterface loggingService,
+            UserContextService userContextService) {
+        this.stockWebSocketSubscriptionManager = stockWebSocketSubscriptionManager;
         this.loggingService = loggingService;
         this.userContextService = userContextService;
     }
@@ -38,9 +39,9 @@ public class StockCandleWebSocketController {
         try {
             // Log subscription request
             loggingService.logAction("WebSocket subscription request for " +
-                            request.getPlatformName() + ":" + request.getStockSymbol() +
-                            " " + request.getTimeframe() +
-                            (request.getSubscriptionType() != null ? " (Type: " + request.getSubscriptionType() + ")" : ""));
+                    request.getPlatformName() + ":" + request.getStockSymbol() +
+                    " " + request.getTimeframe() +
+                    (request.getSubscriptionType() != null ? " (Type: " + request.getSubscriptionType() + ")" : ""));
 
             // Validate request
             if (request.getPlatformName() == null || request.getStockSymbol() == null ||
@@ -53,7 +54,7 @@ public class StockCandleWebSocketController {
             }
 
             // Create subscription
-            String subscriptionId = subscriptionManager.createSubscription(
+            String subscriptionId = stockWebSocketSubscriptionManager.createSubscription(
                     request.getPlatformName(),
                     request.getStockSymbol(),
                     request.getTimeframe(),
@@ -98,7 +99,7 @@ public class StockCandleWebSocketController {
             loggingService.logAction("WebSocket unsubscribe request for subscription " + subscriptionId);
 
             // Cancel subscription
-            boolean cancelled = subscriptionManager.cancelSubscription(subscriptionId);
+            boolean cancelled = stockWebSocketSubscriptionManager.cancelSubscription(subscriptionId);
 
             if (cancelled) {
                 response.put("success", true);
@@ -136,13 +137,13 @@ public class StockCandleWebSocketController {
 
             // Log update request
             loggingService.logAction("WebSocket subscription update request for " + request.getSubscriptionId() +
-                            " with new date range: " +
-                            (request.getNewStartDate() != null ? request.getNewStartDate() : "unchanged") + " to " +
-                            (request.getNewEndDate() != null ? request.getNewEndDate() : "unchanged") +
-                            (request.getSubscriptionType() != null ? " and type: " + request.getSubscriptionType() : ""));
+                    " with new date range: " +
+                    (request.getNewStartDate() != null ? request.getNewStartDate() : "unchanged") + " to " +
+                    (request.getNewEndDate() != null ? request.getNewEndDate() : "unchanged") +
+                    (request.getSubscriptionType() != null ? " and type: " + request.getSubscriptionType() : ""));
 
             // Update subscription with the new type
-            boolean updated = subscriptionManager.updateSubscription(
+            boolean updated = stockWebSocketSubscriptionManager.updateSubscription(
                     request.getSubscriptionId(),
                     request.getNewStartDate(),
                     request.getNewEndDate(),
@@ -155,7 +156,7 @@ public class StockCandleWebSocketController {
                 response.put("subscriptionId", request.getSubscriptionId());
 
                 // Include the subscription type in the response
-                String subscriptionType = subscriptionManager.getSubscriptionType(request.getSubscriptionId());
+                String subscriptionType = stockWebSocketSubscriptionManager.getSubscriptionType(request.getSubscriptionId());
                 if (subscriptionType != null) {
                     response.put("subscriptionType", subscriptionType);
                 }
