@@ -7,6 +7,9 @@ import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.stock.StockServiceInterface;
 import jakarta.annotation.PostConstruct;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Transactional
@@ -44,33 +48,42 @@ public class BinanceDataInitializationService {
         this.userContextService = userContextService;
     }
 
+    // This now only does basic setup, doesn't block startup
     @PostConstruct
     public void initialize() {
-        //SYSTEM SET HERE
         userContextService.setUser("SYSTEM", "SYSTEM");
-        loggingService.logAction("Initializing Binance data synchronization");
+        loggingService.logAction("Binance data initialization service ready");
+    }
 
-        // Check if we need to do initialization as system user
-        if (!stockRepository.existsByPlatformName(PLATFORM_NAME)) {
-            //SYSTEM SET HERE
-            loggingService.logAction("No Binance stocks found. Please add them through the admin interface first.");
-            return;
-        }
+    // This runs AFTER the application is fully started
+    @EventListener(ApplicationReadyEvent.class)
+    @Async
+    public void initializeDataAsync() {
+        try {
+            userContextService.setUser("SYSTEM", "SYSTEM");
+            loggingService.logAction("Starting async Binance data synchronization");
 
-        // Get existing symbols through direct repository access (system level)
-        List<PlatformStock> stocks = stockRepository.findByPlatformName(PLATFORM_NAME);
-
-        if (!stocks.isEmpty()) {
-            //SYSTEM SET HERE
-            loggingService.logAction("Found " + stocks.size() + " Binance symbols in database");
-
-            // Initialize each stock
-            for (PlatformStock stock : stocks) {
-                setupSymbol(stock.getStockSymbol());
+            // Check if we need to do initialization as system user
+            if (!stockRepository.existsByPlatformName(PLATFORM_NAME)) {
+                loggingService.logAction("No Binance stocks found. Please add them through the admin interface first.");
+                return;
             }
-        } else {
-            //SYSTEM SET HERE
-            loggingService.logAction("No Binance symbols found in database. Add some through the API first.");
+
+            // Get existing symbols through direct repository access (system level)
+            List<PlatformStock> stocks = stockRepository.findByPlatformName(PLATFORM_NAME);
+
+            if (!stocks.isEmpty()) {
+                loggingService.logAction("Found " + stocks.size() + " Binance symbols in database");
+
+                // Initialize each stock asynchronously
+                for (PlatformStock stock : stocks) {
+                    setupSymbol(stock.getStockSymbol());
+                }
+            } else {
+                loggingService.logAction("No Binance symbols found in database. Add some through the API first.");
+            }
+        } catch (Exception e) {
+            loggingService.logError("Error during async initialization: " + e.getMessage(), e);
         }
     }
 
@@ -90,7 +103,6 @@ public class BinanceDataInitializationService {
                 }
             }
         } catch (Exception e) {
-            //SYSTEM SET HERE
             loggingService.logError("Error syncing all Binance stocks: " + e.getMessage(), e);
         }
     }
@@ -98,13 +110,11 @@ public class BinanceDataInitializationService {
     public void setupSymbol(String symbol) {
         try {
             // Step 1: Sync historical data
-            //SYSTEM SET HERE
             loggingService.logAction("Starting historical data sync for " + symbol);
             candleService.syncHistoricalData(symbol);
 
             // Step 2: Set up real-time updates if not already subscribed
             if (!activeSubscriptions.getOrDefault(symbol, false)) {
-                //SYSTEM SET HERE
                 loggingService.logAction("Setting up real-time updates for " + symbol);
                 PlatformStock stock = getStock(symbol);
 
@@ -116,7 +126,6 @@ public class BinanceDataInitializationService {
                 }
             }
         } catch (Exception e) {
-            //SYSTEM SET HERE
             loggingService.logError("Failed to initialize " + symbol + " data: " + e.getMessage(), e);
         }
     }
@@ -125,7 +134,6 @@ public class BinanceDataInitializationService {
     @Scheduled(cron = "0 5 0 * * *") // 00:05 UTC daily
     public void performDailyMaintenance() {
         try {
-            //SYSTEM SET HERE
             loggingService.logAction("Running daily maintenance to ensure data completeness");
 
             List<PlatformStock> stocks = stockRepository.findByPlatformName(PLATFORM_NAME);
@@ -133,7 +141,6 @@ public class BinanceDataInitializationService {
                 candleService.syncHistoricalData(stock.getStockSymbol());
             }
         } catch (Exception e) {
-            //SYSTEM SET HERE
             loggingService.logError("Error during daily maintenance: " + e.getMessage(), e);
         }
     }
@@ -142,7 +149,6 @@ public class BinanceDataInitializationService {
     @Scheduled(cron = "0 0 * * * *") // Every hour
     public void verifyWebSocketConnections() {
         try {
-            //SYSTEM SET HERE
             loggingService.logAction("Verifying WebSocket connections");
 
             List<PlatformStock> stocks = stockRepository.findByPlatformName(PLATFORM_NAME);
@@ -156,7 +162,6 @@ public class BinanceDataInitializationService {
                 }
             }
         } catch (Exception e) {
-            //SYSTEM SET HERE
             loggingService.logError("Error verifying WebSocket connections: " + e.getMessage(), e);
         }
     }

@@ -2,12 +2,13 @@ package com.example.ehe_server.controller;
 
 import com.example.ehe_server.dto.websocket.CandleSubscriptionRequest;
 import com.example.ehe_server.dto.websocket.SubscriptionUpdateRequest;
-import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
+import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
 import com.example.ehe_server.service.stock.StockWebSocketSubscriptionManager;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.annotation.SendToUser;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Controller;
 
 import java.util.HashMap;
@@ -18,30 +19,41 @@ public class StockCandleWebSocketController {
 
     private final StockWebSocketSubscriptionManager stockWebSocketSubscriptionManager;
     private final LoggingServiceInterface loggingService;
-    private final UserContextService userContextService;
+    private final WebSocketAuthServiceInterface webSocketAuthService;
 
     public StockCandleWebSocketController(
             StockWebSocketSubscriptionManager stockWebSocketSubscriptionManager,
             LoggingServiceInterface loggingService,
-            UserContextService userContextService) {
+            WebSocketAuthServiceInterface webSocketAuthService) {
         this.stockWebSocketSubscriptionManager = stockWebSocketSubscriptionManager;
         this.loggingService = loggingService;
-        this.userContextService = userContextService;
+        this.webSocketAuthService = webSocketAuthService;
     }
 
     @MessageMapping("/candles/subscribe")
     @SendToUser("/queue/candles")
     public Map<String, Object> subscribeToCandles(
-            @Payload CandleSubscriptionRequest request) {
+            @Payload CandleSubscriptionRequest request,
+            StompHeaderAccessor headerAccessor) {
 
         Map<String, Object> response = new HashMap<>();
 
         try {
+            // Extract user ID from WebSocket authentication
+            Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
+
+            if (userId == null) {
+                response.put("success", false);
+                response.put("message", "User not authenticated");
+                return response;
+            }
+
             // Log subscription request
             loggingService.logAction("WebSocket subscription request for " +
                     request.getPlatformName() + ":" + request.getStockSymbol() +
                     " " + request.getTimeframe() +
-                    (request.getSubscriptionType() != null ? " (Type: " + request.getSubscriptionType() + ")" : ""));
+                    (request.getSubscriptionType() != null ? " (Type: " + request.getSubscriptionType() + ")" : "") +
+                    " from user " + userId);
 
             // Validate request
             if (request.getPlatformName() == null || request.getStockSymbol() == null ||
@@ -60,7 +72,7 @@ public class StockCandleWebSocketController {
                     request.getTimeframe(),
                     request.getStartDate(),
                     request.getEndDate(),
-                    "/user/" + userContextService.getCurrentUserId() + "/queue/candles",
+                    "/user/" + userId + "/queue/candles",
                     request.getSubscriptionType());
 
             // Return subscription details
@@ -81,11 +93,21 @@ public class StockCandleWebSocketController {
     @MessageMapping("/candles/unsubscribe")
     @SendToUser("/queue/candles")
     public Map<String, Object> unsubscribeFromCandles(
-            @Payload Map<String, String> request) {
+            @Payload Map<String, String> request,
+            StompHeaderAccessor headerAccessor) {
 
         Map<String, Object> response = new HashMap<>();
 
         try {
+            // Extract user ID from WebSocket authentication
+            Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
+
+            if (userId == null) {
+                response.put("success", false);
+                response.put("message", "User not authenticated");
+                return response;
+            }
+
             // Get subscription ID
             String subscriptionId = request.get("subscriptionId");
 
@@ -96,7 +118,7 @@ public class StockCandleWebSocketController {
             }
 
             // Log unsubscribe request
-            loggingService.logAction("WebSocket unsubscribe request for subscription " + subscriptionId);
+            loggingService.logAction("WebSocket unsubscribe request for subscription " + subscriptionId + " from user " + userId);
 
             // Cancel subscription
             boolean cancelled = stockWebSocketSubscriptionManager.cancelSubscription(subscriptionId);
@@ -123,11 +145,21 @@ public class StockCandleWebSocketController {
     @MessageMapping("/candles/update-subscription")
     @SendToUser("/queue/candles")
     public Map<String, Object> updateSubscription(
-            @Payload SubscriptionUpdateRequest request) {
+            @Payload SubscriptionUpdateRequest request,
+            StompHeaderAccessor headerAccessor) {
 
         Map<String, Object> response = new HashMap<>();
 
         try {
+            // Extract user ID from WebSocket authentication
+            Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
+
+            if (userId == null) {
+                response.put("success", false);
+                response.put("message", "User not authenticated");
+                return response;
+            }
+
             // Validate request
             if (request.getSubscriptionId() == null) {
                 response.put("success", false);
@@ -140,7 +172,8 @@ public class StockCandleWebSocketController {
                     " with new date range: " +
                     (request.getNewStartDate() != null ? request.getNewStartDate() : "unchanged") + " to " +
                     (request.getNewEndDate() != null ? request.getNewEndDate() : "unchanged") +
-                    (request.getSubscriptionType() != null ? " and type: " + request.getSubscriptionType() : ""));
+                    (request.getSubscriptionType() != null ? " and type: " + request.getSubscriptionType() : "") +
+                    " from user " + userId);
 
             // Update subscription with the new type
             boolean updated = stockWebSocketSubscriptionManager.updateSubscription(
@@ -148,7 +181,7 @@ public class StockCandleWebSocketController {
                     request.getNewStartDate(),
                     request.getNewEndDate(),
                     request.getResetData() != null && request.getResetData(),
-                    request.getSubscriptionType());  // Pass the subscription type
+                    request.getSubscriptionType());
 
             if (updated) {
                 response.put("success", true);

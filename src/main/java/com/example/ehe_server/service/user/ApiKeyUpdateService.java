@@ -76,7 +76,43 @@ public class ApiKeyUpdateService implements ApiKeyUpdateServiceInterface {
 
         loggingService.logAction("API Key updated successfully for platform: " + platformName);
 
-        // Return success DTO
-        return new ApiKeyUpdateResponse(apiKey.getApiKeyId(), apiKey.getPlatformName());
+        // Create response with masked values
+        ApiKeyUpdateResponse response = new ApiKeyUpdateResponse();
+        response.setApiKeyId(apiKey.getApiKeyId());
+        response.setPlatformName(apiKey.getPlatformName());
+
+        // Mask the API key value
+        String apiKeyValueFromDb = apiKey.getApiKeyValueEncrypt();
+        response.setMaskedApiKeyValue(maskApiKeyValue(apiKeyValueFromDb));
+
+        // Mask the secret key value if it exists
+        if (apiKey.getSecretKeyEncrypt() != null && !apiKey.getSecretKeyEncrypt().isEmpty()) {
+            String secretKeyValue = apiKey.getSecretKeyEncrypt();
+            response.setMaskedSecretKey(maskApiKeyValue(secretKeyValue));
+        }
+
+        return response;
+    }
+
+    // Helper method to mask API key values
+    private String maskApiKeyValue(String apiKeyValue) {
+        if (apiKeyValue == null || apiKeyValue.length() <= 10) {
+            // If key is too short, just show a few characters
+            return apiKeyValue != null && !apiKeyValue.isEmpty()
+                    ? apiKeyValue.substring(0, Math.min(3, apiKeyValue.length())) + "****"
+                    : "";
+        }
+
+        // Show first 5 and last 5 characters, mask the middle
+        int visibleCharCount = 5;
+        String firstPart = apiKeyValue.substring(0, visibleCharCount);
+        String lastPart = apiKeyValue.substring(apiKeyValue.length() - visibleCharCount);
+        int maskedLength = apiKeyValue.length() - (2 * visibleCharCount);
+        StringBuilder maskedMiddle = new StringBuilder();
+        for (int i = 0; i < maskedLength; i++) {
+            maskedMiddle.append("*");
+        }
+
+        return firstPart + maskedMiddle + lastPart;
     }
 }

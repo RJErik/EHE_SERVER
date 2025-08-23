@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EntityScan(basePackages = {"com.example.ehe_server.entity"})
 @EnableJpaRepositories(basePackages = {"com.example.ehe_server.repository"})
 @EnableScheduling // Added for WebSocket heartbeat and update checking
+@EnableAsync  // Add this line
 public class EheServerApplication {
 
     public static void main(String[] args) {

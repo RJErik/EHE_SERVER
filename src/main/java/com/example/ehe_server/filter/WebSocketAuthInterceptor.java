@@ -10,6 +10,7 @@ import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -45,10 +46,11 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                 String role = jwtTokenValidator.getRoleFromToken(token);
 
                 // Set authentication for this connection
+                // IMPORTANT: Convert userId to String to match UserContextService expectations
                 String prefixedRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
-                                userId,
+                                userId, // Keep as Long for WebSocket context
                                 null,
                                 Collections.singletonList(new SimpleGrantedAuthority(prefixedRole))
                         );

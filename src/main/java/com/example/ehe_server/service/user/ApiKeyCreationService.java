@@ -60,7 +60,39 @@ public class ApiKeyCreationService implements ApiKeyCreationServiceInterface {
 
         loggingService.logAction("API Key added successfully for platform: " + platformName);
 
-        // Return a success DTO
-        return new ApiKeyCreationResponse("API key added successfully", apiKey.getApiKeyId().longValue());
+        // Create response with masked values
+        ApiKeyCreationResponse response = new ApiKeyCreationResponse();
+        response.setApiKeyId(apiKey.getApiKeyId().longValue());
+        response.setPlatformName(apiKey.getPlatformName());
+        response.setMaskedApiKeyValue(maskApiKeyValue(apiKeyValue));
+
+        // Mask the secret key value if it exists
+        if (secretKey != null && !secretKey.isEmpty()) {
+            response.setMaskedSecretKey(maskApiKeyValue(secretKey));
+        }
+
+        return response;
+    }
+
+    // Helper method to mask API key values
+    private String maskApiKeyValue(String apiKeyValue) {
+        if (apiKeyValue == null || apiKeyValue.length() <= 10) {
+            // If key is too short, just show a few characters
+            return apiKeyValue != null && !apiKeyValue.isEmpty()
+                    ? apiKeyValue.substring(0, Math.min(3, apiKeyValue.length())) + "****"
+                    : "";
+        }
+
+        // Show first 5 and last 5 characters, mask the middle
+        int visibleCharCount = 5;
+        String firstPart = apiKeyValue.substring(0, visibleCharCount);
+        String lastPart = apiKeyValue.substring(apiKeyValue.length() - visibleCharCount);
+        int maskedLength = apiKeyValue.length() - (2 * visibleCharCount);
+        StringBuilder maskedMiddle = new StringBuilder();
+        for (int i = 0; i < maskedLength; i++) {
+            maskedMiddle.append("*");
+        }
+
+        return firstPart + maskedMiddle + lastPart;
     }
 }

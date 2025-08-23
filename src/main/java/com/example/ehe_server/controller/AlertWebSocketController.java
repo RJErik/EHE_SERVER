@@ -1,11 +1,12 @@
 package com.example.ehe_server.controller;
 
 import com.example.ehe_server.service.alert.AlertWebSocketSubscriptionManager;
-import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
+import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.annotation.SendToUser;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Controller;
 
 import java.util.HashMap;
@@ -16,30 +17,39 @@ public class AlertWebSocketController {
 
     private final AlertWebSocketSubscriptionManager alertWebSocketSubscriptionManager;
     private final LoggingServiceInterface loggingService;
-    private final UserContextService userContextService;
+    private final WebSocketAuthServiceInterface webSocketAuthService;
 
     public AlertWebSocketController(
             AlertWebSocketSubscriptionManager alertWebSocketSubscriptionManager,
             LoggingServiceInterface loggingService,
-            UserContextService userContextService) {
+            WebSocketAuthServiceInterface webSocketAuthService) {
         this.alertWebSocketSubscriptionManager = alertWebSocketSubscriptionManager;
         this.loggingService = loggingService;
-        this.userContextService = userContextService;
+        this.webSocketAuthService = webSocketAuthService;
     }
 
     @MessageMapping("/alerts/subscribe")
     @SendToUser("/queue/alerts")
-    public Map<String, Object> subscribeToAlerts() {
+    public Map<String, Object> subscribeToAlerts(StompHeaderAccessor headerAccessor) {
 
         Map<String, Object> response = new HashMap<>();
 
         try {
+            // Extract user ID from WebSocket authentication
+            Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
+
+            if (userId == null) {
+                response.put("success", false);
+                response.put("message", "User not authenticated");
+                return response;
+            }
+
             // Log subscription request
-            loggingService.logAction("WebSocket subscription request for alerts");
+            loggingService.logAction("WebSocket subscription request for alerts from user " + userId);
 
             // Create subscription for this user
             String subscriptionId = alertWebSocketSubscriptionManager.createSubscription(
-                    userContextService.getCurrentUserId().intValue(),
+                    userId,
                     "/user/queue/alerts");
 
             // Return subscription details
@@ -59,11 +69,21 @@ public class AlertWebSocketController {
     @MessageMapping("/alerts/unsubscribe")
     @SendToUser("/queue/alerts")
     public Map<String, Object> unsubscribeFromAlerts(
-            @Payload Map<String, String> request) {
+            @Payload Map<String, String> request,
+            StompHeaderAccessor headerAccessor) {
 
         Map<String, Object> response = new HashMap<>();
 
         try {
+            // Extract user ID from WebSocket authentication
+            Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
+
+            if (userId == null) {
+                response.put("success", false);
+                response.put("message", "User not authenticated");
+                return response;
+            }
+
             String subscriptionId = request.get("subscriptionId");
 
             if (subscriptionId == null) {
@@ -72,7 +92,7 @@ public class AlertWebSocketController {
                 return response;
             }
 
-            loggingService.logAction("WebSocket unsubscribe request for alert subscription " + subscriptionId);
+            loggingService.logAction("WebSocket unsubscribe request for alert subscription " + subscriptionId + " from user " + userId);
 
             boolean cancelled = alertWebSocketSubscriptionManager.cancelSubscription(subscriptionId);
 

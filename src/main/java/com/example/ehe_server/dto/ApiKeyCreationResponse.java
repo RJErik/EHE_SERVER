@@ -3,27 +3,54 @@ package com.example.ehe_server.dto;
 import java.util.Objects;
 
 public class ApiKeyCreationResponse {
-    private String message;
     private Long apiKeyId;
+    private String platformName;
+    private String maskedApiKeyValue;
+    private String maskedSecretKey;
 
     public ApiKeyCreationResponse() {}
 
-    public ApiKeyCreationResponse(String message, Long apiKeyId) {
-        this.message = message;
+    public ApiKeyCreationResponse(Long apiKeyId) {
         this.apiKeyId = apiKeyId;
     }
 
-    public String getMessage() {
-        return message;
+    public ApiKeyCreationResponse(Long apiKeyId, String platformName, String maskedApiKeyValue, String maskedSecretKey) {
+        this.apiKeyId = apiKeyId;
+        this.platformName = platformName;
+        this.maskedApiKeyValue = maskedApiKeyValue;
+        this.maskedSecretKey = maskedSecretKey;
     }
-    public void setMessage(String message) {
-        this.message = message;
-    }
+
     public Long getApiKeyId() {
         return apiKeyId;
     }
+
     public void setApiKeyId(Long apiKeyId) {
         this.apiKeyId = apiKeyId;
+    }
+
+    public String getPlatformName() {
+        return platformName;
+    }
+
+    public void setPlatformName(String platformName) {
+        this.platformName = platformName;
+    }
+
+    public String getMaskedApiKeyValue() {
+        return maskedApiKeyValue;
+    }
+
+    public void setMaskedApiKeyValue(String maskedApiKeyValue) {
+        this.maskedApiKeyValue = maskedApiKeyValue;
+    }
+
+    public String getMaskedSecretKey() {
+        return maskedSecretKey;
+    }
+
+    public void setMaskedSecretKey(String maskedSecretKey) {
+        this.maskedSecretKey = maskedSecretKey;
     }
 
     @Override
@@ -31,12 +58,14 @@ public class ApiKeyCreationResponse {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ApiKeyCreationResponse that = (ApiKeyCreationResponse) o;
-        return Objects.equals(message, that.message) &&
-                Objects.equals(apiKeyId, that.apiKeyId);
+        return Objects.equals(apiKeyId, that.apiKeyId) &&
+                Objects.equals(platformName, that.platformName) &&
+                Objects.equals(maskedApiKeyValue, that.maskedApiKeyValue) &&
+                Objects.equals(maskedSecretKey, that.maskedSecretKey);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(message, apiKeyId);
+        return Objects.hash(apiKeyId, platformName, maskedApiKeyValue, maskedSecretKey);
     }
 }
