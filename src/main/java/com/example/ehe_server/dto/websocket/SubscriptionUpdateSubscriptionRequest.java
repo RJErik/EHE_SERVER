@@ -2,7 +2,7 @@ package com.example.ehe_server.dto.websocket;
 
 import java.time.LocalDateTime;
 
-public class SubscriptionUpdateRequest {
+public class SubscriptionUpdateSubscriptionRequest {
     private String subscriptionId;
     private LocalDateTime newStartDate;
     private LocalDateTime newEndDate;

@@ -1,8 +1,11 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.dto.websocket.AutomatedTradeSubscriptionResponse;
+import com.example.ehe_server.dto.websocket.AutomatedTradeUnsubscriptionRequest;
 import com.example.ehe_server.service.automatictrade.AutomatedTradeWebSocketSubscriptionManager;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.annotation.SendToUser;
@@ -16,16 +19,16 @@ import java.util.Map;
 public class AutomatedTradeWebSocketController {
 
     private final AutomatedTradeWebSocketSubscriptionManager automatedTradeWebSocketSubscriptionManager;
-    private final LoggingServiceInterface loggingService;
     private final WebSocketAuthServiceInterface webSocketAuthService;
+    private final MessageSource messageSource;
 
     public AutomatedTradeWebSocketController(
             AutomatedTradeWebSocketSubscriptionManager automatedTradeWebSocketSubscriptionManager,
-            LoggingServiceInterface loggingService,
-            WebSocketAuthServiceInterface webSocketAuthService) {
+            WebSocketAuthServiceInterface webSocketAuthService,
+            MessageSource messageSource) {
         this.automatedTradeWebSocketSubscriptionManager = automatedTradeWebSocketSubscriptionManager;
-        this.loggingService = loggingService;
         this.webSocketAuthService = webSocketAuthService;
+        this.messageSource = messageSource;
     }
 
     @MessageMapping("/automated-trades/subscribe")
@@ -34,34 +37,25 @@ public class AutomatedTradeWebSocketController {
 
         Map<String, Object> response = new HashMap<>();
 
-        try {
-            // Extract user ID from WebSocket authentication
-            Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
+        // Extract user ID from WebSocket authentication
+        Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
 
-            if (userId == null) {
-                response.put("success", false);
-                response.put("message", "User not authenticated");
-                return response;
-            }
+        // Create subscription for this user
+        AutomatedTradeSubscriptionResponse automatedTradeSubscriptionResponse = automatedTradeWebSocketSubscriptionManager.createSubscription(
+                userId,
+                "/user/queue/automated-trades");
 
-            // Log subscription request
-            loggingService.logAction("WebSocket subscription request for automated trades from user " + userId);
+        String successMessage = messageSource.getMessage(
+                "success.message.alert.automatedTradeRule.create", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
 
-            // Create subscription for this user
-            String subscriptionId = automatedTradeWebSocketSubscriptionManager.createSubscription(
-                    userId,
-                    "/user/queue/automated-trades");
+        // Return subscription details
+        response.put("success", true);
+        response.put("message", successMessage);
+        response.put("subscriptionId", automatedTradeSubscriptionResponse);
 
-            // Return subscription details
-            response.put("success", true);
-            response.put("subscriptionId", subscriptionId);
-            response.put("message", "Automated trade subscription created successfully");
-
-        } catch (Exception e) {
-            loggingService.logError("Error creating automated trade subscription: " + e.getMessage(), e);
-            response.put("success", false);
-            response.put("message", "Error creating automated trade subscription: " + e.getMessage());
-        }
 
         return response;
     }
@@ -69,48 +63,24 @@ public class AutomatedTradeWebSocketController {
     @MessageMapping("/automated-trades/unsubscribe")
     @SendToUser("/queue/automated-trades")
     public Map<String, Object> unsubscribeFromAutomatedTrades(
-            @Payload Map<String, String> request,
-            StompHeaderAccessor headerAccessor) {
+            @Payload AutomatedTradeUnsubscriptionRequest request) {
 
         Map<String, Object> response = new HashMap<>();
 
-        try {
-            // Extract user ID from WebSocket authentication
-            Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
+        String subscriptionId = request.getSubscriptionId();
 
-            if (userId == null) {
-                response.put("success", false);
-                response.put("message", "User not authenticated");
-                return response;
-            }
+        automatedTradeWebSocketSubscriptionManager.cancelSubscription(subscriptionId);
 
-            String subscriptionId = request.get("subscriptionId");
+        String successMessage = messageSource.getMessage(
+                "success.message.alert.automatedTradeRule.cancel", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
 
-            if (subscriptionId == null) {
-                response.put("success", false);
-                response.put("message", "Missing subscription ID");
-                return response;
-            }
+        response.put("success", true);
+        response.put("message", successMessage);
+        response.put("subscriptionId", new AutomatedTradeSubscriptionResponse(subscriptionId));
 
-            loggingService.logAction("WebSocket unsubscribe request for automated trade subscription " + subscriptionId + " from user " + userId);
-
-            boolean cancelled = automatedTradeWebSocketSubscriptionManager.cancelSubscription(subscriptionId);
-
-            if (cancelled) {
-                response.put("success", true);
-                response.put("message", "Automated trade subscription cancelled successfully");
-                response.put("subscriptionId", subscriptionId);
-            } else {
-                response.put("success", false);
-                response.put("message", "Automated trade subscription not found: " + subscriptionId);
-                response.put("subscriptionId", subscriptionId);
-            }
-
-        } catch (Exception e) {
-            loggingService.logError("Error cancelling automated trade subscription: " + e.getMessage(), e);
-            response.put("success", false);
-            response.put("message", "Error cancelling automated trade subscription: " + e.getMessage());
-        }
 
         return response;
     }

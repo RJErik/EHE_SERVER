@@ -2,7 +2,10 @@ package com.example.ehe_server.service.automatictrade;
 
 import com.example.ehe_server.dto.TradeExecutionResponse;
 import com.example.ehe_server.dto.websocket.AutomatedTradeNotificationResponse;
+import com.example.ehe_server.dto.websocket.AutomatedTradeSubscriptionResponse;
 import com.example.ehe_server.entity.*;
+import com.example.ehe_server.exception.custom.InvalidSubscriptionIdException;
+import com.example.ehe_server.exception.custom.SubscriptionNotFoundException;
 import com.example.ehe_server.repository.AutomatedTradeRuleRepository;
 import com.example.ehe_server.repository.MarketCandleRepository;
 import com.example.ehe_server.repository.TransactionRepository;
@@ -79,7 +82,7 @@ public class AutomatedTradeWebSocketSubscriptionManager {
     /**
      * Create a new subscription for automated trades and return its ID
      */
-    public String createSubscription(Integer userId, String destination) {
+    public AutomatedTradeSubscriptionResponse createSubscription(Integer userId, String destination) {
         String subscriptionId = UUID.randomUUID().toString();
 
         AutomatedTradeSubscription subscription = new AutomatedTradeSubscription(
@@ -91,19 +94,24 @@ public class AutomatedTradeWebSocketSubscriptionManager {
 
         loggingService.logAction("Created automated trade subscription: " + subscriptionId);
 
-        return subscriptionId;
+        return new AutomatedTradeSubscriptionResponse(subscriptionId);
     }
 
     /**
      * Cancel a subscription
      */
-    public boolean cancelSubscription(String subscriptionId) {
-        AutomatedTradeSubscription removed = activeSubscriptions.remove(subscriptionId);
-        if (removed != null) {
-            loggingService.logAction("Cancelled automated trade subscription: " + subscriptionId);
-            return true;
+    public void cancelSubscription(String subscriptionId) {
+        if (subscriptionId == null) {
+            throw new InvalidSubscriptionIdException();
         }
-        return false;
+
+        AutomatedTradeSubscription removed = activeSubscriptions.remove(subscriptionId);
+
+        if (removed == null) {
+            throw new SubscriptionNotFoundException(subscriptionId);
+        }
+
+        loggingService.logAction("Cancelled alert subscription: " + subscriptionId);
     }
 
     /**

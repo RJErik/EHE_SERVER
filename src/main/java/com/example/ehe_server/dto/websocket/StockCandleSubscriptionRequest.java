@@ -2,7 +2,7 @@ package com.example.ehe_server.dto.websocket;
 
 import java.time.LocalDateTime;
 
-public class CandleSubscriptionRequest {
+public class StockCandleSubscriptionRequest {
     private String platformName;
     private String stockSymbol;
     private String timeframe;

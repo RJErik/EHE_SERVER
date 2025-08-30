@@ -1,8 +1,12 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.dto.websocket.AlertSubscriptionResponse;
+import com.example.ehe_server.dto.websocket.AlertUnsubscriptionRequest;
+import com.example.ehe_server.dto.websocket.AlertUnsubscriptionResponse;
 import com.example.ehe_server.service.alert.AlertWebSocketSubscriptionManager;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.annotation.SendToUser;
@@ -16,16 +20,16 @@ import java.util.Map;
 public class AlertWebSocketController {
 
     private final AlertWebSocketSubscriptionManager alertWebSocketSubscriptionManager;
-    private final LoggingServiceInterface loggingService;
     private final WebSocketAuthServiceInterface webSocketAuthService;
+    private final MessageSource messageSource;
 
     public AlertWebSocketController(
             AlertWebSocketSubscriptionManager alertWebSocketSubscriptionManager,
-            LoggingServiceInterface loggingService,
-            WebSocketAuthServiceInterface webSocketAuthService) {
+            WebSocketAuthServiceInterface webSocketAuthService,
+            MessageSource messageSource) {
         this.alertWebSocketSubscriptionManager = alertWebSocketSubscriptionManager;
-        this.loggingService = loggingService;
         this.webSocketAuthService = webSocketAuthService;
+        this.messageSource = messageSource;
     }
 
     @MessageMapping("/alerts/subscribe")
@@ -34,34 +38,24 @@ public class AlertWebSocketController {
 
         Map<String, Object> response = new HashMap<>();
 
-        try {
-            // Extract user ID from WebSocket authentication
-            Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
+        // Extract user ID from WebSocket authentication
+        Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
 
-            if (userId == null) {
-                response.put("success", false);
-                response.put("message", "User not authenticated");
-                return response;
-            }
+        // Create subscription for this user
+        AlertSubscriptionResponse alertSubscriptionResponse = alertWebSocketSubscriptionManager.createSubscription(
+                userId,
+                "/user/queue/alerts");
 
-            // Log subscription request
-            loggingService.logAction("WebSocket subscription request for alerts from user " + userId);
+        String successMessage = messageSource.getMessage(
+                "success.message.alert.subscription.create", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
 
-            // Create subscription for this user
-            String subscriptionId = alertWebSocketSubscriptionManager.createSubscription(
-                    userId,
-                    "/user/queue/alerts");
-
-            // Return subscription details
-            response.put("success", true);
-            response.put("subscriptionId", subscriptionId);
-            response.put("message", "Alert subscription created successfully");
-
-        } catch (Exception e) {
-            loggingService.logError("Error creating alert subscription: " + e.getMessage(), e);
-            response.put("success", false);
-            response.put("message", "Error creating alert subscription: " + e.getMessage());
-        }
+        // Return subscription details
+        response.put("success", true);
+        response.put("message", successMessage);
+        response.put("subscriptionId", alertSubscriptionResponse);
 
         return response;
     }
@@ -69,48 +63,24 @@ public class AlertWebSocketController {
     @MessageMapping("/alerts/unsubscribe")
     @SendToUser("/queue/alerts")
     public Map<String, Object> unsubscribeFromAlerts(
-            @Payload Map<String, String> request,
-            StompHeaderAccessor headerAccessor) {
+            @Payload AlertUnsubscriptionRequest request) {
 
         Map<String, Object> response = new HashMap<>();
 
-        try {
-            // Extract user ID from WebSocket authentication
-            Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
+        String subscriptionId = request.getSubscriptionId();
 
-            if (userId == null) {
-                response.put("success", false);
-                response.put("message", "User not authenticated");
-                return response;
-            }
+        alertWebSocketSubscriptionManager.cancelSubscription(subscriptionId);
 
-            String subscriptionId = request.get("subscriptionId");
+        String successMessage = messageSource.getMessage(
+                "success.message.alert.subscription.cancel", // The key from your properties file
+                null,                // Arguments for the message (none in this case)
+                LocaleContextHolder.getLocale() // Gets the current request's locale
+        );
 
-            if (subscriptionId == null) {
-                response.put("success", false);
-                response.put("message", "Missing subscription ID");
-                return response;
-            }
+        response.put("success", true);
+        response.put("message", successMessage);
+        response.put("subscriptionId", new AlertUnsubscriptionResponse(subscriptionId));
 
-            loggingService.logAction("WebSocket unsubscribe request for alert subscription " + subscriptionId + " from user " + userId);
-
-            boolean cancelled = alertWebSocketSubscriptionManager.cancelSubscription(subscriptionId);
-
-            if (cancelled) {
-                response.put("success", true);
-                response.put("message", "Alert subscription cancelled successfully");
-                response.put("subscriptionId", subscriptionId);
-            } else {
-                response.put("success", false);
-                response.put("message", "Alert subscription not found: " + subscriptionId);
-                response.put("subscriptionId", subscriptionId);
-            }
-
-        } catch (Exception e) {
-            loggingService.logError("Error cancelling alert subscription: " + e.getMessage(), e);
-            response.put("success", false);
-            response.put("message", "Error cancelling alert subscription: " + e.getMessage());
-        }
 
         return response;
     }

@@ -5,7 +5,7 @@ package com.example.ehe_server.exception.custom;
  * and examples of how they would be used in a service.
  *
  * All these exceptions extend the CustomBaseException to ensure they can be
- * handled by the GlobalExceptionHandler and carry the necessary data for
+ * handled by the RestGlobalExceptionHandler and carry the necessary data for
  * logging and building the API response.
  */
 

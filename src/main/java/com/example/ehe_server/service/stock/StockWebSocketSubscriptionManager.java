@@ -3,6 +3,11 @@ package com.example.ehe_server.service.stock;
 import com.example.ehe_server.dto.websocket.CandleDataResponse;
 import com.example.ehe_server.dto.websocket.CandleDataResponse.CandleData;
 import com.example.ehe_server.dto.websocket.CandleUpdateMessage;
+import com.example.ehe_server.dto.websocket.StockCandleSubscriptionResponse;
+import com.example.ehe_server.dto.websocket.StockCandleUpdateSubscriptionResponse;
+import com.example.ehe_server.exception.custom.InvalidSubscriptionIdException;
+import com.example.ehe_server.exception.custom.MissingStockSubscriptionParametersException;
+import com.example.ehe_server.exception.custom.SubscriptionNotFoundException;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.stock.MarketCandleServiceInterface;
@@ -174,7 +179,7 @@ public class StockWebSocketSubscriptionManager {
     /**
      * Create a new subscription and return its ID
      */
-    public String createSubscription(
+    public StockCandleSubscriptionResponse createSubscription(
             String platformName,
             String stockSymbol,
             String timeframe,
@@ -182,9 +187,31 @@ public class StockWebSocketSubscriptionManager {
             LocalDateTime endDate,
             String destination,
             String subscriptionType) {
-        userContextService.setUser("SYSTEM", "SYSTEM");
 
         String subscriptionId = UUID.randomUUID().toString();
+
+        // Validate request
+        List<String> missingParams = new ArrayList<>();
+        if (platformName == null || platformName.trim().isEmpty()) {
+            missingParams.add("platformName");
+        }
+        if (stockSymbol == null || stockSymbol.trim().isEmpty()) {
+            missingParams.add("stockSymbol");
+        }
+        if (timeframe == null || timeframe.trim().isEmpty()) {
+            missingParams.add("timeframe");
+        }
+        if (startDate == null) {
+            missingParams.add("startDate");
+        }
+        if (endDate == null) {
+            missingParams.add("endDate");
+        }
+
+        if (!missingParams.isEmpty()) {
+            String missingParamsStr = String.join(", ", missingParams);
+            throw new MissingStockSubscriptionParametersException(missingParamsStr);
+        }
 
         Subscription subscription = new Subscription(
                 subscriptionId,
@@ -206,36 +233,42 @@ public class StockWebSocketSubscriptionManager {
         // Send initial data
         sendInitialData(subscription);
 
-        return subscriptionId;
+        return new StockCandleSubscriptionResponse(subscriptionId, subscriptionType);
     }
 
     /**
      * Cancel a subscription
      */
-    public boolean cancelSubscription(String subscriptionId) {
-        userContextService.setUser("SYSTEM", "SYSTEM");
-        Subscription removed = activeSubscriptions.remove(subscriptionId);
-        if (removed != null) {
-            loggingService.logAction("Cancelled candle data subscription: " + subscriptionId);
-            return true;
+    public void cancelSubscription(String subscriptionId) {
+        if (subscriptionId == null) {
+            throw new InvalidSubscriptionIdException();
         }
-        return false;
+        Subscription removed = activeSubscriptions.remove(subscriptionId);
+        if (removed == null) {
+            throw new SubscriptionNotFoundException(subscriptionId);
+        }
+
+        loggingService.logAction("Cancelled alert subscription: " + subscriptionId);
     }
 
     /**
      * Update a subscription's time range and type
      */
-    public boolean updateSubscription(
+    public StockCandleUpdateSubscriptionResponse updateSubscription(
             String subscriptionId,
             LocalDateTime newStartDate,
             LocalDateTime newEndDate,
             boolean resetData,
             String newSubscriptionType) { // Added parameter
-        userContextService.setUser("SYSTEM", "SYSTEM");
+
+        // Validate request
+        if (subscriptionId == null) {
+            throw new InvalidSubscriptionIdException();
+        }
 
         Subscription subscription = activeSubscriptions.get(subscriptionId);
         if (subscription == null) {
-            return false;
+            throw new SubscriptionNotFoundException(subscriptionId);
         }
 
         // Update time range
@@ -256,19 +289,11 @@ public class StockWebSocketSubscriptionManager {
             sendInitialData(subscription);
         }
 
-        return true;
-    }
-
-    /**
-     * Legacy method to maintain backward compatibility
-     */
-    public boolean updateSubscription(
-            String subscriptionId,
-            LocalDateTime newStartDate,
-            LocalDateTime newEndDate,
-            boolean resetData) {
-
-        return updateSubscription(subscriptionId, newStartDate, newEndDate, resetData, null);
+        if (newSubscriptionType == null || this.getSubscriptionType(subscriptionId) == null) {
+            return new StockCandleUpdateSubscriptionResponse(subscriptionId);
+        } else {
+            return new StockCandleUpdateSubscriptionResponse(subscriptionId, newSubscriptionType);
+        }
     }
 
     /**
