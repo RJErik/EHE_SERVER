@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-@Transactional
 public class BinanceApiClient {
     private final RestTemplate restTemplate;
     private static final String API_BASE_URL = "https://api.binance.com";

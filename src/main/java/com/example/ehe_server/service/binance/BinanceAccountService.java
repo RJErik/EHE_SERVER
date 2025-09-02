@@ -20,7 +20,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service
-@Transactional
 public class BinanceAccountService {
 
     private final RestTemplate restTemplate;

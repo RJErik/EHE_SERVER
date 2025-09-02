@@ -28,4 +28,9 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
             PlatformStock platformStock,
             MarketCandle.Timeframe timeframe,
             LocalDateTime timestamp);
+
+    List<MarketCandle> findAllByPlatformStockAndTimeframeAndTimestamp(
+            PlatformStock platformStock,
+            MarketCandle.Timeframe timeframe,
+            LocalDateTime timestamp);
 }

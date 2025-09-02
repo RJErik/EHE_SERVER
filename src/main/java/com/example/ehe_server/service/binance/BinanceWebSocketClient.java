@@ -19,7 +19,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 @Service
-@Transactional
 public class BinanceWebSocketClient extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final LoggingServiceInterface loggingService;
@@ -150,6 +149,58 @@ public class BinanceWebSocketClient extends TextWebSocketHandler {
                 }).start();
                 break;
             }
+        }
+    }
+
+    /**
+     * Disconnects and cleans up a WebSocket connection for a specific symbol
+     * @param symbol The trading pair symbol to disconnect
+     * @return true if successfully disconnected, false if no connection was found
+     */
+    public boolean disconnectSymbol(String symbol) {
+        String streamName = symbol.toLowerCase() + "@kline_1m";
+
+        try {
+            WebSocketSession session = sessions.get(streamName);
+            if (session != null && session.isOpen()) {
+                // Send unsubscribe message first
+                String unsubscribePayload = "{" +
+                        "\"method\": \"UNSUBSCRIBE\"," +
+                        "\"params\": [\"" + streamName + "\"]," +
+                        "\"id\": " + lastId.getAndIncrement() +
+                        "}";
+
+                session.sendMessage(new TextMessage(unsubscribePayload));
+
+                // Small delay to ensure unsubscribe message is processed
+                Thread.sleep(500);
+
+                // Close the session
+                session.close();
+
+                // Clean up our tracking maps
+                sessions.remove(streamName);
+                handlers.remove(streamName);
+
+                loggingService.logAction("Successfully disconnected WebSocket for stream: " + streamName);
+                return true;
+            } else {
+                loggingService.logAction("No active WebSocket session found for stream: " + streamName);
+
+                // Clean up any stale entries
+                sessions.remove(streamName);
+                handlers.remove(streamName);
+
+                return false;
+            }
+        } catch (Exception e) {
+            loggingService.logError("Error disconnecting WebSocket for symbol " + symbol + ": " + e.getMessage(), e);
+
+            // Force cleanup even if there was an error
+            sessions.remove(streamName);
+            handlers.remove(streamName);
+
+            return false;
         }
     }
 }

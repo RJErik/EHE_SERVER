@@ -18,9 +18,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-@Transactional
 public class BinanceDataInitializationService {
     private static final String PLATFORM_NAME = "Binance";
 
@@ -32,6 +32,7 @@ public class BinanceDataInitializationService {
 
     // Track active websocket subscriptions
     private final Map<String, Boolean> activeSubscriptions = new HashMap<>();
+    private final Map<String, Boolean> historicalSyncInProgress = new ConcurrentHashMap<>(); // NEW
     private final UserContextService userContextService;
 
     public BinanceDataInitializationService(
@@ -109,23 +110,28 @@ public class BinanceDataInitializationService {
 
     public void setupSymbol(String symbol) {
         try {
-            // Step 1: Sync historical data
+            // Mark as syncing
+            historicalSyncInProgress.put(symbol, true);
+            activeSubscriptions.put(symbol, false); // Not live yet
+
             loggingService.logAction("Starting historical data sync for " + symbol);
             candleService.syncHistoricalData(symbol);
 
-            // Step 2: Set up real-time updates if not already subscribed
-            if (!activeSubscriptions.getOrDefault(symbol, false)) {
-                loggingService.logAction("Setting up real-time updates for " + symbol);
-                PlatformStock stock = getStock(symbol);
+            // Historical sync completed, now go live
+            historicalSyncInProgress.put(symbol, false);
 
-                if (stock != null) {
-                    webSocketClient.subscribeToKlineStream(symbol, "1m",
-                            candleData -> candleService.processRealtimeCandle(candleData, stock));
-
-                    activeSubscriptions.put(symbol, true);
-                }
+            // Set up real-time updates
+            loggingService.logAction("Setting up real-time updates for " + symbol);
+            PlatformStock stock = getStock(symbol);
+            if (stock != null) {
+                webSocketClient.subscribeToKlineStream(symbol, "1m",
+                        candleData -> candleService.processRealtimeCandle(candleData, stock));
+                activeSubscriptions.put(symbol, true); // Now live
             }
         } catch (Exception e) {
+            // Cleanup on error
+            historicalSyncInProgress.put(symbol, false);
+            activeSubscriptions.put(symbol, false);
             loggingService.logError("Failed to initialize " + symbol + " data: " + e.getMessage(), e);
         }
     }
@@ -145,7 +151,6 @@ public class BinanceDataInitializationService {
         }
     }
 
-    // Verify WebSocket connections hourly
     @Scheduled(cron = "0 0 * * * *") // Every hour
     public void verifyWebSocketConnections() {
         try {
@@ -155,14 +160,53 @@ public class BinanceDataInitializationService {
             for (PlatformStock stock : stocks) {
                 String symbol = stock.getStockSymbol();
 
-                // Reset subscription flag to force reconnection if needed
-                if (activeSubscriptions.getOrDefault(symbol, false)) {
+                // ONLY verify if we're in live mode (not syncing historical data)
+                boolean isSyncing = historicalSyncInProgress.getOrDefault(symbol, false);
+                boolean isLive = activeSubscriptions.getOrDefault(symbol, false);
+
+                if (isSyncing) {
+                    loggingService.logAction("Skipping WebSocket verification for " + symbol + " - historical sync in progress");
+                    continue;
+                }
+
+                if (isLive) {
+                    // This symbol should have an active WebSocket - verify it
+                    boolean disconnected = webSocketClient.disconnectSymbol(symbol);
+                    if (disconnected) {
+                        loggingService.logAction("Disconnected existing WebSocket for " + symbol);
+                    }
+
                     activeSubscriptions.put(symbol, false);
-                    setupSymbol(symbol);
+
+                    // Small delay then reconnect WebSocket only
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+
+                    // Reconnect WebSocket only (no historical sync)
+                    reconnectWebSocketOnly(symbol);
+                } else {
+                    loggingService.logAction("Symbol " + symbol + " not in live mode, skipping verification");
                 }
             }
         } catch (Exception e) {
             loggingService.logError("Error verifying WebSocket connections: " + e.getMessage(), e);
+        }
+    }
+
+    private void reconnectWebSocketOnly(String symbol) {
+        try {
+            PlatformStock stock = getStock(symbol);
+            if (stock != null) {
+                webSocketClient.subscribeToKlineStream(symbol, "1m",
+                        candleData -> candleService.processRealtimeCandle(candleData, stock));
+                activeSubscriptions.put(symbol, true);
+                loggingService.logAction("Reconnected WebSocket for " + symbol);
+            }
+        } catch (Exception e) {
+            loggingService.logError("Failed to reconnect WebSocket for " + symbol + ": " + e.getMessage(), e);
         }
     }
 

@@ -45,7 +45,7 @@ public class TradingService implements TradingServiceInterface {
     @Override
     @Transactional
     public TradeExecutionResponse executeTrade(Integer userId, Integer portfolioId, String stockSymbol, String action,
-                                                     BigDecimal amount, String quantityType) {
+                                               BigDecimal amount, String quantityType) {
         System.out.println("Executing market order: " + action + " " + amount + " of " + stockSymbol +
                 " for portfolio: " + portfolioId + " using " + quantityType);
 
@@ -102,12 +102,18 @@ public class TradingService implements TradingServiceInterface {
         loggingService.logAction("Market order executed: " + tradeDetails);
 
         return new TradeExecutionResponse(
-                (Long) orderResult.get("orderId"),
+                orderResult.get("orderId") != null ?
+                        ((Number) orderResult.get("orderId")).longValue() : null,
                 (String) orderResult.get("symbol"),
                 (String) orderResult.get("side"),
-                (BigDecimal) orderResult.get("origQty"),
-                (BigDecimal) orderResult.get("executedQty"),
-                (BigDecimal) orderResult.get("cummulativeQuoteQty"),
+                orderResult.get("origQty") != null ?
+                        new BigDecimal(orderResult.get("origQty").toString()) : null,
+
+                orderResult.get("executedQty") != null ?
+                        new BigDecimal(orderResult.get("executedQty").toString()) : null,
+
+                orderResult.get("cummulativeQuoteQty") != null ?
+                        new BigDecimal(orderResult.get("cummulativeQuoteQty").toString()) : null,
                 (String) orderResult.get("status")
         );
     }
