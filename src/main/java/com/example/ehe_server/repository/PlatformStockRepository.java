@@ -9,6 +9,7 @@ import java.util.List;
 @Repository
 public interface PlatformStockRepository extends JpaRepository<PlatformStock, Integer> {
     List<PlatformStock> findByPlatformName(String platformName);
+    List<PlatformStock> findByStockSymbol(String stockSymbol);
     boolean existsByPlatformName(String platformName);
     List<PlatformStock> findByPlatformNameAndStockSymbol(String platformName, String stockSymbol);
 

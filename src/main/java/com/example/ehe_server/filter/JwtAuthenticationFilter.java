@@ -41,7 +41,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     // Public endpoints that don't require authentication
     private static final List<String> PUBLIC_PATHS = List.of(
-            "/api/auth/"
+            "/api/auth/",
+            "/api/home/"
     );
 
     public JwtAuthenticationFilter(

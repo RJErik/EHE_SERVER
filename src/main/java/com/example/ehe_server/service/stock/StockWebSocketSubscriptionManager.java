@@ -17,7 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.sql.SQLOutput;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +68,7 @@ public class StockWebSocketSubscriptionManager {
             this.endDate = endDate;
             this.destination = destination;
             this.subscriptionType = subscriptionType; // Store the subscription type
-            this.lastUpdateTime = LocalDateTime.now();
+            this.lastUpdateTime = LocalDateTime.now(ZoneOffset.UTC);
         }
 
         // Getters
@@ -225,6 +227,12 @@ public class StockWebSocketSubscriptionManager {
 
         activeSubscriptions.put(subscriptionId, subscription);
 
+        System.out.println("Subscriptions length in creation:" + activeSubscriptions.size());
+
+        for (Subscription subscription1 : activeSubscriptions.values()) {
+            System.out.println("Subscription id" + subscription1.id);
+        }
+
         // Log subscription creation
         loggingService.logAction("Created candle data subscription: " + subscriptionId +
                 " for " + platformName + ":" + stockSymbol + " " + timeframe +
@@ -247,6 +255,8 @@ public class StockWebSocketSubscriptionManager {
         if (removed == null) {
             throw new SubscriptionNotFoundException(subscriptionId);
         }
+
+        System.out.println("Subscription id being removed:" + removed.id);
 
         loggingService.logAction("Cancelled alert subscription: " + subscriptionId);
     }
@@ -323,7 +333,10 @@ public class StockWebSocketSubscriptionManager {
             // If successful, update the latest candle info
             if (response.isSuccess() && response.getCandles() != null && !response.getCandles().isEmpty()) {
                 // Update with the last candle in the list
-                subscription.updateLatestCandle(response.getCandles().get(response.getCandles().size() - 1));
+                CandleData latest = response.getCandles().get(response.getCandles().size() - 1);
+                subscription.updateLatestCandle(latest);
+                // Align lastUpdateTime with the latest candle timestamp to avoid skipping boundary candles
+                subscription.setLastUpdateTime(latest.getTimestamp());
             }
 
             // Send to the subscription destination
@@ -342,7 +355,10 @@ public class StockWebSocketSubscriptionManager {
     @Scheduled(fixedRate = 10000)
     public void checkForUpdatesAndSendHeartbeats() {
         userContextService.setUser("SYSTEM", "SYSTEM");
-        LocalDateTime now = LocalDateTime.now();
+        System.out.println("!!!!!!Checking for updates and send heartbeats");
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+
+        System.out.println("Subscriptions length:" + activeSubscriptions.size());
 
         activeSubscriptions.values().forEach(subscription -> {
             try {
@@ -359,13 +375,26 @@ public class StockWebSocketSubscriptionManager {
                                 subscription.getEndDate(),
                                 subscription.getLastUpdateTime());
 
+                System.out.println("#################################");
+                System.out.println(subscription.getPlatformName());
+                System.out.println(subscription.getStockSymbol());
+                System.out.println(subscription.getTimeframe());
+                System.out.println(subscription.getStartDate());
+                System.out.println(subscription.getEndDate());
+                System.out.println(subscription.getLastUpdateTime());
+                System.out.println("#################################");
+                System.out.println("new candles" + newCandles);
+
                 if (!newCandles.isEmpty()) {
                     updatedCandles.addAll(newCandles);
+                    System.out.println(updatedCandles.size() + " new candles");
                     hasUpdates = true;
 
                     // Update the latest candle info with the most recent candle
                     subscription.updateLatestCandle(newCandles.get(newCandles.size() - 1));
                 }
+
+                System.out.println("!!!!Has updates: " + hasUpdates);
 
                 // For non-1-minute timeframes, also check if the latest candle was modified
                 if (!marketCandleService.isOneMinuteTimeframe(subscription.getTimeframe()) &&
@@ -401,18 +430,33 @@ public class StockWebSocketSubscriptionManager {
                 updateMessage.setSubscriptionType(subscription.getSubscriptionType()); // Include subscription type
                 updateMessage.setUpdateTimestamp(now);
 
+                System.out.println("!!!!!!Checking for updates and send heartbeats before has updates check");
+
                 // If there are updates, send them
                 if (hasUpdates) {
+                    System.out.println("!!!!!!If fork");
                     updateMessage.setUpdateType("UPDATE");
                     updateMessage.setUpdatedCandles(updatedCandles);
                     messagingTemplate.convertAndSend(subscription.getDestination(), updateMessage);
-                    subscription.setLastUpdateTime(now);
+                    // Advance lastUpdateTime to the timestamp of the last candle we actually sent
+                    LocalDateTime lastCandleTs = updatedCandles.get(updatedCandles.size() - 1).getTimestamp();
+                    subscription.setLastUpdateTime(lastCandleTs);
+
+                    updatedCandles.forEach(updatedCandle -> {
+                        System.out.println("updatedCandle timestamp: " + updatedCandle.getTimestamp());
+                        System.out.println("updatedCandle low: " + updatedCandle.getLowPrice());
+                        System.out.println("updatedCandle high: " + updatedCandle.getHighPrice());
+                        System.out.println("updatedCandle volume: " + updatedCandle.getVolume());
+                        System.out.println("updatedCandle open: " + updatedCandle.getOpenPrice());
+                        System.out.println("updatedCandle close: " + updatedCandle.getClosePrice());
+                    });
 
                     loggingService.logAction("Sent " + updatedCandles.size() + " candle updates for subscription " +
                             subscription.getId() +
                             (subscription.getSubscriptionType() != null ?
                                     " (Type: " + subscription.getSubscriptionType() + ")" : ""));
                 } else {
+                    System.out.println("!!!!!!Else fork");
                     // Send heartbeat every 10 seconds even if there are no updates
                     updateMessage.setUpdateType("HEARTBEAT");
                     updateMessage.setUpdatedCandles(new ArrayList<>());
