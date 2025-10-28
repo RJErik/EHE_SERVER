@@ -3,7 +3,7 @@ package com.example.ehe_server.service.home;
 import com.example.ehe_server.dto.HomeWorstStockResponse;
 import com.example.ehe_server.entity.MarketCandle;
 import com.example.ehe_server.repository.MarketCandleRepository;
-import com.example.ehe_server.service.intf.home.HomeWorstStockInterface;
+import com.example.ehe_server.service.intf.home.HomeWorstStockServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.stereotype.Service;
 
@@ -11,7 +11,7 @@ import java.math.RoundingMode;
 import java.util.List;
 
 @Service
-public class HomeWorstStockService implements HomeWorstStockInterface {
+public class HomeWorstStockService implements HomeWorstStockServiceInterface {
     private final LoggingServiceInterface loggingService;
     private final MarketCandleRepository marketCandleRepository;
 

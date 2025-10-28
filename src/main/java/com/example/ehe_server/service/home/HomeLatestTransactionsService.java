@@ -3,7 +3,7 @@ package com.example.ehe_server.service.home;
 import com.example.ehe_server.dto.HomeLatestTransactionsResponse;
 import com.example.ehe_server.entity.Transaction;
 import com.example.ehe_server.repository.TransactionRepository;
-import com.example.ehe_server.service.intf.home.HomeLatestTransactionsInterface;
+import com.example.ehe_server.service.intf.home.HomeLatestTransactionsServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.stereotype.Service;
 
@@ -11,7 +11,7 @@ import java.security.SecureRandom;
 import java.util.List;
 
 @Service
-public class HomeLatestTransactionsService implements HomeLatestTransactionsInterface {
+public class HomeLatestTransactionsService implements HomeLatestTransactionsServiceInterface {
     private final LoggingServiceInterface loggingService;
     private final TransactionRepository transactionRepository;
     private final SecureRandom random = new SecureRandom();

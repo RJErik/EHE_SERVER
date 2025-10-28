@@ -4,6 +4,6 @@ import com.example.ehe_server.dto.HomeLatestTransactionsResponse;
 
 import java.util.List;
 
-public interface HomeLatestTransactionsInterface {
+public interface HomeLatestTransactionsServiceInterface {
     List<HomeLatestTransactionsResponse> getLatestTransactions();
 }

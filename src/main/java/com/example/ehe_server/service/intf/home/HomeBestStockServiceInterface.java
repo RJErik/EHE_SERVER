@@ -4,6 +4,6 @@ import com.example.ehe_server.dto.HomeBestStockResponse;
 
 import java.util.List;
 
-public interface HomeBestStockInterface {
+public interface HomeBestStockServiceInterface {
     List<HomeBestStockResponse> getHomeBestStock();
 }

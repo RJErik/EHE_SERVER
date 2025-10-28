@@ -3,9 +3,9 @@ package com.example.ehe_server.controller;
 import com.example.ehe_server.dto.HomeBestStockResponse;
 import com.example.ehe_server.dto.HomeLatestTransactionsResponse;
 import com.example.ehe_server.dto.HomeWorstStockResponse;
-import com.example.ehe_server.service.intf.home.HomeBestStockInterface;
-import com.example.ehe_server.service.intf.home.HomeLatestTransactionsInterface;
-import com.example.ehe_server.service.intf.home.HomeWorstStockInterface;
+import com.example.ehe_server.service.intf.home.HomeBestStockServiceInterface;
+import com.example.ehe_server.service.intf.home.HomeLatestTransactionsServiceInterface;
+import com.example.ehe_server.service.intf.home.HomeWorstStockServiceInterface;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
@@ -19,14 +19,14 @@ import java.util.Map;
 @RequestMapping("/api/home")
 public class HomeInfoController {
     private final MessageSource messageSource;
-    private final HomeBestStockInterface homeBestStock;
-    private final HomeWorstStockInterface homeWorstStock;
-    private final HomeLatestTransactionsInterface homeLatestTransactions;
+    private final HomeBestStockServiceInterface homeBestStock;
+    private final HomeWorstStockServiceInterface homeWorstStock;
+    private final HomeLatestTransactionsServiceInterface homeLatestTransactions;
 
     public HomeInfoController(MessageSource messageSource,
-                              HomeBestStockInterface homeBestStock,
-                              HomeWorstStockInterface homeWorstStock,
-                              HomeLatestTransactionsInterface homeLatestTransactions) {
+                              HomeBestStockServiceInterface homeBestStock,
+                              HomeWorstStockServiceInterface homeWorstStock,
+                              HomeLatestTransactionsServiceInterface homeLatestTransactions) {
         this.homeBestStock = homeBestStock;
         this.messageSource = messageSource;
         this.homeWorstStock = homeWorstStock;
