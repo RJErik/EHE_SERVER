@@ -13,6 +13,7 @@ import com.example.ehe_server.service.binance.BinanceAccountService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioValueServiceInterface;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -133,7 +134,7 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public HoldingsUpdateResponse updateHoldings(Integer userId, Integer portfolioId) {
 
         System.out.println("Starting updateHoldings method for portfolioId: " + portfolioId);

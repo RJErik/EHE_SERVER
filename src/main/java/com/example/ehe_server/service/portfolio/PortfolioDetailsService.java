@@ -8,6 +8,7 @@ import com.example.ehe_server.exception.custom.PortfolioNotFoundException;
 import com.example.ehe_server.repository.*;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioDetailsServiceInterface;
+import com.example.ehe_server.service.intf.portfolio.PortfolioValueServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,17 +25,20 @@ public class PortfolioDetailsService implements PortfolioDetailsServiceInterface
     private final HoldingRepository holdingRepository;
     private final MarketCandleRepository marketCandleRepository;
     private final LoggingServiceInterface loggingService;
+    private final PortfolioValueServiceInterface portfolioValueService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public PortfolioDetailsService(
             PortfolioRepository portfolioRepository,
             HoldingRepository holdingRepository,
             MarketCandleRepository marketCandleRepository,
-            LoggingServiceInterface loggingService) {
+            LoggingServiceInterface loggingService,
+            PortfolioValueServiceInterface portfolioValueService) {
         this.portfolioRepository = portfolioRepository;
         this.holdingRepository = holdingRepository;
         this.marketCandleRepository = marketCandleRepository;
         this.loggingService = loggingService;
+        this.portfolioValueService = portfolioValueService;
     }
 
     @Override
@@ -49,6 +53,16 @@ public class PortfolioDetailsService implements PortfolioDetailsServiceInterface
         Portfolio portfolio = portfolioOptional.get();
         ApiKey apiKey = portfolio.getApiKey();
         String platformName = apiKey != null ? apiKey.getPlatformName() : "Unknown";
+
+        try {
+            // update holdings on exchange before computing details
+            portfolioValueService.updateHoldings(userId, portfolioId);
+        } catch (Exception e) {
+            // choose policy: log and continue with existing holdings, or rethrow
+            loggingService.logError("Failed to update holdings before details: " + e.getMessage(), e);
+            // optionally rethrow if you want the details request to fail on update problems
+        }
+
 
         // Get holdings for this portfolio
         List<Holding> holdings = holdingRepository.findByPortfolio(portfolio);
