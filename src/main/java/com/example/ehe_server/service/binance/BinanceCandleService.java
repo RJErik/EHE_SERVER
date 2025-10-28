@@ -61,9 +61,8 @@ public class BinanceCandleService {
             // We have existing data, start from the latest candle
             //SYSTEM SET HERE
             loggingService.logAction("Found existing candles for " + symbol + ". Latest candle at " + latestCandle.getTimestamp());
-            // Start from the next minute after latest candle
+            // Start from the latest candle
             Instant startInstant = latestCandle.getTimestamp()
-                    .plusMinutes(1)
                     .toInstant(ZoneOffset.UTC);
             //SYSTEM SET HERE
             loggingService.logAction("Updating candles for " + symbol + " from " + startInstant.atZone(ZoneOffset.UTC) +
@@ -106,8 +105,37 @@ public class BinanceCandleService {
         if (candles == null || candles.isEmpty()) {
             return;
         }
-        candleRepository.saveAll(candles);
-        aggregateCandles(stock, candles);
+
+        List<MarketCandle> candlesToSave = new ArrayList<>();
+
+        for (MarketCandle candle : candles) {
+            // Check if candle already exists
+            Optional<MarketCandle> existingCandle = candleRepository
+                    .findByPlatformStockAndTimeframeAndTimestampEquals(
+                            stock, candle.getTimeframe(), candle.getTimestamp());
+
+            if (existingCandle.isPresent()) {
+                // Update existing candle
+                MarketCandle existing = existingCandle.get();
+                existing.setOpenPrice(candle.getOpenPrice());
+                existing.setHighPrice(candle.getHighPrice());
+                existing.setLowPrice(candle.getLowPrice());
+                existing.setClosePrice(candle.getClosePrice());
+                existing.setVolume(candle.getVolume());
+                candlesToSave.add(existing);
+            } else {
+                // Add new candle to save list
+                candlesToSave.add(candle);
+            }
+        }
+
+        // Save all candles (new and updated ones)
+        if (!candlesToSave.isEmpty()) {
+            candleRepository.saveAll(candlesToSave);
+        }
+
+        // Aggregate after saving
+        aggregateCandles(stock, candlesToSave);
     }
 
     private void fetchCandlesInRange(PlatformStock stock, String symbol,

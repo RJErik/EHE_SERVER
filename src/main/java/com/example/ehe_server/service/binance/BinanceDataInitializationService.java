@@ -144,6 +144,16 @@ public class BinanceDataInitializationService {
 
             List<PlatformStock> stocks = stockRepository.findByPlatformName(PLATFORM_NAME);
             for (PlatformStock stock : stocks) {
+                String symbol = stock.getStockSymbol();
+
+                // ONLY verify if we're in live mode (not syncing historical data)
+                boolean isSyncing = historicalSyncInProgress.getOrDefault(symbol, false);
+                boolean isLive = activeSubscriptions.getOrDefault(symbol, false);
+
+                if (isSyncing || isLive) {
+                    loggingService.logAction("Skipping historical sync for " + symbol +  " sync already in progress or the websocket is live.");
+                    continue;
+                }
                 candleService.syncHistoricalData(stock.getStockSymbol());
             }
         } catch (Exception e) {
