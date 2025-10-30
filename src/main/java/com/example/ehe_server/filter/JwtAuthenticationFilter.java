@@ -3,6 +3,8 @@ package com.example.ehe_server.filter;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.audit.UserContextService;
+import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
+import com.example.ehe_server.service.intf.auth.JwtTokenGeneratorInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtTokenValidatorInterface;
 import jakarta.servlet.FilterChain;
@@ -27,6 +29,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final LoggingServiceInterface loggingService;
     private final UserRepository userRepository;
     private final UserContextService userContextService;
+    private final CookieServiceInterface cookieService;
+    private final JwtTokenGeneratorInterface jwtTokenGenerator;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -49,11 +53,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             JwtTokenValidatorInterface jwtTokenValidator,
             LoggingServiceInterface loggingService,
             UserRepository userRepository,
-            UserContextService userContextService) {
+            UserContextService userContextService,
+            CookieServiceInterface cookieService,
+            JwtTokenGeneratorInterface jwtTokenGenerator) {
         this.jwtTokenValidator = jwtTokenValidator;
         this.loggingService = loggingService;
         this.userRepository = userRepository;
         this.userContextService = userContextService;
+        this.cookieService = cookieService;
+        this.jwtTokenGenerator = jwtTokenGenerator;
     }
 
     @Override
@@ -111,6 +119,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             if (isSignificantEndpoint(path)) {
                                 loggingService.logAction("Accessed " + path);
                             }
+
+                            cookieService.clearJwtCookie(response);
+                            cookieService.createJwtCookie(jwtTokenGenerator.generateToken(user.getUserId().longValue(), role), response);
                         } else {
                             // User exists but is not active
                             loggingService.logAction("Authentication failed: User account status is " + user.getAccountStatus());
