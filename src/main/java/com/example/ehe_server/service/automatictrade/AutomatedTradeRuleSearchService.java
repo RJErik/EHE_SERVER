@@ -73,35 +73,6 @@ public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearch
             }
         }
 
-        // Start with all active rules for this user
-        List<AutomatedTradeRule> allRules = automatedTradeRuleRepository.findByUser_UserIdAndIsActiveTrue(userId);
-
-        // Create final copies of the filter parameters to use in lambda expressions
-        final Integer finalPortfolioId = portfolioId;
-        final String finalPlatform = platform;
-        final String finalSymbol = symbol;
-        final AutomatedTradeRule.ConditionType finalConditionType = conditionType;
-        final AutomatedTradeRule.ActionType finalActionType = actionType;
-        final AutomatedTradeRule.QuantityType finalQuantityType = quantityType;
-        final BigDecimal finalMinThresholdValue = minThresholdValue;
-        final BigDecimal finalMaxThresholdValue = maxThresholdValue;
-
-        // Apply filters
-        List<AutomatedTradeRule> filteredRules = allRules.stream()
-                .filter(rule -> finalPortfolioId == null || rule.getPortfolio().getPortfolioId().equals(finalPortfolioId))
-                .filter(rule -> finalPlatform == null || finalPlatform.trim().isEmpty() ||
-                        rule.getPlatformStock().getPlatformName().equals(finalPlatform))
-                .filter(rule -> finalSymbol == null || finalSymbol.trim().isEmpty() ||
-                        rule.getPlatformStock().getStockSymbol().equals(finalSymbol))
-                .filter(rule -> finalConditionType == null || rule.getConditionType() == finalConditionType)
-                .filter(rule -> finalActionType == null || rule.getActionType() == finalActionType)
-                .filter(rule -> finalQuantityType == null || rule.getQuantityType() == finalQuantityType)
-                .filter(rule -> finalMinThresholdValue == null ||
-                        rule.getThresholdValue().compareTo(finalMinThresholdValue) >= 0)
-                .filter(rule -> finalMaxThresholdValue == null ||
-                        rule.getThresholdValue().compareTo(finalMaxThresholdValue) <= 0)
-                .toList();
-
         // Log the search parameters
         StringBuilder searchParams = new StringBuilder("Searching automated trade rules with filters: ");
         if (portfolioId != null) searchParams.append("portfolioId=").append(portfolioId).append(", ");
@@ -118,8 +89,20 @@ public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearch
         if (logMessage.endsWith(", ")) {
             logMessage = logMessage.substring(0, logMessage.length() - 2);
         }
-
         loggingService.logAction(logMessage);
+
+        // Execute single database query with all filters
+        List<AutomatedTradeRule> filteredRules = automatedTradeRuleRepository.searchAutomatedTradeRules(
+                userId,
+                portfolioId,
+                (platform != null && !platform.trim().isEmpty()) ? platform : null,
+                (symbol != null && !symbol.trim().isEmpty()) ? symbol : null,
+                conditionType,
+                actionType,
+                quantityType,
+                minThresholdValue,
+                maxThresholdValue
+        );
 
         // Transform to response format
         List<AutomatedTradeRuleSearchResponse> rulesList = filteredRules.stream()

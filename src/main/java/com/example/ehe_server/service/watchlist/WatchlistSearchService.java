@@ -39,44 +39,30 @@ public class WatchlistSearchService implements WatchlistSearchServiceInterface {
     @Override
     public List<WatchlistSearchResponse> searchWatchlistItems(Integer userId, String platform, String symbol) {
         // Get watchlist for the user
-        Optional<Watchlist> watchlistOptional;
-        if (userRepository.existsById(userId)) {
-            watchlistOptional = watchlistRepository.findByUser(userRepository.findById(userId).orElse(null));
-        } else {
-            return null;
+        if (!userRepository.existsById(userId)) {
+            loggingService.logAction("Watchlist search: User not found");
+            return Collections.emptyList();
         }
 
+        Optional<Watchlist> watchlistOptional = watchlistRepository.findByUser(
+                userRepository.findById(userId).orElse(null)
+        );
+
         if (watchlistOptional.isEmpty()) {
-            // No watchlist found, return empty list
             loggingService.logAction("Watchlist search: No watchlist found for user");
             return Collections.emptyList();
         }
 
         Watchlist watchlist = watchlistOptional.get();
-        List<WatchlistItem> watchlistItems;
 
-        // Apply search filters
-        if (platform != null && !platform.trim().isEmpty() && symbol != null && !symbol.trim().isEmpty()) {
-            // Search by both platform and symbol
-            watchlistItems = watchlistItemRepository
-                    .findByWatchlistAndPlatformStock_PlatformNameAndPlatformStock_StockSymbol(
-                            watchlist, platform, symbol);
-            loggingService.logAction("Searching watchlist with platform=" + platform + " and symbol=" + symbol);
-        } else if (platform != null && !platform.trim().isEmpty()) {
-            // Search by platform only
-            watchlistItems = watchlistItemRepository
-                    .findByWatchlistAndPlatformStock_PlatformName(watchlist, platform);
-            loggingService.logAction("Searching watchlist with platform=" + platform);
-        } else if (symbol != null && !symbol.trim().isEmpty()) {
-            // Search by symbol only
-            watchlistItems = watchlistItemRepository
-                    .findByWatchlistAndPlatformStock_StockSymbol(watchlist, symbol);
-            loggingService.logAction("Searching watchlist with symbol=" + symbol);
-        } else {
-            // No filters, get all items
-            watchlistItems = watchlistItemRepository.findByWatchlist(watchlist);
-            loggingService.logAction("Searching watchlist with no filters");
-        }
+        // Single query handles all filter combinations
+        List<WatchlistItem> watchlistItems = watchlistItemRepository.searchWatchlistItems(
+                watchlist,
+                (platform != null && !platform.trim().isEmpty()) ? platform : null,
+                (symbol != null && !symbol.trim().isEmpty()) ? symbol : null
+        );
+
+        loggingService.logAction("Searching watchlist with platform=" + platform + " and symbol=" + symbol);
 
         // Transform to response DTOs
         List<WatchlistSearchResponse> responses = watchlistItems.stream()
@@ -88,7 +74,6 @@ public class WatchlistSearchService implements WatchlistSearchServiceInterface {
                 ))
                 .collect(Collectors.toList());
 
-        // Log success
         loggingService.logAction("Watchlist search successful, found " + responses.size() + " items");
 
         return responses;

@@ -19,6 +19,7 @@ public class AlertSearchService implements AlertSearchServiceInterface {
 
     private final AlertRepository alertRepository;
     private final LoggingServiceInterface loggingService;
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     public AlertSearchService(
             AlertRepository alertRepository,
@@ -39,53 +40,27 @@ public class AlertSearchService implements AlertSearchServiceInterface {
             }
         }
 
-        // Apply search filters
-        List<Alert> alerts;
-        if (platform != null && !platform.trim().isEmpty() &&
-                symbol != null && !symbol.trim().isEmpty() &&
-                conditionType != null) {
-            // Search by platform, symbol and condition type
-            alerts = alertRepository.findByUser_UserIdAndPlatformStock_PlatformNameAndPlatformStock_StockSymbolAndConditionTypeAndActiveTrue(
-                    userId, platform, symbol, conditionType);
-            loggingService.logAction("Searching alerts with platform=" + platform + ", symbol=" + symbol + ", conditionType=" + conditionType);
-        } else if (platform != null && !platform.trim().isEmpty() &&
-                symbol != null && !symbol.trim().isEmpty()) {
-            // Search by platform and symbol
-            alerts = alertRepository.findByUser_UserIdAndPlatformStock_PlatformNameAndPlatformStock_StockSymbolAndActiveTrue(
-                    userId, platform, symbol);
-            loggingService.logAction("Searching alerts with platform=" + platform + " and symbol=" + symbol);
-        } else if (platform != null && !platform.trim().isEmpty() &&
-                conditionType != null) {
-            // Search by platform and condition type
-            alerts = alertRepository.findByUser_UserIdAndPlatformStock_PlatformNameAndConditionTypeAndActiveTrue(
-                    userId, platform, conditionType);
-            loggingService.logAction("Searching alerts with platform=" + platform + " and conditionType=" + conditionType);
-        } else if (symbol != null && !symbol.trim().isEmpty() &&
-                conditionType != null) {
-            // Search by symbol and condition type
-            alerts = alertRepository.findByUser_UserIdAndPlatformStock_StockSymbolAndConditionTypeAndActiveTrue(
-                    userId, symbol, conditionType);
-            loggingService.logAction("Searching alerts with symbol=" + symbol + " and conditionType=" + conditionType);
-        } else if (platform != null && !platform.trim().isEmpty()) {
-            // Search by platform only
-            alerts = alertRepository.findByUser_UserIdAndPlatformStock_PlatformNameAndActiveTrue(userId, platform);
-            loggingService.logAction("Searching alerts with platform=" + platform);
-        } else if (symbol != null && !symbol.trim().isEmpty()) {
-            // Search by symbol only
-            alerts = alertRepository.findByUser_UserIdAndPlatformStock_StockSymbolAndActiveTrue(userId, symbol);
-            loggingService.logAction("Searching alerts with symbol=" + symbol);
-        } else if (conditionType != null) {
-            // Search by condition type only
-            alerts = alertRepository.findByUser_UserIdAndConditionTypeAndActiveTrue(userId, conditionType);
-            loggingService.logAction("Searching alerts with conditionType=" + conditionType);
-        } else {
-            // No filters, get all active alerts for the user
-            alerts = alertRepository.findByUser_UserIdAndActiveTrue(userId);
-            loggingService.logAction("Searching alerts with no filters");
-        }
+        // Log search parameters
+        StringBuilder searchParams = new StringBuilder("Searching alerts with filters: ");
+        if (platform != null && !platform.trim().isEmpty()) searchParams.append("platform=").append(platform).append(", ");
+        if (symbol != null && !symbol.trim().isEmpty()) searchParams.append("symbol=").append(symbol).append(", ");
+        if (conditionType != null) searchParams.append("conditionType=").append(conditionType).append(", ");
 
-        // Transform to AlertDto using the AlertMapper
-        // Transform to AlertSearchResponse using an inline lambda
+        String logMessage = searchParams.toString();
+        if (logMessage.endsWith(", ")) {
+            logMessage = logMessage.substring(0, logMessage.length() - 2);
+        }
+        loggingService.logAction(logMessage);
+
+        // Execute single database query with all filters
+        List<Alert> alerts = alertRepository.searchAlerts(
+                userId,
+                (platform != null && !platform.trim().isEmpty()) ? platform : null,
+                (symbol != null && !symbol.trim().isEmpty()) ? symbol : null,
+                conditionType
+        );
+
+        // Transform to AlertSearchResponse
         List<AlertSearchResponse> alertSearchResponses = alerts.stream()
                 .map(alert -> {
                     AlertSearchResponse alertSearchResponse = new AlertSearchResponse();
@@ -94,7 +69,7 @@ public class AlertSearchService implements AlertSearchServiceInterface {
                     alertSearchResponse.setSymbol(alert.getPlatformStock().getStockSymbol());
                     alertSearchResponse.setConditionType(alert.getConditionType().name());
                     alertSearchResponse.setThresholdValue(alert.getThresholdValue());
-                    alertSearchResponse.setDateCreated(alert.getDateCreated().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                    alertSearchResponse.setDateCreated(alert.getDateCreated().format(DATE_FORMATTER));
                     alertSearchResponse.setActive(alert.isActive());
                     return alertSearchResponse;
                 })
@@ -103,7 +78,6 @@ public class AlertSearchService implements AlertSearchServiceInterface {
         // Log success
         loggingService.logAction("Alert search successful, found " + alertSearchResponses.size() + " alerts");
 
-        // Return the list of DTOs directly
         return alertSearchResponses;
     }
 }

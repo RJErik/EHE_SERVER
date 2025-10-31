@@ -4,7 +4,6 @@ import com.example.ehe_server.dto.PortfolioSearchResponse;
 import com.example.ehe_server.dto.PortfolioValueResponse;
 import com.example.ehe_server.entity.Portfolio;
 import com.example.ehe_server.entity.Portfolio.PortfolioType;
-import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.PortfolioRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
@@ -43,24 +42,26 @@ public class PortfolioSearchService implements PortfolioSearchServiceInterface {
     public List<PortfolioSearchResponse> searchPortfolios(Integer userId, PortfolioType type, String platform,
                                                           BigDecimal minValue, BigDecimal maxValue) {
 
-        // Get all user's portfolios
-        User user;
-        List<Portfolio> allPortfolios;
-        if (userRepository.existsById(userId)) {
-            user = userRepository.findById(userId).get();
-            allPortfolios = portfolioRepository.findByUser(user);
-        } else {
-            return null;
+        // Validate user exists
+        if (!userRepository.existsById(userId)) {
+            loggingService.logAction("Portfolio search: User not found");
+            return Collections.emptyList();
         }
 
-        // Filter, calculate value, and map to DTOs in a single stream pipeline
-        List<PortfolioSearchResponse> portfoliosList = allPortfolios.stream()
-                .filter(p -> type == null || p.getPortfolioType() == type)
-                .filter(p -> platform == null || (p.getApiKey() != null && p.getApiKey().getPlatformName().equals(platform)))
+        // Get filtered portfolios using single query
+        List<Portfolio> portfolios = portfolioRepository.searchPortfolios(
+                userId,
+                type,
+                (platform != null && !platform.trim().isEmpty()) ? platform : null
+        );
+
+        // Calculate values and filter by value range
+        List<PortfolioSearchResponse> portfoliosList = portfolios.stream()
                 .map(portfolio -> {
-                    // Assuming a refactored portfolioValueService returns a DTO or BigDecimal directly
-                    // For now, we'll extract from the map, but this is a nested code smell
-                    PortfolioValueResponse valueResult = portfolioValueService.calculatePortfolioValue(userId, portfolio.getPortfolioId());
+                    PortfolioValueResponse valueResult = portfolioValueService.calculatePortfolioValue(
+                            userId,
+                            portfolio.getPortfolioId()
+                    );
                     BigDecimal value = valueResult.getTotalValue();
 
                     return new PortfolioSearchResponse(
