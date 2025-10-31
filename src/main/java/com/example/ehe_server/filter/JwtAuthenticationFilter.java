@@ -32,8 +32,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CookieServiceInterface cookieService;
     private final JwtTokenGeneratorInterface jwtTokenGenerator;
 
-    @Value("${app.frontend.url}")
-    private String frontendUrl;
+    @Value("${jwt.refresh.url}")
+    private String REFRESH_URL;
 
     // Be more specific about protected paths - exact matching for endpoints
     private static final List<String> PROTECTED_PATHS = List.of(
@@ -82,11 +82,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Extract JWT token from cookie
+        // **NEW: Special handling for refresh endpoint**
+        if (path.equals(REFRESH_URL)) {
+            handleRefreshEndpoint(request, response, filterChain);
+            return;
+        }
+
+        // Extract JWT access token from cookie
         String token = null;
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
-                if ("jwt_token".equals(cookie.getName())) {
+                if ("jwt_access_token".equals(cookie.getName())) {
                     token = cookie.getValue();
                     break;
                 }
@@ -120,8 +126,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 loggingService.logAction("Accessed " + path);
                             }
 
-                            cookieService.clearJwtCookie(response);
-                            cookieService.createJwtCookie(jwtTokenGenerator.generateToken(user.getUserId().longValue(), role), response);
+                            cookieService.clearJwtCookies(response);
+                            cookieService.addJwtAccessCookie(jwtTokenGenerator.generateAccessToken(user.getUserId().longValue(), role), response);
                         } else {
                             // User exists but is not active
                             loggingService.logAction("Authentication failed: User account status is " + user.getAccountStatus());
@@ -156,16 +162,79 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .anyMatch(path::startsWith);
         }
 
-        // If protected path and not authenticated, redirect to login
+        // If protected path and not authenticated, return 401
         if (needsAuthentication && !isAuthenticated) {
-            loggingService.logAction("Redirecting unauthenticated user from " + path + " to login page");
-            response.setStatus(HttpServletResponse.SC_FOUND); // 302 Found
-            response.setHeader("Location", frontendUrl);
+            loggingService.logAction("Unauthorized access attempt to " + path);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\": \"unauthorized\", \"message\": \"Invalid or expired access token\"}");
             return;
         }
 
         // Continue with filter chain
         filterChain.doFilter(request, response);
+    }
+
+    // **NEW: Add this method to handle refresh endpoint**
+    private void handleRefreshEndpoint(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+
+        // Extract refresh token from cookie
+        String refreshToken = null;
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("jwt_refresh_token".equals(cookie.getName())) {
+                    refreshToken = cookie.getValue();
+                    break;
+                }
+            }
+        }
+
+        try {
+            // Validate the refresh token
+            if (refreshToken != null && jwtTokenValidator.validateToken(refreshToken)) {
+                Long userId = jwtTokenValidator.getUserIdFromToken(refreshToken);
+                String role = jwtTokenValidator.getRoleFromToken(refreshToken);
+
+                // Check if both userId and role are valid
+                if (userId != null && role != null && !role.trim().isEmpty()) {
+
+                    // Check if user exists and is active in the database
+                    Optional<User> userOpt = userRepository.findById(userId.intValue());
+
+                    if (userOpt.isPresent()) {
+                        User user = userOpt.get();
+
+                        // Check if account is active
+                        if (user.getAccountStatus() == User.AccountStatus.ACTIVE) {
+                            // Set user context
+                            userContextService.setUser(String.valueOf(user.getUserId()), role);
+
+                            loggingService.logAction("Valid refresh token for user " + userId);
+
+                            // Allow the request to proceed to the refresh controller
+                            filterChain.doFilter(request, response);
+                            return;
+                        } else {
+                            loggingService.logAction("Refresh failed: User account status is " + user.getAccountStatus());
+                        }
+                    } else {
+                        loggingService.logAction("Refresh failed: User not found in database");
+                    }
+                } else {
+                    loggingService.logAction("Refresh failed: Invalid userId or role in refresh token");
+                }
+            } else {
+                loggingService.logAction("Refresh failed: Invalid or missing refresh token");
+            }
+        } catch (Exception e) {
+            loggingService.logError("Exception during refresh token validation: " + e.getMessage(), e);
+        }
+
+        // If we reach here, refresh token validation failed - return 401
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"error\": \"unauthorized\", \"message\": \"Invalid or expired refresh token\"}");
     }
 
     // Helper method to determine if this is an endpoint we want to log access for

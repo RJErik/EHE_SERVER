@@ -50,7 +50,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
             // If not found in header, try to get from session attributes (from handshake)
             if (token == null && accessor.getSessionAttributes() != null) {
-                token = (String) accessor.getSessionAttributes().get("jwt_token");
+                token = (String) accessor.getSessionAttributes().get("jwt_access_token");
             }
 
             // Step 1: Validate the token's structure and signature

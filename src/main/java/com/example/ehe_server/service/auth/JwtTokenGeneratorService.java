@@ -14,17 +14,34 @@ public class JwtTokenGeneratorService implements JwtTokenGeneratorInterface {
 
     private final RSAPrivateKey privateKey;
 
-    @Value("${jwt.expiration.time}")
-    private long jwtExpirationTime;
+    @Value("${jwt.access.expiration.time}")
+    private long jwtAccessExpirationTime;
+
+    @Value("${jwt.refresh.expiration.time}")
+    private long jwtRefreshExpirationTime;
 
     public JwtTokenGeneratorService(RSAPrivateKey privateKey) {
         this.privateKey = privateKey;
     }
 
     @Override
-    public String generateToken(Long userId, String role) {
+    public String generateAccessToken(Long userId, String role) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationTime);
+        Date expiryDate = new Date(now.getTime() + jwtAccessExpirationTime);
+
+        return Jwts.builder()
+                .claim("user_id", userId)
+                .claim("role", role)
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(privateKey, SignatureAlgorithm.RS256)
+                .compact();
+    }
+
+    @Override
+    public String generateRefreshToken(Long userId, String role) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtRefreshExpirationTime);
 
         return Jwts.builder()
                 .claim("user_id", userId)

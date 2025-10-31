@@ -37,6 +37,6 @@ public class UserLogoutService implements UserLogoutServiceInterface {
         }
 
         // Clear JWT cookie regardless of user status
-        cookieService.clearJwtCookie(response);
+        cookieService.clearJwtCookies(response);
     }
 }

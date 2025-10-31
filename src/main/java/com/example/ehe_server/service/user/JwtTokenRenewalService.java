@@ -53,10 +53,10 @@ public class JwtTokenRenewalService implements JwtTokenRenewalServiceInterface {
         userContextService.setUser(String.valueOf(user.getUserId()), role);
 
         // Generate a new token
-        String newToken = jwtTokenGenerator.generateToken(userId, role);
+        String newToken = jwtTokenGenerator.generateAccessToken(userId, role);
 
         // Set the token as a cookie
-        cookieService.createJwtCookie(newToken, response);
+        cookieService.addJwtAccessCookie(newToken, response);
 
         // Log the successful token renewal
         loggingService.logAction("JWT token renewed successfully");
