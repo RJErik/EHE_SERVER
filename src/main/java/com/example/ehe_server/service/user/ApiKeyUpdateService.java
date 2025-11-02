@@ -64,12 +64,12 @@ public class ApiKeyUpdateService implements ApiKeyUpdateServiceInterface {
 
         // Only update API key value if provided
         if (apiKeyValue != null && !apiKeyValue.isEmpty()) {
-            apiKey.setApiKeyValueEncrypt(apiKeyValue);
+            apiKey.setApiKeyValue(apiKeyValue);
         }
 
         // Only update secret key if provided
         if (secretKey != null && !secretKey.isEmpty()) {
-            apiKey.setSecretKeyEncrypt(secretKey);
+            apiKey.setSecretKey(secretKey);
         }
 
         apiKeyRepository.save(apiKey);
@@ -82,12 +82,12 @@ public class ApiKeyUpdateService implements ApiKeyUpdateServiceInterface {
         response.setPlatformName(apiKey.getPlatformName());
 
         // Mask the API key value
-        String apiKeyValueFromDb = apiKey.getApiKeyValueEncrypt();
+        String apiKeyValueFromDb = apiKey.getApiKeyValue();
         response.setMaskedApiKeyValue(maskApiKeyValue(apiKeyValueFromDb));
 
         // Mask the secret key value if it exists
-        if (apiKey.getSecretKeyEncrypt() != null && !apiKey.getSecretKeyEncrypt().isEmpty()) {
-            String secretKeyValue = apiKey.getSecretKeyEncrypt();
+        if (apiKey.getSecretKey() != null && !apiKey.getSecretKey().isEmpty()) {
+            String secretKeyValue = apiKey.getSecretKey();
             response.setMaskedSecretKey(maskApiKeyValue(secretKeyValue));
         }
 

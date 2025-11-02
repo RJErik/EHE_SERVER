@@ -158,8 +158,8 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
         System.out.println("Using API key ID: " + apiKey.getApiKeyId() + " for platform: " + apiKey.getPlatformName());
 
         // Get credentials for Binance API
-        String encryptedApiKey = apiKey.getApiKeyValueEncrypt();
-        String encryptedSecretKey = apiKey.getSecretKeyEncrypt();
+        String encryptedApiKey = apiKey.getApiKeyValue();
+        String encryptedSecretKey = apiKey.getSecretKey();
 
         // In a real application, you would need to decrypt these values
         // For this example, we'll assume they're not encrypted

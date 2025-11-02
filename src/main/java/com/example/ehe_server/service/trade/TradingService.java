@@ -8,11 +8,9 @@ import com.example.ehe_server.entity.Transaction;
 import com.example.ehe_server.exception.custom.ApiKeyMissingException;
 import com.example.ehe_server.exception.custom.InvalidQuantityTypeException;
 import com.example.ehe_server.exception.custom.PortfolioNotFoundException;
-import com.example.ehe_server.exception.custom.TradeExecutionException;
 import com.example.ehe_server.repository.PortfolioRepository;
 import com.example.ehe_server.repository.PlatformStockRepository;
 import com.example.ehe_server.repository.TransactionRepository;
-import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.binance.BinanceAccountService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.trade.TradingServiceInterface;
@@ -22,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -74,8 +71,8 @@ public class TradingService implements TradingServiceInterface {
         }
 
         // Get credentials for Binance API
-        String encryptedApiKey = apiKey.getApiKeyValueEncrypt();
-        String encryptedSecretKey = apiKey.getSecretKeyEncrypt();
+        String encryptedApiKey = apiKey.getApiKeyValue();
+        String encryptedSecretKey = apiKey.getSecretKey();
 
         // In a real application, you would need to decrypt these values
         String apiKeyValue = encryptedApiKey;

@@ -49,12 +49,12 @@ public class ApiKeyRetrievalService implements ApiKeyRetrievalServiceInterface {
                     dto.setPlatformName(apiKey.getPlatformName());
 
                     // Mask the API key value
-                    String apiKeyValue = apiKey.getApiKeyValueEncrypt();
+                    String apiKeyValue = apiKey.getApiKeyValue();
                     dto.setMaskedApiKeyValue(maskApiKeyValue(apiKeyValue));
 
                     // Mask the secret key value if it exists
-                    if (apiKey.getSecretKeyEncrypt() != null && !apiKey.getSecretKeyEncrypt().isEmpty()) {
-                        String secretKeyValue = apiKey.getSecretKeyEncrypt();
+                    if (apiKey.getSecretKey() != null && !apiKey.getSecretKey().isEmpty()) {
+                        String secretKeyValue = apiKey.getSecretKey();
                         dto.setMaskedSecretKey(maskApiKeyValue(secretKeyValue));
                     }
 

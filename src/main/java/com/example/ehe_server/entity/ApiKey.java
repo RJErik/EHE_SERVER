@@ -19,11 +19,11 @@ public class ApiKey {
     @Column(name = "platform_name", nullable = false, length = 100)
     private String platformName;
 
-    @Column(name = "api_key_value_encrypt", nullable = false)
-    private String apiKeyValueEncrypt;
+    @Column(name = "api_key_value", nullable = false)
+    private String apiKeyValue;
 
-    @Column(name = "secret_key_encrypt")
-    private String secretKeyEncrypt;
+    @Column(name = "secret_key")
+    private String secretKey;
 
     @Column(name = "date_added", nullable = false,
             updatable = false, insertable = false,
@@ -55,20 +55,20 @@ public class ApiKey {
         this.platformName = platformName;
     }
 
-    public String getApiKeyValueEncrypt() {
-        return apiKeyValueEncrypt;
+    public String getApiKeyValue() {
+        return apiKeyValue;
     }
 
-    public void setApiKeyValueEncrypt(String apiKeyValueEncrypt) {
-        this.apiKeyValueEncrypt = apiKeyValueEncrypt;
+    public void setApiKeyValue(String apiKeyValueEncrypt) {
+        this.apiKeyValue = apiKeyValueEncrypt;
     }
 
-    public String getSecretKeyEncrypt() {
-        return secretKeyEncrypt;
+    public String getSecretKey() {
+        return secretKey;
     }
 
-    public void setSecretKeyEncrypt(String secretKeyEncrypt) {
-        this.secretKeyEncrypt = secretKeyEncrypt;
+    public void setSecretKey(String secretKeyEncrypt) {
+        this.secretKey = secretKeyEncrypt;
     }
 
     public LocalDateTime getDateAdded() {

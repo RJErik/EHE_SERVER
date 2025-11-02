@@ -53,8 +53,8 @@ public class ApiKeyCreationService implements ApiKeyCreationServiceInterface {
         ApiKey apiKey = new ApiKey();
         apiKey.setUser(user);
         apiKey.setPlatformName(platformName);
-        apiKey.setApiKeyValueEncrypt(apiKeyValue); // Not encrypting for now as specified
-        apiKey.setSecretKeyEncrypt(secretKey); // Add the secret key
+        apiKey.setApiKeyValue(apiKeyValue); // Not encrypting for now as specified
+        apiKey.setSecretKey(secretKey); // Add the secret key
 
         apiKeyRepository.save(apiKey);
 
