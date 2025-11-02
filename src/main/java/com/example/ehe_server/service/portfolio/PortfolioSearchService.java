@@ -3,7 +3,6 @@ package com.example.ehe_server.service.portfolio;
 import com.example.ehe_server.dto.PortfolioSearchResponse;
 import com.example.ehe_server.dto.PortfolioValueResponse;
 import com.example.ehe_server.entity.Portfolio;
-import com.example.ehe_server.entity.Portfolio.PortfolioType;
 import com.example.ehe_server.repository.PortfolioRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
@@ -39,7 +38,7 @@ public class PortfolioSearchService implements PortfolioSearchServiceInterface {
     }
 
     @Override
-    public List<PortfolioSearchResponse> searchPortfolios(Integer userId, PortfolioType type, String platform,
+    public List<PortfolioSearchResponse> searchPortfolios(Integer userId, String platform,
                                                           BigDecimal minValue, BigDecimal maxValue) {
 
         // Validate user exists
@@ -51,7 +50,6 @@ public class PortfolioSearchService implements PortfolioSearchServiceInterface {
         // Get filtered portfolios using single query
         List<Portfolio> portfolios = portfolioRepository.searchPortfolios(
                 userId,
-                type,
                 (platform != null && !platform.trim().isEmpty()) ? platform : null
         );
 
@@ -68,7 +66,6 @@ public class PortfolioSearchService implements PortfolioSearchServiceInterface {
                             portfolio.getPortfolioId(),
                             portfolio.getPortfolioName(),
                             portfolio.getApiKey() != null ? portfolio.getApiKey().getPlatformName() : null,
-                            portfolio.getPortfolioType().toString(),
                             portfolio.getCreationDate().format(DATE_FORMATTER),
                             value
                     );
@@ -78,8 +75,7 @@ public class PortfolioSearchService implements PortfolioSearchServiceInterface {
                 .collect(Collectors.toList());
 
         // Log success
-        loggingService.logAction("Searched portfolios with criteria - type: " + type +
-                ", platform: " + platform +
+        loggingService.logAction("Searched portfolios with criteria - platform: " + platform +
                 ", minValue: " + minValue +
                 ", maxValue: " + maxValue +
                 ". Found " + portfoliosList.size() + " results.");

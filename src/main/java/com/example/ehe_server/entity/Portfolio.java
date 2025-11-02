@@ -9,10 +9,6 @@ import java.time.LocalDateTime;
 @Table(name = "portfolio")
 public class Portfolio {
 
-    public enum PortfolioType {
-        Real, Simulated
-    }
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "portfolio_id")
@@ -30,10 +26,6 @@ public class Portfolio {
     @NotBlank
     @Column(name = "portfolio_name", nullable = false, length = 100)
     private String portfolioName;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "portfolio_type", nullable = false, length = 50)
-    private PortfolioType portfolioType;
 
     @Column(name = "reserved_cash", precision = 18, scale = 8)
     private BigDecimal reservedCash;
@@ -73,14 +65,6 @@ public class Portfolio {
 
     public void setPortfolioName(String portfolioName) {
         this.portfolioName = portfolioName;
-    }
-
-    public PortfolioType getPortfolioType() {
-        return portfolioType;
-    }
-
-    public void setPortfolioType(PortfolioType portfolioType) {
-        this.portfolioType = portfolioType;
     }
 
     public BigDecimal getReservedCash() {

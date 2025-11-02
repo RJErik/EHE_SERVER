@@ -61,7 +61,6 @@ public class PortfolioCreationService implements PortfolioCreationServiceInterfa
         portfolio.setUser(userContextService.getCurrentHumanUser());
         portfolio.setApiKey(apiKey);
         portfolio.setPortfolioName(portfolioName);
-        portfolio.setPortfolioType(Portfolio.PortfolioType.Real);
         portfolio.setCreationDate(LocalDateTime.now());
 
         // Save the portfolio
@@ -85,7 +84,6 @@ public class PortfolioCreationService implements PortfolioCreationServiceInterfa
                 savedPortfolio.getPortfolioId(),
                 savedPortfolio.getPortfolioName(),
                 apiKey.getPlatformName(),
-                savedPortfolio.getPortfolioType().toString(),
                 savedPortfolio.getCreationDate().format(DATE_FORMATTER),
                 totalValue
         );

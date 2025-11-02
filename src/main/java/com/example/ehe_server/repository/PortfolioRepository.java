@@ -1,7 +1,6 @@
 package com.example.ehe_server.repository;
 
 import com.example.ehe_server.entity.Portfolio;
-import com.example.ehe_server.entity.Portfolio.PortfolioType;
 import com.example.ehe_server.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -18,11 +17,9 @@ public interface PortfolioRepository extends JpaRepository<Portfolio, Integer> {
 
     @Query("SELECT p FROM Portfolio p WHERE " +
             "p.user.userId = :userId AND " +
-            "(:type IS NULL OR p.portfolioType = :type) AND " +
             "(:platform IS NULL OR p.apiKey.platformName = :platform)")
     List<Portfolio> searchPortfolios(
             @Param("userId") Integer userId,
-            @Param("type") PortfolioType type,
             @Param("platform") String platform
     );
 }
