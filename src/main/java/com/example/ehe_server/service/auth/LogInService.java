@@ -1,6 +1,5 @@
 package com.example.ehe_server.service.auth;
 
-import com.example.ehe_server.dto.LoginRequest;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.exception.custom.*;
 import com.example.ehe_server.repository.AdminRepository;
@@ -48,33 +47,33 @@ public class LogInService implements LogInServiceInterface {
     }
 
     @Override
-    public void authenticateUser(LoginRequest request, HttpServletResponse response) {
+    public void authenticateUser(String email, String password, HttpServletResponse response) {
         // Validate both fields are provided
-        if ((request.getEmail() == null || request.getEmail().trim().isEmpty()) &&
-                (request.getPassword() == null || request.getPassword().trim().isEmpty())) {
+        if ((email == null || email.trim().isEmpty()) &&
+                (password == null || password.trim().isEmpty())) {
             throw new MissingLoginCredentialsException();
         }
 
         // Validate email is provided
-        if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
+        if (email == null || email.trim().isEmpty()) {
             throw new MissingEmailException();
         }
 
         // Validate password is provided
-        if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+        if (password == null || password.trim().isEmpty()) {
             throw new MissingPasswordException();
         }
 
         // Validate email format
-        if (!EMAIL_PATTERN.matcher(request.getEmail()).matches()) {
-            throw new InvalidEmailFormatException(request.getEmail());
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
+            throw new InvalidEmailFormatException(email);
         }
 
         // Find user by email hash
-        Optional<User> userOpt = userRepository.findByEmail(request.getEmail());
+        Optional<User> userOpt = userRepository.findByEmail(email);
 
         if (userOpt.isEmpty()) {
-            throw new InvalidEmailFormatException(request.getEmail()).withActionLink("registering.", "register");
+            throw new InvalidEmailFormatException(email).withActionLink("registering.", "register");
         }
 
         User user = userOpt.get();
@@ -82,16 +81,16 @@ public class LogInService implements LogInServiceInterface {
         // Check account status
 
         if (user.getAccountStatus() == User.AccountStatus.NONVERIFIED) {
-            throw new NonVerifiedAccountException(request.getEmail(), user.getAccountStatus().toString()).withResendButton();
+            throw new NonVerifiedAccountException(email, user.getAccountStatus().toString()).withResendButton();
         }
 
         if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-            throw new InactiveAccountException(request.getEmail(), user.getAccountStatus().toString());
+            throw new InactiveAccountException(email, user.getAccountStatus().toString());
         }
 
         // Verify password
-        if (!BCrypt.checkpw(request.getPassword(), user.getPasswordHash())) {
-            throw new InvalidCredentialsException(request.getEmail());
+        if (!BCrypt.checkpw(password, user.getPasswordHash())) {
+            throw new InvalidCredentialsException(email);
         }
 
         // Check if user is an admin

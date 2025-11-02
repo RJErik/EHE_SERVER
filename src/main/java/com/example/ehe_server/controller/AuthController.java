@@ -71,7 +71,7 @@ public class AuthController {
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request,
                                                      HttpServletResponse response) {
         // Call alert retrieval service
-        logInService.authenticateUser(request, response);
+        logInService.authenticateUser(request.getEmail(), request.getPassword(), response);
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -95,10 +95,9 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegistrationRequest request,
-                                                        HttpServletResponse response) {
+    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegistrationRequest request) {
         // Call alert retrieval service
-        registrationService.registerUser(request, response);
+        registrationService.registerUser(request.getUsername(), request.getEmail(), request.getPassword());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(

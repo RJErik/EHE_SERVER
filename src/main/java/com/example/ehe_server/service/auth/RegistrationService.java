@@ -1,6 +1,5 @@
 package com.example.ehe_server.service.auth;
 
-import com.example.ehe_server.dto.RegistrationRequest;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
 import com.example.ehe_server.exception.custom.*;
@@ -11,7 +10,6 @@ import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.RegistrationServiceInterface;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.security.crypto.bcrypt.BCrypt;
@@ -59,38 +57,37 @@ public class RegistrationService implements RegistrationServiceInterface {
 
     @Override
     @Transactional
-    public void registerUser(RegistrationRequest request, HttpServletResponse response) {
+    public void registerUser(String username, String email, String password) {
         // Validation logic remains the same...
         // Validate input fields
-        if (request.getUsername() == null || request.getEmail() == null || request.getPassword() == null ||
-                request.getUsername().isBlank() || request.getEmail().isBlank() || request.getPassword().isBlank()) { // Added isBlank checks
+        if (username == null || email == null || password == null ||
+                username.trim().isEmpty() || email.trim().isEmpty() || password.trim().isEmpty()) {
             throw new MissingRegistrationFieldsException();
         }
         // Validate username format
-        if (!USERNAME_PATTERN.matcher(request.getUsername()).matches()) {
-            throw new InvalidUsernameFormatException(request.getUsername());
+        if (!USERNAME_PATTERN.matcher(username).matches()) {
+            throw new InvalidUsernameFormatException(username);
         }
         // Validate email format
-        if (!EMAIL_PATTERN.matcher(request.getEmail()).matches()) {
-            throw new InvalidEmailFormatException(request.getEmail());
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
+            throw new InvalidEmailFormatException(email);
         }
         // Validate password strength
-        if (!PASSWORD_PATTERN.matcher(request.getPassword()).matches()) {
+        if (!PASSWORD_PATTERN.matcher(password).matches()) {
             throw new InvalidPasswordFormatException();
         }
 
 
         // Check if email already exists
-        String email = request.getEmail();
         if (userRepository.findByEmail(email).isPresent()) {
             throw new EmailAlreadyRegisteredException(email).withActionLink("log in.", "login");
         }
 
         // Create new user entity
         User newUser = new User();
-        newUser.setUserName(request.getUsername());
+        newUser.setUserName(username);
         newUser.setEmail(email);
-        newUser.setPasswordHash(BCrypt.hashpw(request.getPassword(), BCrypt.gensalt()));
+        newUser.setPasswordHash(BCrypt.hashpw(password, BCrypt.gensalt()));
         newUser.setAccountStatus(User.AccountStatus.NONVERIFIED); // <<<--- SET STATUS TO NONVERIFIED
         newUser.setRegistrationDate(LocalDateTime.now());
 
@@ -126,15 +123,15 @@ public class RegistrationService implements RegistrationServiceInterface {
 
         try {
             // Call the *synchronous* version of the email sending method
-            emailService.sendVerificationEmail(savedUser, token, request.getEmail());
+            emailService.sendVerificationEmail(savedUser, token, email);
 
             // If email sending was successful (no exception thrown), set the success response for the controller
-            loggingService.logAction("Sent verification email to " + request.getEmail());
+            loggingService.logAction("Sent verification email to " + email);
 
         } catch (MailException e) {
             // Set the response to indicate failure *because* the email couldn't be sent
-            loggingService.logError("Failed to send verification email to " + request.getEmail(), e);
-            throw new EmailSendFailureException(request.getEmail(), e.getMessage()).withResendButton();
+            loggingService.logError("Failed to send verification email to " + email, e);
+            throw new EmailSendFailureException(email, e.getMessage()).withResendButton();
 
             // IMPORTANT: Throw a runtime exception to trigger Transaction rollback.
             // The user record created above should be rolled back if we can't send the email.
