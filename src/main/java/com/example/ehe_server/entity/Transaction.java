@@ -39,10 +39,6 @@ public class Transaction {
     @Column(name = "price", nullable = false, precision = 18, scale = 8)
     private BigDecimal price;
 
-    @ManyToOne
-    @JoinColumn(name = "api_key_id", nullable = false)
-    private ApiKey apiKey;
-
     @Column(name = "transaction_date", nullable = false, updatable = false,
             columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private LocalDateTime transactionDate;
@@ -98,14 +94,6 @@ public class Transaction {
 
     public void setPrice(BigDecimal price) {
         this.price = price;
-    }
-
-    public ApiKey getApiKey() {
-        return apiKey;
-    }
-
-    public void setApiKey(ApiKey apiKey) {
-        this.apiKey = apiKey;
     }
 
     public LocalDateTime getTransactionDate() {

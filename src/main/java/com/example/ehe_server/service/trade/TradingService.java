@@ -130,7 +130,6 @@ public class TradingService implements TradingServiceInterface {
                     Transaction.TransactionType.Buy : Transaction.TransactionType.Sell);
             transaction.setQuantity(executedQty);
             transaction.setPrice(averagePrice);
-            transaction.setApiKey(apiKey);
             transaction.setTransactionDate(LocalDateTime.now());
 
             // Set status based on order result
@@ -171,7 +170,6 @@ public class TradingService implements TradingServiceInterface {
                     Transaction.TransactionType.Buy : Transaction.TransactionType.Sell);
             transaction.setQuantity(quantity != null ? quantity : BigDecimal.ZERO);
             transaction.setPrice(BigDecimal.ZERO);
-            transaction.setApiKey(apiKey);
             transaction.setTransactionDate(LocalDateTime.now());
             transaction.setStatus(Transaction.Status.Failed);
 
