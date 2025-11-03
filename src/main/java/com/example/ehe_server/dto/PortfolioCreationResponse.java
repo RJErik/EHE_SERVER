@@ -13,7 +13,7 @@ public class PortfolioCreationResponse {
 
     public PortfolioCreationResponse() {}
 
-    public PortfolioCreationResponse(Integer id, String name, String platform, String type, String creationDate, BigDecimal value) {
+    public PortfolioCreationResponse(Integer id, String name, String platform, String creationDate, BigDecimal value) {
         this.id = id;
         this.name = name;
         this.platform = platform;

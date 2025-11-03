@@ -14,7 +14,7 @@ public class PortfolioRetrievalResponse {
 
     public PortfolioRetrievalResponse() {}
 
-    public PortfolioRetrievalResponse(Integer id, String name, String platform, String type, String creationDate, BigDecimal value) {
+    public PortfolioRetrievalResponse(Integer id, String name, String platform, String creationDate, BigDecimal value) {
         this.id = id;
         this.name = name;
         this.platform = platform;

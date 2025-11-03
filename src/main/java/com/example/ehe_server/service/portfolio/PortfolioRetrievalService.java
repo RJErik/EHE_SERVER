@@ -62,7 +62,6 @@ public class PortfolioRetrievalService implements PortfolioRetrievalServiceInter
             portfolioMap.put("id", portfolio.getPortfolioId());
             portfolioMap.put("name", portfolio.getPortfolioName());
             portfolioMap.put("platform", portfolio.getApiKey().getPlatformName());
-            portfolioMap.put("type", portfolio.getPortfolioType().toString());
             portfolioMap.put("creationDate", portfolio.getCreationDate().format(DATE_FORMATTER));
             portfolioMap.put("value", totalValue);
 
@@ -85,7 +84,6 @@ public class PortfolioRetrievalService implements PortfolioRetrievalServiceInter
                             portfolio.getPortfolioId(),
                             portfolio.getPortfolioName(),
                             portfolio.getApiKey().getPlatformName(),
-                            portfolio.getPortfolioType().toString(),
                             portfolio.getCreationDate().format(DATE_FORMATTER),
                             totalValue
                     );
