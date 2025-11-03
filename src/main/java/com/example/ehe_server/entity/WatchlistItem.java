@@ -13,8 +13,8 @@ public class WatchlistItem {
     private Integer watchlistItemId;
 
     @ManyToOne
-    @JoinColumn(name = "watchlist_id", nullable = false)
-    private Watchlist watchlist;
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @ManyToOne
     @JoinColumn(name = "platform_stock_id", nullable = false)
@@ -33,12 +33,12 @@ public class WatchlistItem {
         this.watchlistItemId = watchlistItemId;
     }
 
-    public Watchlist getWatchlist() {
-        return watchlist;
+    public User getUser() {
+        return user;
     }
 
-    public void setWatchlist(Watchlist watchlist) {
-        this.watchlist = watchlist;
+    public void setUser(User user) {
+        this.user = user;
     }
 
     public PlatformStock getPlatformStock() {

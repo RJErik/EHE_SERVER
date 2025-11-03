@@ -36,7 +36,7 @@ public class WatchlistRemovalService implements WatchlistRemovalServiceInterface
         WatchlistItem watchlistItem = watchlistItemOptional.get();
 
         // Verify the item belongs to the user's watchlist
-        if (!watchlistItem.getWatchlist().getUser().getUserId().equals(userId)) {
+        if (!watchlistItem.getUser().getUserId().equals(userId)) {
             throw new UnauthorizedWatchlistAccessException(userId, watchlistItemId);
         }
 
