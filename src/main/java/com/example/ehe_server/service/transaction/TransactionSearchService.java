@@ -32,6 +32,7 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
     @Override
     public List<TransactionSearchResponse> searchTransactions(
             Integer userId,
+            Integer portfolioId,  // ADD THIS
             String platform,
             String symbol,
             LocalDateTime fromTime,
@@ -67,6 +68,7 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
         // Perform search
         List<Transaction> transactions = transactionRepository.searchTransactions(
                 userId,
+                portfolioId,  // ADD THIS
                 platform,
                 symbol,
                 transactionType,

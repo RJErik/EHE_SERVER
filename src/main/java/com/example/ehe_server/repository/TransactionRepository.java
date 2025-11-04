@@ -21,6 +21,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
 
     @Query("SELECT t FROM Transaction t WHERE " +
             "(:userId IS NULL OR t.portfolio.user.userId = :userId) AND " +
+            "(:portfolioId IS NULL OR t.portfolio.portfolioId = :portfolioId) AND " +
             "(:platform IS NULL OR t.platformStock.platformName = :platform) AND " +
             "(:symbol IS NULL OR t.platformStock.stockSymbol = :symbol) AND " +
             "(:type IS NULL OR t.transactionType = :type) AND " +
@@ -34,6 +35,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
             "ORDER BY t.transactionDate DESC")
     List<Transaction> searchTransactions(
             @Param("userId") Integer userId,
+            @Param("portfolioId") Integer portfolioId,  // ADD THIS
             @Param("platform") String platform,
             @Param("symbol") String symbol,
             @Param("type") Transaction.TransactionType type,

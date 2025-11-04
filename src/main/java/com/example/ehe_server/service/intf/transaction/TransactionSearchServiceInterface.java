@@ -12,6 +12,7 @@ public interface TransactionSearchServiceInterface {
     /**
      * Searches transactions with multiple filter criteria (Admin only)
      * @param userId Optional user ID filter
+     * @param portfolioId Optional portfolio ID filter
      * @param platform Optional platform filter
      * @param symbol Optional stock symbol filter
      * @param fromTime Optional start date filter
@@ -26,6 +27,7 @@ public interface TransactionSearchServiceInterface {
      */
     List<TransactionSearchResponse> searchTransactions(
             Integer userId,
+            Integer portfolioId,  // ADD THIS
             String platform,
             String symbol,
             LocalDateTime fromTime,

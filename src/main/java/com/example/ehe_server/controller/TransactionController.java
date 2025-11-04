@@ -74,6 +74,7 @@ public class TransactionController {
         // Call transaction search service with extracted parameters
         List<TransactionSearchResponse> transactionResponses = transactionSearchService.searchTransactions(
                 request.getUserId(),
+                request.getPortfolioId(),
                 request.getPlatform(),
                 request.getSymbol(),
                 fromTime,

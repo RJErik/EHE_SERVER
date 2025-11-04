@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 
 public class TransactionSearchRequest {
     private Integer userId;
+    private Integer portfolioId;
     private String platform;
     private String symbol;
     private String fromTime;
@@ -18,6 +19,9 @@ public class TransactionSearchRequest {
     // Getters and Setters
     public Integer getUserId() { return userId; }
     public void setUserId(Integer userId) { this.userId = userId; }
+
+    public Integer getPortfolioId() { return portfolioId; }
+    public void setPortfolioId(Integer portfolioId) { this.portfolioId = portfolioId; }
 
     public String getPlatform() { return platform; }
     public void setPlatform(String platform) { this.platform = platform; }
