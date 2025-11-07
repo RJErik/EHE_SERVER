@@ -8,6 +8,7 @@ import com.example.ehe_server.service.intf.user.ApiKeyUpdateServiceInterface;
 import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.auth.PasswordResetRequestServiceInterface;
 import com.example.ehe_server.service.intf.user.*;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
@@ -111,9 +112,9 @@ public class UserController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, Object>> logout(HttpServletResponse response) {
+    public ResponseEntity<Map<String, Object>> logout(HttpServletRequest request, HttpServletResponse response) {
         // Call automated trade rule retrieval service
-        userLogoutService.logoutUser(userContextService.getCurrentUserId().intValue(), response);
+        userLogoutService.logoutUser(userContextService.getCurrentUserId().intValue(), request, response);
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -153,9 +154,9 @@ public class UserController {
     }
 
     @PostMapping("/renew-token")
-    public ResponseEntity<Map<String, Object>> renewToken(HttpServletResponse response) {
+    public ResponseEntity<Map<String, Object>> renewToken(HttpServletRequest request, HttpServletResponse response) {
         // Call automated trade rule retrieval service
-        jwtTokenRenewalService.renewToken(userContextService.getCurrentUserId(), response);
+        jwtTokenRenewalService.renewToken(userContextService.getCurrentUserId(), request, response);
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(

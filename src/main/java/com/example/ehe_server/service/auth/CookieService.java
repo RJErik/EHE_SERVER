@@ -15,9 +15,6 @@ public class CookieService implements CookieServiceInterface {
     @Value("${jwt.refresh.expiration.time}")
     private long jwtRefreshExpirationTime;
 
-    @Value("${jwt.refresh.url}")
-    private String jwtRefreshUrl;
-
     @Override
     public void addJwtAccessCookie(String jwtToken, HttpServletResponse response) {
         Cookie cookie = new Cookie("jwt_access_token", jwtToken);
@@ -35,7 +32,7 @@ public class CookieService implements CookieServiceInterface {
         Cookie cookie = new Cookie("jwt_refresh_token", jwtToken);
         cookie.setHttpOnly(true);
         cookie.setSecure(false); //turn to true after development.
-        cookie.setPath(jwtRefreshUrl);
+        cookie.setPath("/");
         cookie.setMaxAge((int) (jwtRefreshExpirationTime / 1000));
         cookie.setAttribute("SameSite", "Strict");
 
@@ -58,7 +55,7 @@ public class CookieService implements CookieServiceInterface {
         Cookie refreshCookie = new Cookie("jwt_refresh_token", "");
         refreshCookie.setHttpOnly(true);
         refreshCookie.setSecure(true);
-        refreshCookie.setPath(jwtRefreshUrl);
+        refreshCookie.setPath("/");
         refreshCookie.setMaxAge(0);
         refreshCookie.setAttribute("SameSite", "Strict");
 

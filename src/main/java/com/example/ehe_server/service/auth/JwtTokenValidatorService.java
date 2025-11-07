@@ -1,26 +1,33 @@
 package com.example.ehe_server.service.auth;
 
+import com.example.ehe_server.entity.JwtRefreshToken;
+import com.example.ehe_server.repository.JwtRefreshTokenRepository;
 import com.example.ehe_server.service.intf.auth.JwtTokenValidatorInterface;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.SignatureException;
+import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 
 import java.security.interfaces.RSAPublicKey;
+import java.util.Optional;
 
 @Service
 public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
 
     private final RSAPublicKey publicKey;
+    private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
 
-    public JwtTokenValidatorService(RSAPublicKey publicKey) {
+    public JwtTokenValidatorService(RSAPublicKey publicKey,
+                                    JwtRefreshTokenRepository jwtRefreshTokenRepository) {
         this.publicKey = publicKey;
+        this.jwtRefreshTokenRepository = jwtRefreshTokenRepository;
     }
 
     @Override
-    public boolean validateToken(String token) {
+    public boolean validateAccessToken(String token) {
         try {
             Jwts.parserBuilder()
                     .setSigningKey(publicKey)
@@ -34,6 +41,24 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
             return false;
         }
     }
+
+    @Override
+    public boolean validateRefreshToken(String token) {
+        try {
+            Jwts.parserBuilder()
+                    .setSigningKey(publicKey)
+                    .build()
+                    .parseClaimsJws(token);
+            Optional<JwtRefreshToken> jwtRefreshToken =  jwtRefreshTokenRepository.findByJwtRefreshTokenHash(BCrypt.hashpw(token, BCrypt.gensalt()));
+            return jwtRefreshToken.isPresent();
+        } catch (SignatureException | MalformedJwtException | ExpiredJwtException e) {
+            // Invalid or expired token
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
 
     @Override
     public Long getUserIdFromToken(String token) {

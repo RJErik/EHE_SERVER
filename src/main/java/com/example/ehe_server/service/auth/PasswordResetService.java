@@ -11,6 +11,7 @@ import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 
 import com.example.ehe_server.service.audit.UserContextService;
+import com.example.ehe_server.service.intf.auth.JwtRefreshTokenServiceInterface;
 import com.example.ehe_server.service.intf.auth.PasswordResetServiceInterface;
 import com.example.ehe_server.service.intf.auth.PasswordResetTokenValidationServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
@@ -33,6 +34,7 @@ public class PasswordResetService implements PasswordResetServiceInterface {
     private final PasswordResetTokenValidationServiceInterface passwordResetTokenValidationService;
     private final LoggingServiceInterface loggingService;
     private final AdminRepository adminRepository;
+    private final JwtRefreshTokenServiceInterface jwtRefreshTokenService;
     private final UserContextService userContextService;
 
     public PasswordResetService(
@@ -41,12 +43,14 @@ public class PasswordResetService implements PasswordResetServiceInterface {
             PasswordResetTokenValidationServiceInterface passwordResetTokenValidationService,
             LoggingServiceInterface loggingService,
             AdminRepository adminRepository,
+            JwtRefreshTokenServiceInterface jwtRefreshTokenService,
             UserContextService userContextService) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.passwordResetTokenValidationService = passwordResetTokenValidationService;
         this.loggingService = loggingService;
         this.adminRepository = adminRepository;
+        this.jwtRefreshTokenService = jwtRefreshTokenService;
         this.userContextService = userContextService;
     }
 
@@ -110,6 +114,8 @@ public class PasswordResetService implements PasswordResetServiceInterface {
         // Save changes
         userRepository.save(user);
         verificationTokenRepository.save(verificationToken);
+
+        jwtRefreshTokenService.removeAllUserTokens(user.getUserId());
 
         loggingService.logAction("Password reset successful");
     }

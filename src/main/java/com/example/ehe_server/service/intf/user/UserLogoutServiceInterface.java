@@ -1,7 +1,8 @@
 package com.example.ehe_server.service.intf.user;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 public interface UserLogoutServiceInterface {
-    void logoutUser(Integer userId, HttpServletResponse response);
+    void logoutUser(Integer userId, HttpServletRequest request, HttpServletResponse response);
 }

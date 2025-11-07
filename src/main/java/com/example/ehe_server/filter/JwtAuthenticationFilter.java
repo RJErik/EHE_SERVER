@@ -103,7 +103,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             // First validate the JWT token
-            if (token != null && jwtTokenValidator.validateToken(token)) {
+            if (token != null && jwtTokenValidator.validateAccessToken(token)) {
                 Long userId = jwtTokenValidator.getUserIdFromToken(token);
                 String role = jwtTokenValidator.getRoleFromToken(token);
 
@@ -192,7 +192,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             // Validate the refresh token
-            if (refreshToken != null && jwtTokenValidator.validateToken(refreshToken)) {
+            if (refreshToken != null && jwtTokenValidator.validateRefreshToken(refreshToken)) {
                 Long userId = jwtTokenValidator.getUserIdFromToken(refreshToken);
                 String role = jwtTokenValidator.getRoleFromToken(refreshToken);
 
