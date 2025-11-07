@@ -137,7 +137,7 @@ public class PortfolioController {
     @PostMapping("/portfolios/search")
     public ResponseEntity<Map<String, Object>> searchPortfolio(@RequestBody PortfolioSearchRequest request) {
         // Call automated trade rule retrieval service
-        List<PortfolioSearchResponse> portfolioSearchResponses = portfolioSearchService.searchPortfolios(userContextService.getCurrentUserId().intValue(), request.getType(), request.getPlatform(), request.getMinValue(), request.getMaxValue());
+        List<PortfolioSearchResponse> portfolioSearchResponses = portfolioSearchService.searchPortfolios(userContextService.getCurrentUserId().intValue(), request.getPlatform(), request.getMinValue(), request.getMaxValue());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
