@@ -24,15 +24,12 @@ public class RestGlobalExceptionHandler {
 
     private final LoggingServiceInterface loggingService;
     private final MessageSource messageSource;
-    private final ApiErrorContextProperties errorContextProperties;
 
     public RestGlobalExceptionHandler(
             LoggingServiceInterface loggingService,
-            MessageSource messageSource,
-            ApiErrorContextProperties errorContextProperties) {
+            MessageSource messageSource) {
         this.loggingService = loggingService;
         this.messageSource = messageSource;
-        this.errorContextProperties = errorContextProperties;
     }
 
     // Catch all custom exceptions and delegate to a common builder
@@ -40,30 +37,30 @@ public class RestGlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleCustomBaseException(CustomBaseException ex, HttpServletRequest request) {
         HttpStatus status = determineHttpStatus(ex);
 
-        // Resolve default messages from messages.properties to use as fallbacks
+        // Resolve default messages
         String defaultLogMessage = messageSource.getMessage(DEFAULT_LOG_DETAIL_KEY, null, "Default log message", LocaleContextHolder.getLocale());
         String defaultUserMessage = messageSource.getMessage(DEFAULT_ERROR_MESSAGE_KEY, null, "An error occurred.", LocaleContextHolder.getLocale());
 
-        // 1. Get the URL-based prefix first, so it can be used for both logging and the user message.
+        // 1. Get the HTTP method and URL pattern
+        String method = request.getMethod(); // GET, POST, DELETE, etc.
         String bestMatchPattern = (String) request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
-        String prefix = errorContextProperties.getMapping().getOrDefault(bestMatchPattern, errorContextProperties.getDefaultContext());
+        String prefix = getContextPrefix(method, bestMatchPattern);
 
-        // 2. Resolve, format, and log the detailed error message WITH the prefix.
+        // 2. Resolve, format, and log the detailed error message WITH the prefix
         String logPattern = messageSource.getMessage(ex.getLogDetailKey(), null, defaultLogMessage, LocaleContextHolder.getLocale());
         String logMessage = MessageFormat.format(logPattern, ex.getLogArgs());
-        String finalLogMessage = prefix + " " + logMessage; // Combine prefix and log message
-        loggingService.logError(finalLogMessage, ex); // Log the combined message
+        String finalLogMessage = prefix + " " + logMessage;
+        loggingService.logError(finalLogMessage, ex);
 
-        // 3. Resolve and format the user-facing message WITH the prefix.
+        // 3. Resolve and format the user-facing message WITH the prefix
         String baseUserMessage = messageSource.getMessage(ex.getMessage(), null, defaultUserMessage, LocaleContextHolder.getLocale());
         String finalUserMessage = prefix + " " + baseUserMessage;
 
-        // 4. Build the response body from the exception's data
+        // 4. Build the response body
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("success", false);
         errorResponse.put("message", finalUserMessage);
 
-        // Add actionLink and showResendButton if they exist in the exception
         if (ex.getActionLink() != null) {
             errorResponse.put("actionLink", ex.getActionLink());
         }
@@ -72,6 +69,31 @@ public class RestGlobalExceptionHandler {
         }
 
         return new ResponseEntity<>(errorResponse, status);
+    }
+
+    /**
+     * Resolves the error context prefix with fallback chain:
+     * 1. Try METHOD.PATTERN (e.g., POST./api/user/alerts)
+     * 2. Try just PATTERN (e.g., /api/user/alerts)
+     * 3. Fall back to default
+     */
+    private String getContextPrefix(String method, String pattern) {
+        // Try method-specific key first
+        String methodSpecificKey = "error.context." + method + "." + pattern;
+        String prefix = messageSource.getMessage(methodSpecificKey, null, null, LocaleContextHolder.getLocale());
+
+        // If not found, try pattern-only key
+        if (prefix == null) {
+            String patternOnlyKey = "error.context." + pattern;
+            prefix = messageSource.getMessage(patternOnlyKey, null, null, LocaleContextHolder.getLocale());
+        }
+
+        // If still not found, use default
+        if (prefix == null) {
+            prefix = messageSource.getMessage("error.context.default", null, "An error occurred:", LocaleContextHolder.getLocale());
+        }
+
+        return prefix;
     }
 
     /**
