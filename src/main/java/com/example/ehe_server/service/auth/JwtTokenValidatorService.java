@@ -12,7 +12,7 @@ import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 
 import java.security.interfaces.RSAPublicKey;
-import java.util.Optional;
+import java.util.List;
 
 @Service
 public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
@@ -45,12 +45,28 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
     @Override
     public boolean validateRefreshToken(String token) {
         try {
-            Jwts.parserBuilder()
+            Claims claims = Jwts.parserBuilder()
                     .setSigningKey(publicKey)
                     .build()
-                    .parseClaimsJws(token);
-            Optional<JwtRefreshToken> jwtRefreshToken =  jwtRefreshTokenRepository.findByJwtRefreshTokenHash(BCrypt.hashpw(token, BCrypt.gensalt()));
-            return jwtRefreshToken.isPresent();
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Extract user_id from the token claims
+            Long userId = claims.get("user_id", Long.class);
+
+            // Get only this user's refresh tokens from the database
+            List<JwtRefreshToken> userRefreshTokens = jwtRefreshTokenRepository.findByUser_UserId(userId.intValue());
+
+            // Check if the provided token matches any of this user's stored hashes
+            for (JwtRefreshToken storedToken : userRefreshTokens) {
+                if (BCrypt.checkpw(token, storedToken.getJwtRefreshTokenHash())) {
+                    return true;
+                }
+            }
+            System.out.println("No refresh token found");
+
+            // No matching hash found
+            return false;
         } catch (SignatureException | MalformedJwtException | ExpiredJwtException e) {
             // Invalid or expired token
             return false;
