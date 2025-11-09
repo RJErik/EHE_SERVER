@@ -125,9 +125,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             if (isSignificantEndpoint(path)) {
                                 loggingService.logAction("Accessed " + path);
                             }
-
-                            cookieService.clearJwtCookies(response);
-                            cookieService.addJwtAccessCookie(jwtTokenGenerator.generateAccessToken(user.getUserId().longValue(), role), response);
                         } else {
                             // User exists but is not active
                             loggingService.logAction("Authentication failed: User account status is " + user.getAccountStatus());
