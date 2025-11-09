@@ -7,7 +7,6 @@ import com.example.ehe_server.service.intf.user.UserLogoutServiceInterface;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +46,7 @@ public class UserLogoutService implements UserLogoutServiceInterface {
         for (Cookie cookie : request.getCookies()) {
             if ("jwt_refresh_token".equals(cookie.getName())) {
                 String refreshToken = cookie.getValue();
-                jwtRefreshTokenService.removeRefreshTokenByHash(BCrypt.hashpw(refreshToken, BCrypt.gensalt()));
+                jwtRefreshTokenService.removeRefreshTokenByToken(refreshToken);
                 break;
             }
         }
