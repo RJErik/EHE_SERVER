@@ -17,13 +17,13 @@ public interface JwtRefreshTokenServiceInterface {
      * Remove a refresh token by ID
      * @param tokenId The ID of the token to remove
      */
-    void removeRefreshToken(Integer tokenId);
+    void removeRefreshTokenById(Integer tokenId);
 
     /**
      * Remove a refresh token by token hash
-     * @param tokenHash The hash of the token to remove
+     * @param token The token to remove
      */
-    void removeRefreshTokenByHash(String tokenHash);
+    void removeRefreshTokenByToken(String token);
 
     /**
      * Remove all refresh tokens for a specific user
