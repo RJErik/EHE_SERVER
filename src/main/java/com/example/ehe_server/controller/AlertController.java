@@ -49,7 +49,7 @@ public class AlertController {
     @GetMapping("/alerts")
     public ResponseEntity<Map<String, Object>> getAlerts() {
         // Call alert retrieval service
-        List<AlertRetrievalResponse> alertRetrievalResponses = alertRetrievalService.getAlerts(userContextService.getCurrentUserId().intValue());
+        List<AlertRetrievalResponse> alertRetrievalResponses = alertRetrievalService.getAlerts(userContextService.getCurrentUserId());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -78,7 +78,7 @@ public class AlertController {
     public ResponseEntity<Map<String, Object>> createAlert(@RequestBody AlertCreationRequest request) {
         // Call alert creation service to add item
         AlertCreationResponse alertCreationResponse = alertCreationService.createAlert(
-                userContextService.getCurrentUserId().intValue(),
+                userContextService.getCurrentUserId(),
                 request.getPlatform(),
                 request.getSymbol(),
                 request.getConditionType(),
@@ -110,7 +110,7 @@ public class AlertController {
     @DeleteMapping("/alerts")
     public ResponseEntity<Map<String, Object>> removeAlert(@RequestBody AlertRemovalRequest request) {
         // Call alert removal service to remove item
-        alertRemovalService.removeAlert(userContextService.getCurrentUserId().intValue(), request.getId());
+        alertRemovalService.removeAlert(userContextService.getCurrentUserId(), request.getId());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -136,7 +136,7 @@ public class AlertController {
     public ResponseEntity<Map<String, Object>> searchAlerts(@RequestBody AlertSearchRequest request) {
         // Call alert search service
         List<AlertSearchResponse> alertSearchResponses = alertSearchService.searchAlerts(
-                userContextService.getCurrentUserId().intValue(),
+                userContextService.getCurrentUserId(),
                 request.getPlatform(),
                 request.getSymbol(),
                 request.getConditionType());

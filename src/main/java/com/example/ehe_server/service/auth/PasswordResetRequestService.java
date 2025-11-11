@@ -101,9 +101,9 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
 
     @Override
     @Transactional
-    public void requestPasswordResetForAuthenticatedUser(Long userId) {
+    public void requestPasswordResetForAuthenticatedUser(Integer userId) {
         // Find user by ID (authenticated user context)
-        var userOpt = userRepository.findById(userId.intValue());
+        var userOpt = userRepository.findById(userId);
 
         if (userOpt.isEmpty()) {
             throw new UserNotFoundException(userId);
@@ -124,7 +124,7 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
     private void processPasswordResetRequest(User user, String email) {
         // Rate limiting check
         LocalDateTime rateLimitThreshold = LocalDateTime.now().minusMinutes(RATE_LIMIT_MINUTES);
-        long recentTokenCount = verificationTokenRepository.countByUser_UserIdAndTokenTypeAndIssueDateAfter(
+        int recentTokenCount = verificationTokenRepository.countByUser_UserIdAndTokenTypeAndIssueDateAfter(
                 user.getUserId(), VerificationToken.TokenType.PASSWORD_RESET, rateLimitThreshold);
 
         if (recentTokenCount >= RATE_LIMIT_MAX_REQUESTS) {

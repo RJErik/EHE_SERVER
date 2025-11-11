@@ -10,5 +10,5 @@ public interface UserInfoServiceInterface {
      * @param userId The ID of the user whose information should be retrieved
      * @return A map containing the operation result and user information if successful
      */
-    UserInfoResponse getUserInfo(Long userId);
+    UserInfoResponse getUserInfo(Integer userId);
 }

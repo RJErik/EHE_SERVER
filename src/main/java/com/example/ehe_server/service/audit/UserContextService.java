@@ -69,10 +69,10 @@ public class UserContextService implements UserContextServiceInterface {
      *
      * @return User ID if authenticated, null otherwise
      */
-    public Long getCurrentUserId() {
+    public Integer getCurrentUserId() {
         if (isHumanUser()) {
             try {
-                return Long.parseLong(getCurrentUserIdAsString());
+                return Integer.parseInt(getCurrentUserIdAsString());
             } catch (NumberFormatException e) {
                 return null;
             }

@@ -32,7 +32,7 @@ public class RegistrationService implements RegistrationServiceInterface {
     private final AdminRepository adminRepository;
 
     @Value("${app.verification.token.expiry-hours}") // Get expiry from config
-    private long tokenExpiryHours;
+    private int tokenExpiryHours;
 
     // Validation patterns remain the same...
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");

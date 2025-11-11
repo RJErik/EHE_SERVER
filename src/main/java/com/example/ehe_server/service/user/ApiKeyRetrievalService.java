@@ -30,11 +30,11 @@ public class ApiKeyRetrievalService implements ApiKeyRetrievalServiceInterface {
     }
 
     @Override
-    public List<ApiKeyRetrievalResponse> getApiKeys(Long userId) {
+    public List<ApiKeyRetrievalResponse> getApiKeys(Integer userId) {
         // Get current user ID from user context
         User user;
-        if (userRepository.existsById(userId.intValue())) {
-            user = userRepository.findById(userId.intValue()).get();
+        if (userRepository.existsById(userId)) {
+            user = userRepository.findById(userId).get();
         } else {
             return null;
         }

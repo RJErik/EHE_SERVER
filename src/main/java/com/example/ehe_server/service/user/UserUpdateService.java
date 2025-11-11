@@ -51,7 +51,7 @@ public class UserUpdateService implements UserUpdateServiceInterface {
 
         Optional<User> userOpt = userRepository.findById(userId);
         if (userOpt.isEmpty()) {
-            throw new UserNotFoundException(userId.longValue());
+            throw new UserNotFoundException(userId);
         }
 
 

@@ -120,8 +120,8 @@ public class LogInService implements LogInServiceInterface {
         userContextService.setUser(String.valueOf(user.getUserId()), role);
 
         // Generate JWT token with user ID and roles
-        String jwtAccessToken = jwtTokenGenerator.generateAccessToken(Long.valueOf(user.getUserId()), role);
-        String jwtRefreshToken = jwtTokenGenerator.generateRefreshToken(Long.valueOf(user.getUserId()), role);
+        String jwtAccessToken = jwtTokenGenerator.generateAccessToken(user.getUserId(), role);
+        String jwtRefreshToken = jwtTokenGenerator.generateRefreshToken(user.getUserId(), role);
 
         // Create JWT cookie
         cookieService.addJwtAccessCookie(jwtAccessToken, response);

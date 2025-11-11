@@ -31,11 +31,11 @@ public class ApiKeyRemovalService implements ApiKeyRemovalServiceInterface {
 
     @Override
     @Transactional
-    public void removeApiKey(Long userId, Integer apiKeyId) {
+    public void removeApiKey(Integer userId, Integer apiKeyId) {
         // Get current user ID from user context
         User user;
-        if (userRepository.existsById(userId.intValue())) {
-            user = userRepository.findById(userId.intValue()).get();
+        if (userRepository.existsById(userId)) {
+            user = userRepository.findById(userId).get();
         } else {
             return;
         }

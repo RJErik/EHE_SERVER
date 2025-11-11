@@ -18,6 +18,6 @@ public interface VerificationTokenRepository extends JpaRepository<VerificationT
     List<VerificationToken> findByUser_UserIdAndTokenType(Integer userId, VerificationToken.TokenType type);
 
     // Count tokens issued recently for a user/type (used for rate limiting)
-    long countByUser_UserIdAndTokenTypeAndIssueDateAfter(Integer userId, VerificationToken.TokenType type, LocalDateTime timestamp);
+    int countByUser_UserIdAndTokenTypeAndIssueDateAfter(Integer userId, VerificationToken.TokenType type, LocalDateTime timestamp);
 
 }

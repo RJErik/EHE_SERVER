@@ -160,10 +160,10 @@ public class JwtRefreshTokenService implements JwtRefreshTokenServiceInterface {
                     .getBody();
 
             // Extract user_id from the token claims
-            Long userId = claims.get("user_id", Long.class);
+            Integer userId = claims.get("user_id", Integer.class);
 
             // Get only this user's refresh tokens from the database
-            List<JwtRefreshToken> userRefreshTokens = jwtRefreshTokenRepository.findByUser_UserId(userId.intValue());
+            List<JwtRefreshToken> userRefreshTokens = jwtRefreshTokenRepository.findByUser_UserId(userId);
 
             // Check if the provided token matches any of this user's stored hashes
             for (JwtRefreshToken storedToken : userRefreshTokens) {

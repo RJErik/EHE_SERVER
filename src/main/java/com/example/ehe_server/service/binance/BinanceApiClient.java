@@ -3,7 +3,6 @@ package com.example.ehe_server.service.binance;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 

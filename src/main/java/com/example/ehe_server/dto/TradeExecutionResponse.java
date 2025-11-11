@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.util.Objects;
 
 public class TradeExecutionResponse {
-    private Long orderId;
+    private Integer orderId;
     private String symbol;
     private String side;
     private BigDecimal origQty;
@@ -14,7 +14,7 @@ public class TradeExecutionResponse {
 
     public TradeExecutionResponse() {}
 
-    public TradeExecutionResponse(Long orderId, String symbol, String side, BigDecimal origQty, BigDecimal executedQty, BigDecimal cummulativeQuoteQty, String status) {
+    public TradeExecutionResponse(Integer orderId, String symbol, String side, BigDecimal origQty, BigDecimal executedQty, BigDecimal cummulativeQuoteQty, String status) {
         this.orderId = orderId;
         this.symbol = symbol;
         this.side = side;
@@ -25,8 +25,8 @@ public class TradeExecutionResponse {
     }
 
     // Getters and setters for all fields
-    public Long getOrderId() { return orderId; }
-    public void setOrderId(Long orderId) { this.orderId = orderId; }
+    public Integer getOrderId() { return orderId; }
+    public void setOrderId(Integer orderId) { this.orderId = orderId; }
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
     public String getSide() { return side; }

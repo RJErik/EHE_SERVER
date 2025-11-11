@@ -55,7 +55,7 @@ public class WatchlistController {
     @GetMapping("/watchlists")
     public ResponseEntity<Map<String, Object>> getWatchlists() {
         // Call automated trade rule retrieval service
-        List<WatchlistRetrievalResponse> watchlistRetrievalResponses = watchlistRetrievalService.getWatchlistItems(userContextService.getCurrentUserId().intValue());
+        List<WatchlistRetrievalResponse> watchlistRetrievalResponses = watchlistRetrievalService.getWatchlistItems(userContextService.getCurrentUserId());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -86,7 +86,7 @@ public class WatchlistController {
     public ResponseEntity<Map<String, Object>> createWatchlist(@RequestBody WatchlistCreationRequest request) {
         // Call automated trade rule retrieval service
         WatchlistCreationResponse watchlistCreationResponse = watchlistCreationService.createWatchlistItem(
-                userContextService.getCurrentUserId().intValue(), request.getPlatform(), request.getSymbol());
+                userContextService.getCurrentUserId(), request.getPlatform(), request.getSymbol());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -114,7 +114,7 @@ public class WatchlistController {
     @DeleteMapping("/watchlists")
     public ResponseEntity<Map<String, Object>> removeWatchlistItem(@RequestBody WatchlistRemovalRequest request) {
         // Call automated trade rule retrieval service
-        watchlistRemovalService.removeWatchlistItem(userContextService.getCurrentUserId().intValue(), request.getId());
+        watchlistRemovalService.removeWatchlistItem(userContextService.getCurrentUserId(), request.getId());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -144,7 +144,7 @@ public class WatchlistController {
     public ResponseEntity<Map<String, Object>> searchWatchlists(@RequestBody WatchlistSearchRequest request) {
         // Call automated trade rule retrieval service
         List<WatchlistSearchResponse> watchlistSearchResponses = watchlistSearchService.searchWatchlistItems(
-                userContextService.getCurrentUserId().intValue(), request.getPlatform(), request.getSymbol());
+                userContextService.getCurrentUserId(), request.getPlatform(), request.getSymbol());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -171,7 +171,7 @@ public class WatchlistController {
     @GetMapping("/watchlists/candles")
     public ResponseEntity<Map<String, Object>> getWatchlistCandles() {
         // Call automated trade rule retrieval service
-        List<WatchlistCandleResponse> watchlistCandleResponses = watchlistCandleService.getLatestCandles(userContextService.getCurrentUserId().intValue());
+        List<WatchlistCandleResponse> watchlistCandleResponses = watchlistCandleService.getLatestCandles(userContextService.getCurrentUserId());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(

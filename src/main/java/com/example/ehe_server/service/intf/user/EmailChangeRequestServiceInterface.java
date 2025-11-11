@@ -7,5 +7,5 @@ public interface EmailChangeRequestServiceInterface {
      * @param newEmail The new email address
      * @return A map containing the result of the operation
      */
-    void requestEmailChange(Long userId, String newEmail);
+    void requestEmailChange(Integer userId, String newEmail);
 }

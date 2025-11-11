@@ -34,11 +34,11 @@ public class ApiKeyCreationService implements ApiKeyCreationServiceInterface {
 
     @Override
     @Transactional
-    public ApiKeyCreationResponse createApiKey(Long userId, String platformName, String apiKeyValue, String secretKey) {
+    public ApiKeyCreationResponse createApiKey(Integer userId, String platformName, String apiKeyValue, String secretKey) {
         // Get current user ID from user context
         User user;
-        if (userRepository.existsById(userId.intValue())) {
-            user = userRepository.findById(userId.intValue()).get();
+        if (userRepository.existsById(userId)) {
+            user = userRepository.findById(userId).get();
         } else {
             return null;
         }
@@ -62,7 +62,7 @@ public class ApiKeyCreationService implements ApiKeyCreationServiceInterface {
 
         // Create response with masked values
         ApiKeyCreationResponse response = new ApiKeyCreationResponse();
-        response.setApiKeyId(apiKey.getApiKeyId().longValue());
+        response.setApiKeyId(apiKey.getApiKeyId());
         response.setPlatformName(apiKey.getPlatformName());
         response.setMaskedApiKeyValue(maskApiKeyValue(apiKeyValue));
 

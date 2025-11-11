@@ -23,11 +23,11 @@ public class UserDeactivationService implements UserDeactivationServiceInterface
 
     @Override
     @Transactional
-    public void deactivateUser(Long userId) {
+    public void deactivateUser(Integer userId) {
         // Check if user exists and is active
         User user;
-        if (userRepository.existsById(userId.intValue())) {
-            user = userRepository.findById(userId.intValue()).get();
+        if (userRepository.existsById(userId)) {
+            user = userRepository.findById(userId).get();
         } else {
             return;
         }

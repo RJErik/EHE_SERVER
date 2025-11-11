@@ -7,5 +7,5 @@ public interface UserDeactivationServiceInterface {
      * @param userId The ID of the user to deactivate
      * @return Map containing the result of the operation
      */
-    void deactivateUser(Long userId);
+    void deactivateUser(Integer userId);
 }

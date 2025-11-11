@@ -115,7 +115,7 @@ public class AutomatedTradeRuleCreationService implements AutomatedTradeRuleCrea
         if (userRepository.existsById(userId)) {
             user = userRepository.findById(userId).get();
         } else {
-            throw new UserNotFoundException(userId.longValue());
+            throw new UserNotFoundException(userId);
         }
 
         // Create new automated trade rule

@@ -56,7 +56,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             // Step 1: Validate the token's structure and signature
             if (token != null && jwtTokenValidator.validateAccessToken(token)) {
                 try {
-                    Long userId = jwtTokenValidator.getUserIdFromToken(token);
+                    Integer userId = jwtTokenValidator.getUserIdFromToken(token);
                     String role = jwtTokenValidator.getRoleFromToken(token);
 
                     if (userId == null || role == null || role.trim().isEmpty()) {

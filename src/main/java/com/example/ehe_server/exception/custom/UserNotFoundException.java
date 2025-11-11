@@ -6,7 +6,7 @@ package com.example.ehe_server.exception.custom;
  */
 
 public class UserNotFoundException extends ResourceNotFoundException {
-  public UserNotFoundException(Long userId) {
+  public UserNotFoundException(Integer userId) {
     super("error.message.userNotFound", "error.logDetail.userNotFound", userId);
   }
 }

@@ -48,7 +48,7 @@ public class AutomatedTradeRuleController {
     @GetMapping("/automated-trade-rules")
     public ResponseEntity<Map<String, Object>> getAutomatedTradeRules() {
         // Call automated trade rule retrieval service
-        List<AutomatedTradeRuleRetrievalResponse> automatedTradeRuleRetrievalResponses = automatedTradeRuleRetrievalService.getAutomatedTradeRules(userContextService.getCurrentUserId().intValue());
+        List<AutomatedTradeRuleRetrievalResponse> automatedTradeRuleRetrievalResponses = automatedTradeRuleRetrievalService.getAutomatedTradeRules(userContextService.getCurrentUserId());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -79,7 +79,7 @@ public class AutomatedTradeRuleController {
     public ResponseEntity<Map<String, Object>> createAutomatedTradeRule(@RequestBody AutomatedTradeRuleCreationRequest request) {
         // Call alert retrieval service
         AutomatedTradeRuleCreationResponse automatedTradeRuleCreationResponse = automatedTradeRuleCreationService.createAutomatedTradeRule(
-                userContextService.getCurrentUserId().intValue(),
+                userContextService.getCurrentUserId(),
                 request.getPortfolioId(),
                 request.getPlatform(),
                 request.getSymbol(),
@@ -115,7 +115,7 @@ public class AutomatedTradeRuleController {
     @DeleteMapping("/automated-trade-rules")
     public ResponseEntity<Map<String, Object>> removeAutomatedTradeRule(@RequestBody AutomatedTradeRemovalRequest request) {
         // Call alert retrieval service
-        automatedTradeRuleRemovalService.removeAutomatedTradeRule(userContextService.getCurrentUserId().intValue(), request.getId());
+        automatedTradeRuleRemovalService.removeAutomatedTradeRule(userContextService.getCurrentUserId(), request.getId());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -143,7 +143,7 @@ public class AutomatedTradeRuleController {
     public ResponseEntity<Map<String, Object>> searchAutomatedTradeRules(@RequestBody AutomatedTradeRuleSearchRequest request) {
         // Call automated trade rule retrieval service
         List<AutomatedTradeRuleSearchResponse> automatedTradeRuleSearchResponses = automatedTradeRuleSearchService.searchAutomatedTradeRules(
-                userContextService.getCurrentUserId().intValue(),
+                userContextService.getCurrentUserId(),
                 request.getPortfolioId(),
                 request.getPlatform(),
                 request.getSymbol(),

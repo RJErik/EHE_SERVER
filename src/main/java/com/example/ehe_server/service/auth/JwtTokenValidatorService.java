@@ -52,10 +52,10 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
                     .getBody();
 
             // Extract user_id from the token claims
-            Long userId = claims.get("user_id", Long.class);
+            Integer userId = claims.get("user_id", Integer.class);
 
             // Get only this user's refresh tokens from the database
-            List<JwtRefreshToken> userRefreshTokens = jwtRefreshTokenRepository.findByUser_UserId(userId.intValue());
+            List<JwtRefreshToken> userRefreshTokens = jwtRefreshTokenRepository.findByUser_UserId(userId);
 
             // Check if the provided token matches any of this user's stored hashes
             for (JwtRefreshToken storedToken : userRefreshTokens) {
@@ -77,7 +77,7 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
 
 
     @Override
-    public Long getUserIdFromToken(String token) {
+    public Integer getUserIdFromToken(String token) {
         try {
             Claims claims = Jwts.parserBuilder()
                     .setSigningKey(publicKey)
@@ -85,7 +85,7 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
                     .parseClaimsJws(token)
                     .getBody();
 
-            return claims.get("user_id", Long.class);
+            return claims.get("user_id", Integer.class);
         } catch (Exception e) {
             return null;
         }

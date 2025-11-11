@@ -5,5 +5,5 @@ import com.example.ehe_server.dto.ApiKeyRetrievalResponse;
 import java.util.List;
 
 public interface ApiKeyRetrievalServiceInterface {
-    List<ApiKeyRetrievalResponse> getApiKeys(Long userId);
+    List<ApiKeyRetrievalResponse> getApiKeys(Integer userId);
 }

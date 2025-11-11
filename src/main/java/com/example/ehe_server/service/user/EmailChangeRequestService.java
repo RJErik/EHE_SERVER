@@ -63,7 +63,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
 
     @Override
     @Transactional
-    public void requestEmailChange(Long userId, String newEmail) {
+    public void requestEmailChange(Integer userId, String newEmail) {
         // Validate email format
         if (newEmail == null || newEmail.trim().isEmpty()) {
             throw new MissingEmailException();
@@ -74,7 +74,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
         }
 
         // Find the user
-        Optional<User> userOpt = userRepository.findById(userId.intValue());
+        Optional<User> userOpt = userRepository.findById(userId);
 
         if (userOpt.isEmpty()) {
             throw new UserNotFoundException(userId);

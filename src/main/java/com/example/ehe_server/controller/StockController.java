@@ -111,7 +111,7 @@ public class StockController {
     public ResponseEntity<Map<String, Object>> getTradingCapacity(@RequestBody TradingCapacityRequest request) {
         // Call automated trade rule retrieval service
         TradingCapacityResponse tradingCapacityResponse = tradingCapacityService.getTradingCapacity(
-                userContextService.getCurrentUserId().intValue(), request.getPortfolioId(), request.getStockSymbol());
+                userContextService.getCurrentUserId(), request.getPortfolioId(), request.getStockSymbol());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -140,7 +140,7 @@ public class StockController {
     public ResponseEntity<Map<String, Object>> executeTrade(@RequestBody TradeRequest request) {
         // Call automated trade rule retrieval service
         TradeExecutionResponse tradeExecutionResponse = tradingService.executeTrade(
-                userContextService.getCurrentUserId().intValue(),
+                userContextService.getCurrentUserId(),
                 request.getPortfolioId(),
                 request.getStockSymbol(),
                 request.getAction(),

@@ -114,7 +114,7 @@ public class UserController {
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(HttpServletRequest request, HttpServletResponse response) {
         // Call automated trade rule retrieval service
-        userLogoutService.logoutUser(userContextService.getCurrentUserId().intValue(), request, response);
+        userLogoutService.logoutUser(userContextService.getCurrentUserId(), request, response);
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(

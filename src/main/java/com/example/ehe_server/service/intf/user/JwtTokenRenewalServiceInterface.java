@@ -11,5 +11,5 @@ public interface JwtTokenRenewalServiceInterface {
      * @param response HTTP response to set the new cookie
      * @return A map containing success status and messages
      */
-    void renewToken(Long userId, HttpServletRequest request, HttpServletResponse response);
+    void renewToken(Integer userId, HttpServletRequest request, HttpServletResponse response);
 }

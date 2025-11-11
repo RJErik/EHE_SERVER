@@ -25,7 +25,7 @@ public class JwtTokenGeneratorService implements JwtTokenGeneratorInterface {
     }
 
     @Override
-    public String generateAccessToken(Long userId, String role) {
+    public String generateAccessToken(Integer userId, String role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtAccessExpirationTime);
 
@@ -39,7 +39,7 @@ public class JwtTokenGeneratorService implements JwtTokenGeneratorInterface {
     }
 
     @Override
-    public String generateRefreshToken(Long userId, String role) {
+    public String generateRefreshToken(Integer userId, String role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtRefreshExpirationTime);
 

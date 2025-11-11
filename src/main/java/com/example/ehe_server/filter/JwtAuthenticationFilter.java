@@ -29,8 +29,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final LoggingServiceInterface loggingService;
     private final UserRepository userRepository;
     private final UserContextService userContextService;
-    private final CookieServiceInterface cookieService;
-    private final JwtTokenGeneratorInterface jwtTokenGenerator;
 
     @Value("${jwt.refresh.url}")
     private String REFRESH_URL;
@@ -53,15 +51,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             JwtTokenValidatorInterface jwtTokenValidator,
             LoggingServiceInterface loggingService,
             UserRepository userRepository,
-            UserContextService userContextService,
-            CookieServiceInterface cookieService,
-            JwtTokenGeneratorInterface jwtTokenGenerator) {
+            UserContextService userContextService) {
         this.jwtTokenValidator = jwtTokenValidator;
         this.loggingService = loggingService;
         this.userRepository = userRepository;
         this.userContextService = userContextService;
-        this.cookieService = cookieService;
-        this.jwtTokenGenerator = jwtTokenGenerator;
     }
 
     @Override
@@ -104,14 +98,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             // First validate the JWT token
             if (token != null && jwtTokenValidator.validateAccessToken(token)) {
-                Long userId = jwtTokenValidator.getUserIdFromToken(token);
+                Integer userId = jwtTokenValidator.getUserIdFromToken(token);
                 String role = jwtTokenValidator.getRoleFromToken(token);
 
                 // Check if both userId and role are valid
                 if (userId != null && role != null && !role.trim().isEmpty()) {
 
                     // Now check if user exists and is active in the database
-                    Optional<User> userOpt = userRepository.findById(userId.intValue());
+                    Optional<User> userOpt = userRepository.findById(userId);
 
                     if (userOpt.isPresent()) {
                         User user = userOpt.get();
@@ -190,14 +184,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             // Validate the refresh token
             if (refreshToken != null && jwtTokenValidator.validateRefreshToken(refreshToken)) {
-                Long userId = jwtTokenValidator.getUserIdFromToken(refreshToken);
+                Integer userId = jwtTokenValidator.getUserIdFromToken(refreshToken);
                 String role = jwtTokenValidator.getRoleFromToken(refreshToken);
 
                 // Check if both userId and role are valid
                 if (userId != null && role != null && !role.trim().isEmpty()) {
 
                     // Check if user exists and is active in the database
-                    Optional<User> userOpt = userRepository.findById(userId.intValue());
+                    Optional<User> userOpt = userRepository.findById(userId);
 
                     if (userOpt.isPresent()) {
                         User user = userOpt.get();

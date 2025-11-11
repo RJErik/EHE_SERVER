@@ -3,29 +3,29 @@ package com.example.ehe_server.dto;
 import java.util.Objects;
 
 public class ApiKeyCreationResponse {
-    private Long apiKeyId;
+    private Integer apiKeyId;
     private String platformName;
     private String maskedApiKeyValue;
     private String maskedSecretKey;
 
     public ApiKeyCreationResponse() {}
 
-    public ApiKeyCreationResponse(Long apiKeyId) {
+    public ApiKeyCreationResponse(Integer apiKeyId) {
         this.apiKeyId = apiKeyId;
     }
 
-    public ApiKeyCreationResponse(Long apiKeyId, String platformName, String maskedApiKeyValue, String maskedSecretKey) {
+    public ApiKeyCreationResponse(Integer apiKeyId, String platformName, String maskedApiKeyValue, String maskedSecretKey) {
         this.apiKeyId = apiKeyId;
         this.platformName = platformName;
         this.maskedApiKeyValue = maskedApiKeyValue;
         this.maskedSecretKey = maskedSecretKey;
     }
 
-    public Long getApiKeyId() {
+    public Integer getApiKeyId() {
         return apiKeyId;
     }
 
-    public void setApiKeyId(Long apiKeyId) {
+    public void setApiKeyId(Integer apiKeyId) {
         this.apiKeyId = apiKeyId;
     }
 

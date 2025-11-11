@@ -151,7 +151,7 @@ public class TradingService implements TradingServiceInterface {
 
             return new TradeExecutionResponse(
                     orderResult.get("orderId") != null ?
-                            ((Number) orderResult.get("orderId")).longValue() : null,
+                            ((Number) orderResult.get("orderId")).intValue() : null,
                     (String) orderResult.get("symbol"),
                     (String) orderResult.get("side"),
                     orderResult.get("origQty") != null ?

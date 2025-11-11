@@ -45,7 +45,7 @@ public class WatchlistCreationService implements WatchlistCreationServiceInterfa
     public WatchlistCreationResponse createWatchlistItem(Integer userId, String platform, String symbol) {
         // Get user
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(userId.longValue()));
+                .orElseThrow(() -> new UserNotFoundException(userId));
 
         // Check if platform and symbol combination exists
         List<PlatformStock> platformStocks = platformStockRepository.findByPlatformNameAndStockSymbol(platform, symbol);

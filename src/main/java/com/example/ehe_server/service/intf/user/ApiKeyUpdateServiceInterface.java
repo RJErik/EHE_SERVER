@@ -5,5 +5,5 @@ import com.example.ehe_server.dto.ApiKeyUpdateResponse;
 import java.util.Map;
 
 public interface ApiKeyUpdateServiceInterface {
-    ApiKeyUpdateResponse updateApiKey(Long userId, Integer apiKeyId, String platformName, String apiKeyValue, String secretKey);
+    ApiKeyUpdateResponse updateApiKey(Integer userId, Integer apiKeyId, String platformName, String apiKeyValue, String secretKey);
 }

@@ -58,7 +58,7 @@ public class PortfolioController {
     @GetMapping("/portfolios")
     public ResponseEntity<Map<String, Object>> getPortfolios() {
         // Call automated trade rule retrieval service
-        List<PortfolioRetrievalResponse> portfolioRetrievalResponses = portfolioRetrievalService.getPortfolios(userContextService.getCurrentUserId().intValue());
+        List<PortfolioRetrievalResponse> portfolioRetrievalResponses = portfolioRetrievalService.getPortfolios(userContextService.getCurrentUserId());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -137,7 +137,7 @@ public class PortfolioController {
     @PostMapping("/portfolios/search")
     public ResponseEntity<Map<String, Object>> searchPortfolio(@RequestBody PortfolioSearchRequest request) {
         // Call automated trade rule retrieval service
-        List<PortfolioSearchResponse> portfolioSearchResponses = portfolioSearchService.searchPortfolios(userContextService.getCurrentUserId().intValue(), request.getPlatform(), request.getMinValue(), request.getMaxValue());
+        List<PortfolioSearchResponse> portfolioSearchResponses = portfolioSearchService.searchPortfolios(userContextService.getCurrentUserId(), request.getPlatform(), request.getMinValue(), request.getMaxValue());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -161,7 +161,7 @@ public class PortfolioController {
     @PostMapping("/portfolios/update-holdings")
     public ResponseEntity<Map<String, Object>> updateHoldings(@RequestBody PortfolioUpdateHoldingsRequest request) {
         // Call portfolio value service to update holdings
-        HoldingsUpdateResponse holdingsUpdateResponse = portfolioValueService.updateHoldings(userContextService.getCurrentUserId().intValue(), request.getPortfolioId());
+        HoldingsUpdateResponse holdingsUpdateResponse = portfolioValueService.updateHoldings(userContextService.getCurrentUserId(), request.getPortfolioId());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -190,7 +190,7 @@ public class PortfolioController {
     @PostMapping("/portfolios/value")
     public ResponseEntity<Map<String, Object>> getPortfolioValue(@RequestBody PortfolioValueRequest request) {
         // Call portfolio value service to calculate value
-        PortfolioValueResponse portfolioValueResponse = portfolioValueService.calculatePortfolioValue(userContextService.getCurrentUserId().intValue(), request.getPortfolioId());
+        PortfolioValueResponse portfolioValueResponse = portfolioValueService.calculatePortfolioValue(userContextService.getCurrentUserId(), request.getPortfolioId());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -219,7 +219,7 @@ public class PortfolioController {
     @PostMapping("/portfolios/details")
     public ResponseEntity<Map<String, Object>> getPortfolioDetails(@RequestBody PortfolioDetailsRequest request) {
         // Call portfolio details service
-        PortfolioDetailsResponse portfolioDetailsResponse = portfolioDetailsService.getPortfolioDetails(userContextService.getCurrentUserId().intValue(), request.getPortfolioId());
+        PortfolioDetailsResponse portfolioDetailsResponse = portfolioDetailsService.getPortfolioDetails(userContextService.getCurrentUserId(), request.getPortfolioId());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
@@ -241,7 +241,7 @@ public class PortfolioController {
     @PostMapping("/portfolios/by-platform")
     public ResponseEntity<Map<String, Object>> getPortfoliosByPlatform(@RequestBody PortfolioByPlatformRequest request) {
         // Call portfolio service
-        List<PortfolioByPlatformResponse> portfolioByPlatformResponses = portfolioByPlatformService.getPortfoliosByPlatform(userContextService.getCurrentUserId().intValue(), request.getPlatform());
+        List<PortfolioByPlatformResponse> portfolioByPlatformResponses = portfolioByPlatformService.getPortfoliosByPlatform(userContextService.getCurrentUserId(), request.getPlatform());
 
         // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(

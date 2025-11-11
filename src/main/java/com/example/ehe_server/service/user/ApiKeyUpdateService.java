@@ -37,11 +37,11 @@ public class ApiKeyUpdateService implements ApiKeyUpdateServiceInterface {
 
     @Override
     @Transactional
-    public ApiKeyUpdateResponse updateApiKey(Long userId, Integer apiKeyId, String platformName, String apiKeyValue, String secretKey) {
+    public ApiKeyUpdateResponse updateApiKey(Integer userId, Integer apiKeyId, String platformName, String apiKeyValue, String secretKey) {
         // Check if user exists and is active
         User user;
-        if (userRepository.existsById(userId.intValue())) {
-            user = userRepository.findById(userId.intValue()).get();
+        if (userRepository.existsById(userId)) {
+            user = userRepository.findById(userId).get();
         } else {
             return null;
         }

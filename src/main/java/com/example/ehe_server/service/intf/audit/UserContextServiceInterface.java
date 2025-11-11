@@ -29,7 +29,7 @@ public interface UserContextServiceInterface {
      * Get the current authenticated user ID
      * @return User ID if authenticated, null otherwise
      */
-    Long getCurrentUserId();
+    Integer getCurrentUserId();
 
     /**
      * Get the current user's username for PostgreSQL audit context, as sting
