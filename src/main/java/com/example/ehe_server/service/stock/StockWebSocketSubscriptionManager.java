@@ -386,41 +386,56 @@ public class StockWebSocketSubscriptionManager {
                 System.out.println("new candles" + newCandles);
 
                 if (!newCandles.isEmpty()) {
+                    // A new candle was formed, so the previous one is now complete
+                    // Check if the previous candle was modified since last check
+                    if (subscription.getLatestCandleTimestamp() != null) {
+                        CandleData previousCandle = marketCandleService.getCandleAtTimestamp(
+                                subscription.getPlatformName(),
+                                subscription.getStockSymbol(),
+                                subscription.getTimeframe(),
+                                subscription.getLatestCandleTimestamp());
+
+                        if (previousCandle != null &&
+                                (
+                                        !previousCandle.getOpenPrice().equals(subscription.getLatestCandleOpen()) ||
+                                                !previousCandle.getHighPrice().equals(subscription.getLatestCandleHigh()) ||
+                                                !previousCandle.getLowPrice().equals(subscription.getLatestCandleLow()) ||
+                                                !previousCandle.getClosePrice().equals(subscription.getLatestCandleClose()) ||
+                                                !previousCandle.getVolume().equals(subscription.getLatestCandleVolume())
+                                )) {
+                            System.out.println("Previous candle was modified, adding to updates");
+                            updatedCandles.add(previousCandle);
+                            hasUpdates = true;
+                        }
+                    }
+
+                    // Add new candles
                     updatedCandles.addAll(newCandles);
-                    System.out.println(updatedCandles.size() + " new candles");
+                    System.out.println(updatedCandles.size() + " candles in total to send");
                     hasUpdates = true;
 
                     // Update the latest candle info with the most recent candle
                     subscription.updateLatestCandle(newCandles.get(newCandles.size() - 1));
-                }
+                } else {
+                    // No new candles, check if the latest candle (currently forming) was modified
+                    if (subscription.getLatestCandleTimestamp() != null) {
+                        CandleData modifiedCandle = marketCandleService.getModifiedLatestCandle(
+                                subscription.getPlatformName(),
+                                subscription.getStockSymbol(),
+                                subscription.getTimeframe(),
+                                subscription.getLatestCandleTimestamp(),
+                                subscription.getLatestCandleOpen(),
+                                subscription.getLatestCandleHigh(),
+                                subscription.getLatestCandleLow(),
+                                subscription.getLatestCandleClose(),
+                                subscription.getLatestCandleVolume());
 
-                System.out.println("!!!!Has updates: " + hasUpdates);
-
-                // For non-1-minute timeframes, also check if the latest candle was modified
-                if (!marketCandleService.isOneMinuteTimeframe(subscription.getTimeframe()) &&
-                        subscription.getLatestCandleTimestamp() != null) {
-
-                    CandleData modifiedCandle = marketCandleService.getModifiedLatestCandle(
-                            subscription.getPlatformName(),
-                            subscription.getStockSymbol(),
-                            subscription.getTimeframe(),
-                            subscription.getLatestCandleTimestamp(),
-                            subscription.getLatestCandleOpen(),
-                            subscription.getLatestCandleHigh(),
-                            subscription.getLatestCandleLow(),
-                            subscription.getLatestCandleClose(),
-                            subscription.getLatestCandleVolume());
-
-                    if (modifiedCandle != null) {
-                        // Only add if not already included in new candles
-                        if (updatedCandles.stream().noneMatch(c ->
-                                c.getTimestamp().equals(modifiedCandle.getTimestamp()))) {
+                        if (modifiedCandle != null) {
                             updatedCandles.add(modifiedCandle);
                             hasUpdates = true;
+                            subscription.updateLatestCandle(modifiedCandle);
+                            System.out.println("Current candle was modified, adding to updates");
                         }
-
-                        // Update the latest candle info
-                        subscription.updateLatestCandle(modifiedCandle);
                     }
                 }
 

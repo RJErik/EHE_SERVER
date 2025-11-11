@@ -49,12 +49,11 @@ public interface MarketCandleServiceInterface {
             BigDecimal lastCandleClose,
             BigDecimal lastCandleVolume);
 
-    Timeframe parseTimeframe(String timeframeStr);
+    CandleData getCandleAtTimestamp(
+            String platformName,
+            String stockSymbol,
+            String timeframeStr,
+            LocalDateTime timestamp);
 
-    /**
-     * Determines if a given timeframe is 1 minute (the smallest timeframe)
-     * @param timeframeStr The timeframe string to check
-     * @return true if the timeframe is 1 minute, false otherwise
-     */
-    boolean isOneMinuteTimeframe(String timeframeStr);
+    Timeframe parseTimeframe(String timeframeStr);
 }

@@ -277,13 +277,6 @@ public class MarketCandleService implements MarketCandleServiceInterface {
                 (lastCandleTimestamp != null ? lastCandleTimestamp.format(formatter) : "null"));
 
         try {
-            // Skip this check for 1-minute candles since they are atomic
-            if (isOneMinuteTimeframe(timeframeStr)) {
-                System.out.println("Skipping modified check for 1-minute candles as they're atomic");
-                System.out.println(">>> RETURNING NO MODIFIED CANDLES FOR TIMEFRAME " + timeframeStr + " (ATOMIC) <<<");
-                return null;
-            }
-
             // Find the platform stock
             List<PlatformStock> platformStocks = platformStockRepository.findByPlatformName(platformName);
 
@@ -380,14 +373,79 @@ public class MarketCandleService implements MarketCandleServiceInterface {
     }
 
     @Override
-    public boolean isOneMinuteTimeframe(String timeframeStr) {
-        if (timeframeStr == null) {
-            return false;
+    public CandleData getCandleAtTimestamp(
+            String platformName,
+            String stockSymbol,
+            String timeframeStr,
+            LocalDateTime timestamp) {
+
+        if (timestamp == null) {
+            return null;
         }
 
-        return timeframeStr.equalsIgnoreCase("1m") ||
-                timeframeStr.equalsIgnoreCase("1min") ||
-                timeframeStr.equalsIgnoreCase("M1");
+        System.out.println("\n### EXECUTING getCandleAtTimestamp() ###");
+        System.out.println("Request params: platform=" + platformName +
+                ", stock=" + stockSymbol +
+                ", timeframe=" + timeframeStr +
+                ", timestamp=" + timestamp.format(formatter));
+
+        try {
+            // Find the platform stock
+            System.out.println("Searching for platform: " + platformName + ", stock: " + stockSymbol);
+            List<PlatformStock> platformStocks = platformStockRepository.findByPlatformName(platformName);
+
+            Optional<PlatformStock> platformStockOpt = platformStocks.stream()
+                    .filter(ps -> ps.getStockSymbol().equals(stockSymbol))
+                    .findFirst();
+
+            if (platformStockOpt.isEmpty()) {
+                System.out.println("ERROR: Stock '" + stockSymbol + "' not found for platform '" + platformName + "'");
+                return null;
+            }
+
+            PlatformStock stock = platformStockOpt.get();
+            System.out.println("Found matching stock: " + stock.getStockSymbol());
+
+            // Parse timeframe
+            System.out.println("Parsing timeframe: " + timeframeStr);
+            Timeframe timeframe;
+            try {
+                timeframe = parseTimeframe(timeframeStr);
+                System.out.println("Successfully parsed timeframe to: " + timeframe);
+            } catch (IllegalArgumentException e) {
+                System.out.println("ERROR: Failed to parse timeframe '" + timeframeStr + "': " + e.getMessage());
+                return null;
+            }
+
+            // Get candle at specific timestamp
+            System.out.println("Fetching candle at timestamp: " + timestamp.format(formatter));
+            List<MarketCandle> candles = marketCandleRepository
+                    .findByPlatformStockAndTimeframeAndTimestampBetweenOrderByTimestampAsc(
+                            stock, timeframe, timestamp, timestamp);
+
+            if (candles.isEmpty()) {
+                System.out.println("No candle found at timestamp: " + timestamp.format(formatter));
+                System.out.println(">>> RETURNING NULL FOR TIMESTAMP " + timestamp.format(formatter) + " <<<");
+                return null;
+            }
+
+            CandleData result = convertToDTO(candles.get(0));
+            System.out.println("Found candle at timestamp: " + timestamp.format(formatter));
+            System.out.println("Candle details: O:" + result.getOpenPrice() +
+                    " H:" + result.getHighPrice() +
+                    " L:" + result.getLowPrice() +
+                    " C:" + result.getClosePrice() +
+                    " V:" + result.getVolume());
+            System.out.println(">>> RETURNING CANDLE FOR TIMESTAMP " + timestamp.format(formatter) + " <<<");
+
+            return result;
+
+        } catch (Exception e) {
+            System.out.println("ERROR in getCandleAtTimestamp: " + e.getMessage());
+            e.printStackTrace();
+            loggingService.logError("Error getting candle at timestamp: " + e.getMessage(), e);
+            return null;
+        }
     }
 
     @Override
