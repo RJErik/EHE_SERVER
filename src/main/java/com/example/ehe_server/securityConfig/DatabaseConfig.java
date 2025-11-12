@@ -96,7 +96,7 @@ public class DatabaseConfig {
 
                 // Set the PostgreSQL session variable for audit purposes
                 try (PreparedStatement statement = connection.prepareStatement(
-                        "SELECT set_config('myapp.current_user', ?, false)")) {
+                        "SELECT set_config('ehe.current_user', ?, false)")) {
                     statement.setString(1, currentUser);
                     statement.execute();
                 }
