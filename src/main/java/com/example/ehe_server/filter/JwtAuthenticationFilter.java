@@ -2,9 +2,6 @@ package com.example.ehe_server.filter;
 
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.audit.UserContextService;
-import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
-import com.example.ehe_server.service.intf.auth.JwtTokenGeneratorInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtTokenValidatorInterface;
 import jakarta.servlet.FilterChain;
@@ -14,48 +11,50 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.Collections;
 import java.util.Optional;
 
 @Component
-@Order(2)
+@Order(1)  // Run BEFORE Spring Security's authorization layer
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenValidatorInterface jwtTokenValidator;
     private final LoggingServiceInterface loggingService;
     private final UserRepository userRepository;
-    private final UserContextService userContextService;
 
     @Value("${jwt.refresh.url}")
-    private String REFRESH_URL;
+    private String jwtRefreshUrl;
 
-    // Be more specific about protected paths - exact matching for endpoints
-    private static final List<String> PROTECTED_PATHS = List.of(
-            "/api/user/",
-            "/api/admin/",
-            "/candles/"
-            // Add other protected paths
-    );
+    private enum TokenType {
+        ACCESS("jwt_access_token"),
+        REFRESH("jwt_refresh_token");
 
-    // Public endpoints that don't require authentication
-    private static final List<String> PUBLIC_PATHS = List.of(
-            "/api/auth/",
-            "/api/home/"
-    );
+        private final String cookieName;
+
+        TokenType(String cookieName) {
+            this.cookieName = cookieName;
+        }
+
+        public String getCookieName() {
+            return cookieName;
+        }
+    }
 
     public JwtAuthenticationFilter(
             JwtTokenValidatorInterface jwtTokenValidator,
             LoggingServiceInterface loggingService,
-            UserRepository userRepository,
-            UserContextService userContextService) {
+            UserRepository userRepository) {
         this.jwtTokenValidator = jwtTokenValidator;
         this.loggingService = loggingService;
         this.userRepository = userRepository;
-        this.userContextService = userContextService;
     }
 
     @Override
@@ -64,175 +63,117 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // Set the request path in audit context
-        userContextService.setRequestPath(request.getRequestURI());
+        // Try to authenticate the user (if token exists)
+        // Doesn't matter if it fails or succeeds—SecurityContext will be populated or empty
+        // Spring Security's authorizeHttpRequests will handle what to do
+        authenticateIfTokenExists(request, path);
 
-        // Check if this is a public endpoint
-        boolean isPublicEndpoint = PUBLIC_PATHS.stream().anyMatch(path::startsWith);
-
-        // Skip authentication for public endpoints
-        if (isPublicEndpoint) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        // **NEW: Special handling for refresh endpoint**
-        if (path.equals(REFRESH_URL)) {
-            handleRefreshEndpoint(request, response, filterChain);
-            return;
-        }
-
-        // Extract JWT access token from cookie
-        String token = null;
-        if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                if ("jwt_access_token".equals(cookie.getName())) {
-                    token = cookie.getValue();
-                    break;
-                }
-            }
-        }
-
-        boolean isAuthenticated = false;
-
-        try {
-            // First validate the JWT token
-            if (token != null && jwtTokenValidator.validateAccessToken(token)) {
-                Integer userId = jwtTokenValidator.getUserIdFromToken(token);
-                String role = jwtTokenValidator.getRoleFromToken(token);
-
-                // Check if both userId and role are valid
-                if (userId != null && role != null && !role.trim().isEmpty()) {
-
-                    // Now check if user exists and is active in the database
-                    Optional<User> userOpt = userRepository.findById(userId);
-
-                    if (userOpt.isPresent()) {
-                        User user = userOpt.get();
-
-                        // Check if account is active
-                        if (user.getAccountStatus() == User.AccountStatus.ACTIVE) {
-                            userContextService.setUser(String.valueOf(user.getUserId()), role);
-                            isAuthenticated = true;
-
-                            // Log access to significant endpoints
-                            if (isSignificantEndpoint(path)) {
-                                loggingService.logAction("Accessed " + path);
-                            }
-                        } else {
-                            // User exists but is not active
-                            loggingService.logAction("Authentication failed: User account status is " + user.getAccountStatus());
-                        }
-                    } else {
-                        // User doesn't exist in database
-                        loggingService.logAction("Authentication failed: User not found in database");
-                    }
-                } else {
-                    // Invalid userId or role in token
-                    loggingService.logAction("Authentication failed: Invalid userId or role in JWT token");
-                }
-            } else {
-                // Invalid or missing token
-                if (token != null) {
-                    loggingService.logAction("Authentication failed: Invalid JWT token");
-                }
-            }
-        } catch (Exception e) {
-            loggingService.logError("Exception during authentication: " + e.getMessage(), e);
-        }
-
-        // Check if this is a protected path
-        boolean needsAuthentication = false;
-
-        // Handle exact endpoints
-        if (path.equals("/api/user/verify") || path.equals("/api/admin/verify")) {
-            needsAuthentication = true;
-        } else {
-            // For other paths, check if they start with any protected path
-            needsAuthentication = PROTECTED_PATHS.stream()
-                    .anyMatch(path::startsWith);
-        }
-
-        // If protected path and not authenticated, return 401
-        if (needsAuthentication && !isAuthenticated) {
-            loggingService.logAction("Unauthorized access attempt to " + path);
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"error\": \"unauthorized\", \"message\": \"Invalid or expired access token\"}");
-            return;
-        }
-
-        // Continue with filter chain
         filterChain.doFilter(request, response);
     }
 
-    // **NEW: Add this method to handle refresh endpoint**
-    private void handleRefreshEndpoint(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
-
-        // Extract refresh token from cookie
-        String refreshToken = null;
-        if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                if ("jwt_refresh_token".equals(cookie.getName())) {
-                    refreshToken = cookie.getValue();
-                    break;
-                }
-            }
-        }
-
+    /**
+     * Attempts to extract, validate, and set user authentication in SecurityContext.
+     * If no valid token exists, SecurityContext remains empty (which is fine—
+     * Spring Security will treat the request as unauthenticated).
+     */
+    private void authenticateIfTokenExists(HttpServletRequest request, String path) {
         try {
-            // Validate the refresh token
-            if (refreshToken != null && jwtTokenValidator.validateRefreshToken(refreshToken)) {
-                Integer userId = jwtTokenValidator.getUserIdFromToken(refreshToken);
-                String role = jwtTokenValidator.getRoleFromToken(refreshToken);
+            // Try access token first (normal requests)
+            String token = extractTokenFromCookie(TokenType.ACCESS, request);
 
-                // Check if both userId and role are valid
-                if (userId != null && role != null && !role.trim().isEmpty()) {
-
-                    // Check if user exists and is active in the database
-                    Optional<User> userOpt = userRepository.findById(userId);
-
-                    if (userOpt.isPresent()) {
-                        User user = userOpt.get();
-
-                        // Check if account is active
-                        if (user.getAccountStatus() == User.AccountStatus.ACTIVE) {
-                            // Set user context
-                            userContextService.setUser(String.valueOf(user.getUserId()), role);
-
-                            loggingService.logAction("Valid refresh token for user " + userId);
-
-                            // Allow the request to proceed to the refresh controller
-                            filterChain.doFilter(request, response);
-                            return;
-                        } else {
-                            loggingService.logAction("Refresh failed: User account status is " + user.getAccountStatus());
-                        }
-                    } else {
-                        loggingService.logAction("Refresh failed: User not found in database");
-                    }
-                } else {
-                    loggingService.logAction("Refresh failed: Invalid userId or role in refresh token");
-                }
-            } else {
-                loggingService.logAction("Refresh failed: Invalid or missing refresh token");
+            if (token != null && isTokenValid(token, TokenType.ACCESS)) {
+                setUserAuthentication(token, path);
+                return;
             }
-        } catch (Exception e) {
-            loggingService.logError("Exception during refresh token validation: " + e.getMessage(), e);
-        }
 
-        // If we reach here, refresh token validation failed - return 401
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setContentType("application/json");
-        response.getWriter().write("{\"error\": \"unauthorized\", \"message\": \"Invalid or expired refresh token\"}");
+            // If access token failed, maybe it's a refresh endpoint—try refresh token
+            String refreshToken = extractTokenFromCookie(TokenType.REFRESH, request);
+            if (refreshToken != null && isTokenValid(refreshToken, TokenType.REFRESH) && path.equals(jwtRefreshUrl)) {
+                setUserAuthentication(refreshToken, path);
+                return;
+            }
+
+            // No valid token found—that's OK, SecurityContext stays empty
+            loggingService.logAction("[" + path + "] No valid JWT token provided");
+
+        } catch (Exception e) {
+            loggingService.logError("[" + path + "] Error during JWT authentication: " + e.getMessage(), e);
+            // Don't throw—let SecurityConfig's authorizeHttpRequests handle rejection
+        }
     }
 
-    // Helper method to determine if this is an endpoint we want to log access for
-    private boolean isSignificantEndpoint(String path) {
-        return path.startsWith("/api/admin/") ||
-                path.contains("/profile") ||
-                path.contains("/settings") ||
-                path.contains("/user");
+    /**
+     * Validates token, extracts claims, loads User from DB, and sets Authentication.
+     */
+    private void setUserAuthentication(String token, String path) {
+        try {
+            Integer userId = jwtTokenValidator.getUserIdFromToken(token);
+            String role = jwtTokenValidator.getRoleFromToken(token);
+
+            if (!areClaimsValid(userId, role)) {
+                loggingService.logAction("[" + path + "] JWT claims invalid: userId=" + userId + ", role=" + role);
+                return;
+            }
+
+            // Load and validate user exists and is active
+            Optional<User> userOpt = userRepository.findById(userId);
+            if (userOpt.isEmpty()) {
+                loggingService.logAction("[" + path + "] JWT user not found: userId=" + userId);
+                return;
+            }
+
+            User user = userOpt.get();
+            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
+                loggingService.logAction("[" + path + "] JWT user inactive: userId=" + userId + ", status=" + user.getAccountStatus());
+                return;
+            }
+
+            // ✅ Create Authentication with roles and set in context
+            Authentication auth = createAuthentication(user, role);
+            SecurityContextHolder.getContext().setAuthentication(auth);
+
+            loggingService.logAction("[" + path + "] User authenticated: userId=" + user.getUserId() + ", role=" + role);
+
+        } catch (Exception e) {
+            loggingService.logError("[" + path + "] Exception setting user authentication: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Creates an Authentication object with the user's role as a granted authority.
+     * Spring Security's authorizeHttpRequests will read this to check hasRole().
+     */
+    private Authentication createAuthentication(User user, String role) {
+        // Convert role string to GrantedAuthority
+        // Spring expects "ROLE_ADMIN", "ROLE_USER", etc.
+        String authorityName = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+
+        return new PreAuthenticatedAuthenticationToken(
+                String.valueOf(user.getUserId()),  // principal: who is this?
+                null,                              // credentials: not needed (token already validated)
+                Collections.singletonList(new SimpleGrantedAuthority(authorityName))
+        );
+    }
+
+    private String extractTokenFromCookie(TokenType tokenType, HttpServletRequest request) {
+        if (request.getCookies() == null) {
+            return null;
+        }
+        for (Cookie cookie : request.getCookies()) {
+            if (tokenType.getCookieName().equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
+    }
+
+    private boolean isTokenValid(String token, TokenType tokenType) {
+        return tokenType == TokenType.ACCESS
+                ? jwtTokenValidator.validateAccessToken(token)
+                : jwtTokenValidator.validateRefreshToken(token);
+    }
+
+    private boolean areClaimsValid(Integer userId, String role) {
+        return userId != null && role != null && !role.trim().isEmpty();
     }
 }

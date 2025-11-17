@@ -11,7 +11,9 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
@@ -22,8 +24,8 @@ import java.util.Optional;
 public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
     private final JwtTokenValidatorInterface jwtTokenValidator;
-    private final UserRepository userRepository; // <-- Added UserRepository
-    private final LoggingServiceInterface loggingService; // <-- Added LoggingService
+    private final UserRepository userRepository;
+    private final LoggingServiceInterface loggingService;
 
     public WebSocketAuthInterceptor(
             JwtTokenValidatorInterface jwtTokenValidator,
@@ -38,69 +40,129 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-        // We only care about the initial connection command
+        // Only authenticate on initial WebSocket connection
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
-            String token = null;
+            authenticateWebSocketConnection(accessor);
+        }
 
-            // Try to get token from STOMP header first
-            List<String> authorization = accessor.getNativeHeader("Authorization");
-            if (authorization != null && !authorization.isEmpty()) {
-                token = authorization.get(0).replace("Bearer ", "");
+        return message;
+    }
+
+    /**
+     * Authenticates a WebSocket connection by extracting and validating JWT token.
+     * Sets the authenticated user in both SecurityContext and STOMP session.
+     */
+    private void authenticateWebSocketConnection(StompHeaderAccessor accessor) {
+        try {
+            String token = extractTokenFromWebSocket(accessor);
+
+            if (token == null) {
+                loggingService.logAction("[WebSocket/CONNECT] No JWT token provided");
+                return;
             }
 
-            // If not found in header, try to get from session attributes (from handshake)
-            if (token == null && accessor.getSessionAttributes() != null) {
-                token = (String) accessor.getSessionAttributes().get("jwt_access_token");
+            if (!jwtTokenValidator.validateAccessToken(token)) {
+                loggingService.logAction("[WebSocket/CONNECT] Invalid or expired JWT token");
+                return;
             }
 
-            // Step 1: Validate the token's structure and signature
-            if (token != null && jwtTokenValidator.validateAccessToken(token)) {
-                try {
-                    Integer userId = jwtTokenValidator.getUserIdFromToken(token);
-                    String role = jwtTokenValidator.getRoleFromToken(token);
+            setWebSocketAuthentication(token, accessor);
 
-                    if (userId == null || role == null || role.trim().isEmpty()) {
-                        loggingService.logAction("WebSocket Auth Failed: Invalid userId or role in JWT token.");
-                        return message; // Stop further processing
-                    }
+        } catch (Exception e) {
+            loggingService.logError("[WebSocket/CONNECT] Exception during authentication: " + e.getMessage(), e);
+        }
+    }
 
-                    // Step 2: Check if user exists in the database
-                    Optional<User> userOpt = userRepository.findById(userId.intValue());
+    /**
+     * Extracts JWT token from WebSocket connection.
+     * First tries Authorization header, then falls back to session attributes.
+     *
+     * @return JWT token string, or null if not found
+     */
+    private String extractTokenFromWebSocket(StompHeaderAccessor accessor) {
+        // Try to get token from Authorization header (Bearer token format)
+        List<String> authorization = accessor.getNativeHeader("Authorization");
+        if (authorization != null && !authorization.isEmpty()) {
+            String authHeader = authorization.get(0);
+            if (authHeader.startsWith("Bearer ")) {
+                return authHeader.substring(7); // Remove "Bearer " prefix
+            }
+            return authHeader;
+        }
 
-                    if (userOpt.isPresent()) {
-                        User user = userOpt.get();
-
-                        // Step 3: Check if the user's account is active
-                        if (user.getAccountStatus() == User.AccountStatus.ACTIVE) {
-                            // All checks passed, user is authenticated and active.
-                            String prefixedRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
-                            UsernamePasswordAuthenticationToken authentication =
-                                    new UsernamePasswordAuthenticationToken(
-                                            userId, // Principal
-                                            null,   // Credentials
-                                            Collections.singletonList(new SimpleGrantedAuthority(prefixedRole))
-                                    );
-                            // Attach the authenticated user to the WebSocket session
-                            accessor.setUser(authentication);
-                            loggingService.logAction("WebSocket connection established for user: " + userId);
-                        } else {
-                            // User exists but account is not active
-                            loggingService.logAction("WebSocket Auth Failed: User account status is " + user.getAccountStatus() + " for user: " + userId);
-                        }
-                    } else {
-                        // User from token does not exist in the database
-                        loggingService.logAction("WebSocket Auth Failed: User not found in database for user ID: " + userId);
-                    }
-                } catch (Exception e) {
-                    loggingService.logError("Exception during WebSocket authentication: " + e.getMessage(), e);
-                }
-            } else {
-                // Token is invalid or missing
-                if (token != null) {
-                    loggingService.logAction("WebSocket Auth Failed: Invalid JWT token provided.");
-                }
+        // Fallback: try session attributes (set during WebSocket handshake)
+        if (accessor.getSessionAttributes() != null) {
+            Object token = accessor.getSessionAttributes().get("jwt_access_token");
+            if (token instanceof String) {
+                return (String) token;
             }
         }
-        return message;
+
+        return null;
+    }
+
+    /**
+     * Validates token claims, loads user from DB, and sets authentication.
+     * Sets authentication in both SecurityContext and STOMP accessor for accessibility
+     * throughout the WebSocket session.
+     */
+    private void setWebSocketAuthentication(String token, StompHeaderAccessor accessor) {
+        try {
+            Integer userId = jwtTokenValidator.getUserIdFromToken(token);
+            String role = jwtTokenValidator.getRoleFromToken(token);
+
+            if (!areClaimsValid(userId, role)) {
+                loggingService.logAction("[WebSocket/CONNECT] JWT claims invalid: userId=" + userId + ", role=" + role);
+                return;
+            }
+
+            // Load and validate user exists and is active
+            Optional<User> userOpt = userRepository.findById(userId);
+            if (userOpt.isEmpty()) {
+                loggingService.logAction("[WebSocket/CONNECT] JWT user not found: userId=" + userId);
+                return;
+            }
+
+            User user = userOpt.get();
+            if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
+                loggingService.logAction("[WebSocket/CONNECT] JWT user inactive: userId=" + userId + ", status=" + user.getAccountStatus());
+                return;
+            }
+
+            // ✅ Create Authentication and set in both contexts
+            Authentication auth = createAuthentication(user, role);
+
+            // Set in Spring Security context (for broader Spring access)
+            SecurityContextHolder.getContext().setAuthentication(auth);
+
+            // Set in STOMP session (for WebSocket-specific access)
+            accessor.setUser(auth);
+
+            loggingService.logAction("[WebSocket/CONNECT] User authenticated: userId=" + user.getUserId() + ", role=" + role);
+
+        } catch (Exception e) {
+            loggingService.logError("[WebSocket/CONNECT] Exception setting WebSocket authentication: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Creates an Authentication object with the user's role as a granted authority.
+     * Spring Security uses this to check message-level authorization (e.g., @PreAuthorize).
+     */
+    private Authentication createAuthentication(User user, String role) {
+        String authorityName = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+
+        return new UsernamePasswordAuthenticationToken(
+                user.getUserId(),  // principal: who is this?
+                null,              // credentials: not needed (token already validated)
+                Collections.singletonList(new SimpleGrantedAuthority(authorityName))
+        );
+    }
+
+    /**
+     * Validates that userId and role claims are present and valid.
+     */
+    private boolean areClaimsValid(Integer userId, String role) {
+        return userId != null && role != null && !role.trim().isEmpty();
     }
 }
