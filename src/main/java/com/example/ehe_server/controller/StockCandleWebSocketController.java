@@ -43,6 +43,7 @@ public class StockCandleWebSocketController {
 
         // Create subscription
         StockCandleSubscriptionResponse stockCandleSubscriptionResponse = stockWebSocketSubscriptionManager.createSubscription(
+                webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor),
                 request.getPlatformName(),
                 request.getStockSymbol(),
                 request.getTimeframe(),
