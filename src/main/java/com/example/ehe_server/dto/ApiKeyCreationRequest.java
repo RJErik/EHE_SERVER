@@ -1,15 +1,10 @@
 package com.example.ehe_server.dto;
 
-import jakarta.validation.constraints.NotBlank;
-
 public class ApiKeyCreationRequest {
-    @NotBlank(message = "Platform name is required")
     private String platformName;
 
-    @NotBlank(message = "API key value is required")
     private String apiKeyValue;
 
-    @NotBlank(message = "Secret key value is required")
     private String secretKey;
 
     // Getters and setters

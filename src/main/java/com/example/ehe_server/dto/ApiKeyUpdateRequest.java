@@ -1,13 +1,8 @@
 package com.example.ehe_server.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-
 public class ApiKeyUpdateRequest {
-    @NotNull(message = "API key ID is required")
     private Integer apiKeyId;
 
-    @NotBlank(message = "Platform name is required")
     private String platformName;
 
     private String apiKeyValue;

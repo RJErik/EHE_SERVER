@@ -1,12 +1,7 @@
 package com.example.ehe_server.dto;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotEmpty;
-
 public class PasswordResetRequest {
 
-    @NotEmpty(message = "Email is required")
-    @Email(message = "Please provide a valid email address")
     private String email;
 
     // Getter and Setter
