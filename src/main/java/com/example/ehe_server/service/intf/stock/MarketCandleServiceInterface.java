@@ -47,7 +47,8 @@ public interface MarketCandleServiceInterface {
             BigDecimal lastCandleHigh,
             BigDecimal lastCandleLow,
             BigDecimal lastCandleClose,
-            BigDecimal lastCandleVolume);
+            BigDecimal lastCandleVolume,
+            LocalDateTime endDate);
 
     CandleData getCandleAtTimestamp(
             String platformName,

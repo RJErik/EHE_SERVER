@@ -143,7 +143,6 @@ public class MarketCandleService implements MarketCandleServiceInterface {
             e.printStackTrace();
             response.setSuccess(false);
             response.setMessage("Error fetching candle data: " + e.getMessage());
-            //SYSTEM SET HERE
             loggingService.logError("Error fetching candle data: " + e.getMessage(), e);
         }
 
@@ -161,7 +160,6 @@ public class MarketCandleService implements MarketCandleServiceInterface {
 
         return response;
     }
-
 
     @Override
     public List<CandleData> getUpdatedCandles(
@@ -206,51 +204,62 @@ public class MarketCandleService implements MarketCandleServiceInterface {
             try {
                 timeframe = parseTimeframe(timeframeStr);
                 System.out.println("Successfully parsed timeframe to: " + timeframe);
-                System.out.println("Looking for updates for timeframe: " + timeframe + " since " +
-                        lastCheckTime.format(formatter));
+                System.out.println("Looking for updates for timeframe: " + timeframe +
+                        " after " + lastCheckTime.format(formatter) +
+                        " and before/at " + endDate.format(formatter));
             } catch (IllegalArgumentException e) {
                 System.out.println("ERROR: Failed to parse timeframe '" + timeframeStr + "': " + e.getMessage());
                 return new ArrayList<>();
             }
 
-            // For updated candles
-            System.out.println("Looking for latest candle updates since " + lastCheckTime.format(formatter));
-            System.out.println("Querying database for latest candle...");
+            // ✅ FIXED: Fetch candles that are AFTER lastCheckTime but WITHIN the date range
+            System.out.println("Querying database for candles after " + lastCheckTime.format(formatter) +
+                    " and before/at " + endDate.format(formatter));
 
-            MarketCandle latestCandle = marketCandleRepository
-                    .findTopByPlatformStockAndTimeframeOrderByTimestampDesc(
-                            stock, timeframe);
+            List<MarketCandle> updatedCandles = marketCandleRepository
+                    .findByPlatformStockAndTimeframeAndTimestampBetweenOrderByTimestampAsc(
+                            stock,
+                            timeframe,
+                            lastCheckTime,
+                            endDate);
 
-            if (latestCandle == null) {
-                System.out.println("No candles found for the specified criteria");
+            System.out.println("Database returned " + updatedCandles.size() + " candles in the range");
+
+            // Filter out the candle at lastCheckTime (we want AFTER, not including)
+            List<MarketCandle> newCandles = updatedCandles.stream()
+                    .filter(candle -> candle.getTimestamp().isAfter(lastCheckTime))
+                    .collect(Collectors.toList());
+
+            if (newCandles.isEmpty()) {
+                System.out.println("No new candles found since last check time within the date range");
                 System.out.println(">>> RETURNING 0 CANDLES FOR TIMEFRAME " + timeframeStr + " <<<");
                 return new ArrayList<>();
             }
 
-            System.out.println("Latest candle found: " + latestCandle.getTimestamp().format(formatter));
-            System.out.println("Latest candle details: O:" + latestCandle.getOpenPrice() +
-                    " H:" + latestCandle.getHighPrice() +
-                    " L:" + latestCandle.getLowPrice() +
-                    " C:" + latestCandle.getClosePrice());
+            System.out.println("Found " + newCandles.size() + " new candles within the date range");
+            System.out.println("First new candle: " + newCandles.get(0).getTimestamp().format(formatter));
+            System.out.println("Last new candle: " + newCandles.get(newCandles.size() - 1).getTimestamp().format(formatter));
 
-            // Check if candle is newer than last check time
-            if (latestCandle.getTimestamp().isAfter(lastCheckTime)) {
-                System.out.println("Latest candle is newer than last check time");
-                List<CandleData> result = new ArrayList<>();
-                result.add(convertToDTO(latestCandle));
-                System.out.println(">>> RETURNING 1 UPDATED CANDLE FOR TIMEFRAME " + timeframeStr + " <<<");
-                System.out.println(">>> CANDLE TIMESTAMP: " + latestCandle.getTimestamp().format(formatter) + " <<<");
-                return result;
+            // Log all candle timestamps for debugging
+            StringBuilder candleTimestamps = new StringBuilder();
+            for (MarketCandle candle : newCandles) {
+                if (candleTimestamps.length() > 0) {
+                    candleTimestamps.append(", ");
+                }
+                candleTimestamps.append(candle.getTimestamp().format(formatter));
             }
+            System.out.println("New candle timestamps: [" + candleTimestamps.toString() + "]");
 
-            System.out.println("No new candles since last check time");
-            System.out.println(">>> RETURNING 0 CANDLES FOR TIMEFRAME " + timeframeStr + " <<<");
-            return new ArrayList<>();
+            List<CandleData> result = newCandles.stream()
+                    .map(this::convertToDTO)
+                    .collect(Collectors.toList());
+
+            System.out.println(">>> RETURNING " + result.size() + " UPDATED CANDLES FOR TIMEFRAME " + timeframeStr + " <<<");
+            return result;
 
         } catch (Exception e) {
             System.out.println("CRITICAL ERROR in getUpdatedCandles: " + e.getMessage());
             e.printStackTrace();
-            //SYSTEM SET HERE
             loggingService.logError("Error fetching updated candles: " + e.getMessage(), e);
             System.out.println(">>> RETURNING 0 CANDLES DUE TO ERROR FOR TIMEFRAME " + timeframeStr + " <<<");
             return new ArrayList<>();
@@ -267,7 +276,8 @@ public class MarketCandleService implements MarketCandleServiceInterface {
             BigDecimal lastCandleHigh,
             BigDecimal lastCandleLow,
             BigDecimal lastCandleClose,
-            BigDecimal lastCandleVolume) {
+            BigDecimal lastCandleVolume,
+            LocalDateTime endDate) {  // ✅ Added endDate parameter
 
         System.out.println("\n### EXECUTING getModifiedLatestCandle() ###");
         System.out.println("Request params: platform=" + platformName +
@@ -275,8 +285,17 @@ public class MarketCandleService implements MarketCandleServiceInterface {
                 ", timeframe=" + timeframeStr);
         System.out.println("Last candle timestamp: " +
                 (lastCandleTimestamp != null ? lastCandleTimestamp.format(formatter) : "null"));
+        System.out.println("End date: " +
+                (endDate != null ? endDate.format(formatter) : "null"));
 
         try {
+            // ✅ Check if the last candle timestamp is beyond the subscription range
+            if (lastCandleTimestamp != null && lastCandleTimestamp.isAfter(endDate)) {
+                System.out.println("Last candle timestamp is after endDate, skipping modification check");
+                System.out.println(">>> RETURNING NO MODIFIED CANDLES FOR TIMEFRAME " + timeframeStr + " (OUT OF RANGE) <<<");
+                return null;
+            }
+
             // Find the platform stock
             List<PlatformStock> platformStocks = platformStockRepository.findByPlatformName(platformName);
 
@@ -304,68 +323,63 @@ public class MarketCandleService implements MarketCandleServiceInterface {
                 return null;
             }
 
-            // Get the latest candle
-            MarketCandle latestCandle = marketCandleRepository
-                    .findTopByPlatformStockAndTimeframeOrderByTimestampDesc(
-                            stock, timeframe);
+            // ✅ Get the candle at the specific timestamp (not the absolute latest)
+            System.out.println("Fetching candle at timestamp: " + lastCandleTimestamp.format(formatter));
+            List<MarketCandle> candles = marketCandleRepository
+                    .findByPlatformStockAndTimeframeAndTimestampBetweenOrderByTimestampAsc(
+                            stock, timeframe, lastCandleTimestamp, lastCandleTimestamp);
 
-            if (latestCandle == null) {
-                System.out.println("No candles found for the specified criteria");
+            if (candles.isEmpty()) {
+                System.out.println("No candle found at the specified timestamp");
                 System.out.println(">>> RETURNING NO MODIFIED CANDLES FOR TIMEFRAME " + timeframeStr + " (NO DATA) <<<");
                 return null;
             }
 
-            // If timestamps match, check if data has changed
-            if (latestCandle.getTimestamp().equals(lastCandleTimestamp)) {
-                boolean isModified = false;
+            MarketCandle currentCandle = candles.get(0);
+            System.out.println("Found candle at timestamp: " + currentCandle.getTimestamp().format(formatter));
 
-                if (!latestCandle.getOpenPrice().equals(lastCandleOpen)) {
-                    System.out.println("Open price changed: " + lastCandleOpen + " -> " + latestCandle.getOpenPrice());
-                    isModified = true;
-                }
+            // Check if the candle has been modified
+            boolean isModified = false;
 
-                if (!latestCandle.getHighPrice().equals(lastCandleHigh)) {
-                    System.out.println("High price changed: " + lastCandleHigh + " -> " + latestCandle.getHighPrice());
-                    isModified = true;
-                }
+            if (!currentCandle.getOpenPrice().equals(lastCandleOpen)) {
+                System.out.println("Open price changed: " + lastCandleOpen + " -> " + currentCandle.getOpenPrice());
+                isModified = true;
+            }
 
-                if (!latestCandle.getLowPrice().equals(lastCandleLow)) {
-                    System.out.println("Low price changed: " + lastCandleLow + " -> " + latestCandle.getLowPrice());
-                    isModified = true;
-                }
+            if (!currentCandle.getHighPrice().equals(lastCandleHigh)) {
+                System.out.println("High price changed: " + lastCandleHigh + " -> " + currentCandle.getHighPrice());
+                isModified = true;
+            }
 
-                if (!latestCandle.getClosePrice().equals(lastCandleClose)) {
-                    System.out.println("Close price changed: " + lastCandleClose + " -> " + latestCandle.getClosePrice());
-                    isModified = true;
-                }
+            if (!currentCandle.getLowPrice().equals(lastCandleLow)) {
+                System.out.println("Low price changed: " + lastCandleLow + " -> " + currentCandle.getLowPrice());
+                isModified = true;
+            }
 
-                if (!latestCandle.getVolume().equals(lastCandleVolume)) {
-                    System.out.println("Volume changed: " + lastCandleVolume + " -> " + latestCandle.getVolume());
-                    isModified = true;
-                }
+            if (!currentCandle.getClosePrice().equals(lastCandleClose)) {
+                System.out.println("Close price changed: " + lastCandleClose + " -> " + currentCandle.getClosePrice());
+                isModified = true;
+            }
 
-                if (isModified) {
-                    System.out.println("Latest candle has been modified, returning updated data");
-                    System.out.println(">>> RETURNING 1 MODIFIED CANDLE FOR TIMEFRAME " + timeframeStr + " <<<");
-                    System.out.println(">>> CANDLE TIMESTAMP: " + latestCandle.getTimestamp().format(formatter) + " <<<");
-                    return convertToDTO(latestCandle);
-                } else {
-                    System.out.println("Latest candle has not changed");
-                    System.out.println(">>> RETURNING NO MODIFIED CANDLES FOR TIMEFRAME " + timeframeStr + " (NO CHANGES) <<<");
-                    return null;
-                }
+            if (!currentCandle.getVolume().equals(lastCandleVolume)) {
+                System.out.println("Volume changed: " + lastCandleVolume + " -> " + currentCandle.getVolume());
+                isModified = true;
+            }
+
+            if (isModified) {
+                System.out.println("Candle has been modified, returning updated data");
+                System.out.println(">>> RETURNING 1 MODIFIED CANDLE FOR TIMEFRAME " + timeframeStr + " <<<");
+                System.out.println(">>> CANDLE TIMESTAMP: " + currentCandle.getTimestamp().format(formatter) + " <<<");
+                return convertToDTO(currentCandle);
             } else {
-                // Timestamps don't match, no need to check for modifications
-                // This will be caught by the regular getUpdatedCandles() method
-                System.out.println("Latest candle timestamp doesn't match last known candle");
-                System.out.println(">>> RETURNING NO MODIFIED CANDLES FOR TIMEFRAME " + timeframeStr + " (TIMESTAMP MISMATCH) <<<");
+                System.out.println("Candle has not changed");
+                System.out.println(">>> RETURNING NO MODIFIED CANDLES FOR TIMEFRAME " + timeframeStr + " (NO CHANGES) <<<");
                 return null;
             }
 
         } catch (Exception e) {
             System.out.println("ERROR in getModifiedLatestCandle: " + e.getMessage());
             e.printStackTrace();
-            //SYSTEM SET HERE
             loggingService.logError("Error checking for modified candle: " + e.getMessage(), e);
             System.out.println(">>> RETURNING NO MODIFIED CANDLES DUE TO ERROR FOR TIMEFRAME " + timeframeStr + " <<<");
             return null;
