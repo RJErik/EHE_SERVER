@@ -9,7 +9,7 @@ public class TradeExecutionResponse {
     private String side;
     private BigDecimal origQty;
     private BigDecimal executedQty;
-    private BigDecimal cummulativeQuoteQty;
+    private BigDecimal cumulativeQuoteQty;
     private String status;
 
     public TradeExecutionResponse() {}
@@ -20,7 +20,7 @@ public class TradeExecutionResponse {
         this.side = side;
         this.origQty = origQty;
         this.executedQty = executedQty;
-        this.cummulativeQuoteQty = cummulativeQuoteQty;
+        this.cumulativeQuoteQty = cummulativeQuoteQty;
         this.status = status;
     }
 
@@ -35,8 +35,8 @@ public class TradeExecutionResponse {
     public void setOrigQty(BigDecimal origQty) { this.origQty = origQty; }
     public BigDecimal getExecutedQty() { return executedQty; }
     public void setExecutedQty(BigDecimal executedQty) { this.executedQty = executedQty; }
-    public BigDecimal getCummulativeQuoteQty() { return cummulativeQuoteQty; }
-    public void setCummulativeQuoteQty(BigDecimal cummulativeQuoteQty) { this.cummulativeQuoteQty = cummulativeQuoteQty; }
+    public BigDecimal getCumulativeQuoteQty() { return cumulativeQuoteQty; }
+    public void setCumulativeQuoteQty(BigDecimal cumulativeQuoteQty) { this.cumulativeQuoteQty = cumulativeQuoteQty; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
@@ -50,12 +50,12 @@ public class TradeExecutionResponse {
                 Objects.equals(side, that.side) &&
                 Objects.equals(origQty, that.origQty) &&
                 Objects.equals(executedQty, that.executedQty) &&
-                Objects.equals(cummulativeQuoteQty, that.cummulativeQuoteQty) &&
+                Objects.equals(cumulativeQuoteQty, that.cumulativeQuoteQty) &&
                 Objects.equals(status, that.status);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(orderId, symbol, side, origQty, executedQty, cummulativeQuoteQty, status);
+        return Objects.hash(orderId, symbol, side, origQty, executedQty, cumulativeQuoteQty, status);
     }
 }
