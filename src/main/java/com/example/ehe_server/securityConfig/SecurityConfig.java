@@ -1,9 +1,10 @@
 package com.example.ehe_server.securityConfig;
 
 import com.example.ehe_server.filter.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AnonymousConfigurer;
@@ -22,32 +23,34 @@ import java.util.Arrays;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    // Keep the JwtTokenValidatorInterface if needed by other parts of your security setup
-    // private final JwtTokenValidatorInterface jwtTokenValidator;
-    // public SecurityConfig(JwtTokenValidatorInterface jwtTokenValidator) {
-    //     this.jwtTokenValidator = jwtTokenValidator;
-    // }
-    // If not needed directly here anymore, remove the constructor injection for it.
+    @Value("${spring.security.require-https}")
+    private boolean requireHttps;
 
     @Bean
-    @Profile("dev") // This bean will only be active in the "dev" profile
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> {
-                    auth.requestMatchers("/api/auth/**").permitAll() // Add /ws/** here
-                            .requestMatchers("/api/home/**").permitAll()
+                    auth.requestMatchers("/api/auth/**", "/api/home/**").permitAll()
                             .requestMatchers("/api/admin/**").hasRole("ADMIN")
                             .requestMatchers("/api/user/**", "/ws/**").hasRole("USER")
                             .anyRequest().authenticated();
                 })
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exceptions ->
+                                exceptions.authenticationEntryPoint((request, response, authException) -> {
+                                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized: " + authException.getMessage());
+                                })
+                )
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
                 .anonymous(AnonymousConfigurer::disable);
+        if (requireHttps) {
+            http.requiresChannel(channel -> channel.anyRequest().requiresSecure());
+        }
 
         return http.build();
     }
@@ -89,32 +92,6 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
-    }
-
-    // For production environments, require HTTPS
-    @Bean
-    @Profile("prod") // This bean will only be active in the "prod" profile
-    public SecurityFilterChain prodFilterChain(HttpSecurity http) throws Exception {
-        // Configure like the main filter chain but add HTTPS requirement
-        http
-                .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Use the same CORS source
-                .authorizeHttpRequests(auth -> {
-                    auth.requestMatchers("/api/auth/**").permitAll()
-                            .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                            .requestMatchers("/api/user/**").hasRole("USER")
-                            .anyRequest().authenticated();
-                })
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .httpBasic(basic -> basic.disable())
-                .formLogin(form -> form.disable())
-                // Add HTTPS requirement for production
-                .requiresChannel(channel ->
-                        channel.anyRequest().requiresSecure())
-                .anonymous(AnonymousConfigurer::disable);
-
-        return http.build();
     }
 
     @Bean
