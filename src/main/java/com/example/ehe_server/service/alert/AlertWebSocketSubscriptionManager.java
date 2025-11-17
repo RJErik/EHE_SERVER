@@ -3,11 +3,13 @@ package com.example.ehe_server.service.alert;
 import com.example.ehe_server.dto.websocket.AlertNotificationResponse;
 import com.example.ehe_server.dto.websocket.AlertSubscriptionResponse;
 import com.example.ehe_server.entity.Alert;
+import com.example.ehe_server.entity.JwtRefreshToken;
 import com.example.ehe_server.entity.MarketCandle;
 import com.example.ehe_server.entity.PlatformStock;
 import com.example.ehe_server.exception.custom.InvalidSubscriptionIdException;
 import com.example.ehe_server.exception.custom.SubscriptionNotFoundException;
 import com.example.ehe_server.repository.AlertRepository;
+import com.example.ehe_server.repository.JwtRefreshTokenRepository;
 import com.example.ehe_server.repository.MarketCandleRepository;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
@@ -27,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AlertWebSocketSubscriptionManager {
 
     private final UserContextService userContextService;
+    private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
 
     private static class AlertSubscription {
         private final String id;
@@ -83,12 +86,15 @@ public class AlertWebSocketSubscriptionManager {
             AlertRepository alertRepository,
             MarketCandleRepository marketCandleRepository,
             SimpMessagingTemplate messagingTemplate,
-            LoggingServiceInterface loggingService, UserContextService userContextService) {
+            LoggingServiceInterface loggingService,
+            UserContextService userContextService,
+            JwtRefreshTokenRepository jwtRefreshTokenRepository) {
         this.alertRepository = alertRepository;
         this.marketCandleRepository = marketCandleRepository;
         this.messagingTemplate = messagingTemplate;
         this.loggingService = loggingService;
         this.userContextService = userContextService;
+        this.jwtRefreshTokenRepository = jwtRefreshTokenRepository;
     }
 
     /**
@@ -357,6 +363,30 @@ public class AlertWebSocketSubscriptionManager {
     }
 
     /**
+     * Validate active subscriptions and remove those without valid refresh tokens
+     */
+    private void validateAndCleanupSubscriptions() {
+        List<String> subscriptionsToRemove = new ArrayList<>();
+
+        for (AlertSubscription subscription : activeSubscriptions.values()) {
+            List<JwtRefreshToken> userTokens = jwtRefreshTokenRepository.findByUser_UserId(subscription.getUserId());
+            if (userTokens == null || userTokens.isEmpty()) {
+                System.out.println("User " + subscription.getUserId() + " has no refresh tokens. Disconnecting subscription " + subscription.getId());
+                subscriptionsToRemove.add(subscription.getId());
+            }
+        }
+
+        // Remove invalid subscriptions
+        for (String subscriptionId : subscriptionsToRemove) {
+            try {
+                cancelSubscription(subscriptionId);
+            } catch (Exception e) {
+                loggingService.logError("Error removing subscription " + subscriptionId + ": " + e.getMessage(), e);
+            }
+        }
+    }
+
+    /**
      * Scheduled task to check for new alerts every minute
      */
     @Scheduled(fixedRate = 60000) // Run every minute
@@ -364,6 +394,9 @@ public class AlertWebSocketSubscriptionManager {
         userContextService.setUser("SYSTEM", "SYSTEM");
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime currentMinute = now.truncatedTo(ChronoUnit.MINUTES);
+
+        // Validate active subscriptions and remove those without refresh tokens
+        validateAndCleanupSubscriptions();
 
         for (AlertSubscription subscription : activeSubscriptions.values()) {
             // Skip if initial check isn't completed yet

@@ -7,6 +7,7 @@ import com.example.ehe_server.entity.*;
 import com.example.ehe_server.exception.custom.InvalidSubscriptionIdException;
 import com.example.ehe_server.exception.custom.SubscriptionNotFoundException;
 import com.example.ehe_server.repository.AutomatedTradeRuleRepository;
+import com.example.ehe_server.repository.JwtRefreshTokenRepository;
 import com.example.ehe_server.repository.MarketCandleRepository;
 import com.example.ehe_server.repository.TransactionRepository;
 import com.example.ehe_server.service.audit.UserContextService;
@@ -28,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AutomatedTradeWebSocketSubscriptionManager {
 
     private final UserContextService userContextService;
+    private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
 
     private static class AutomatedTradeSubscription {
         private final String id;
@@ -69,7 +71,8 @@ public class AutomatedTradeWebSocketSubscriptionManager {
             LoggingServiceInterface loggingService,
             TradingServiceInterface tradingService,
             TransactionRepository transactionRepository,
-            UserContextService userContextService) {
+            UserContextService userContextService,
+            JwtRefreshTokenRepository jwtRefreshTokenRepository) {
         this.automatedTradeRuleRepository = automatedTradeRuleRepository;
         this.marketCandleRepository = marketCandleRepository;
         this.simpMessagingTemplate = simpMessagingTemplate;
@@ -77,6 +80,7 @@ public class AutomatedTradeWebSocketSubscriptionManager {
         this.tradingService = tradingService;
         this.transactionRepository = transactionRepository;
         this.userContextService = userContextService;
+        this.jwtRefreshTokenRepository = jwtRefreshTokenRepository;
     }
 
     /**
@@ -125,6 +129,9 @@ public class AutomatedTradeWebSocketSubscriptionManager {
 
         loggingService.logAction("Checking automated trade rules at " + currentMinute);
 
+        // Validate active subscriptions and remove those without refresh tokens
+        validateAndCleanupSubscriptions();
+
         try {
             // Get all active automated trade rules
             List<AutomatedTradeRule> activeRules = automatedTradeRuleRepository.findAllByIsActiveTrue();
@@ -138,6 +145,30 @@ public class AutomatedTradeWebSocketSubscriptionManager {
             }
         } catch (Exception e) {
             loggingService.logError("Error in automated trade rule check: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Validate active subscriptions and remove those without valid refresh tokens
+     */
+    private void validateAndCleanupSubscriptions() {
+        List<String> subscriptionsToRemove = new ArrayList<>();
+
+        for (AutomatedTradeSubscription subscription : activeSubscriptions.values()) {
+            List<JwtRefreshToken> userTokens = jwtRefreshTokenRepository.findByUser_UserId(subscription.getUserId());
+            if (userTokens == null || userTokens.isEmpty()) {
+                System.out.println("User " + subscription.getUserId() + " has no refresh tokens. Disconnecting subscription " + subscription.getId());
+                subscriptionsToRemove.add(subscription.getId());
+            }
+        }
+
+        // Remove invalid subscriptions
+        for (String subscriptionId : subscriptionsToRemove) {
+            try {
+                cancelSubscription(subscriptionId);
+            } catch (Exception e) {
+                loggingService.logError("Error removing subscription " + subscriptionId + ": " + e.getMessage(), e);
+            }
         }
     }
 
@@ -352,8 +383,8 @@ public class AutomatedTradeWebSocketSubscriptionManager {
             if (tradeResult.getExecutedQty() != null) {
                 message.append(", executed quantity: ").append(tradeResult.getExecutedQty());
             }
-            if (tradeResult.getCummulativeQuoteQty() != null) {
-                message.append(", total cost: ").append(tradeResult.getCummulativeQuoteQty());
+            if (tradeResult.getCumulativeQuoteQty() != null) {
+                message.append(", total cost: ").append(tradeResult.getCumulativeQuoteQty());
             }
             if (tradeResult.getOrderId() != null) {
                 message.append(", order ID: ").append(tradeResult.getOrderId());
