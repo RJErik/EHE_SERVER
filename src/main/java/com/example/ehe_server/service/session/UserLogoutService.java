@@ -1,9 +1,9 @@
-package com.example.ehe_server.service.user;
+package com.example.ehe_server.service.session;
 
 import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtRefreshTokenServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-import com.example.ehe_server.service.intf.user.UserLogoutServiceInterface;
+import com.example.ehe_server.service.intf.session.UserLogoutServiceInterface;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

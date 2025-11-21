@@ -1,6 +1,6 @@
 package com.example.ehe_server.service.alpaca;
 
-import com.example.ehe_server.securityConfig.AlpacaProperties;
+import com.example.ehe_server.properties.AlpacaProperties;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;

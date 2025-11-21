@@ -1,4 +1,4 @@
-package com.example.ehe_server.securityConfig;
+package com.example.ehe_server.properties;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -16,7 +16,7 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
 @Configuration
-public class JwtConfig {
+public class JwtProperties {
 
     @Value("${jwt.keystore.path}")
     private String keystorePath;
@@ -29,6 +29,34 @@ public class JwtConfig {
 
     @Value("${jwt.key.private.password}")
     private String privateKeyPassword;
+
+    @Value("${jwt.access.expiration.time}")
+    private long jwtAccessExpirationTime;
+
+    @Value("${jwt.refresh.expiration.time}")
+    private long jwtRefreshExpirationTime;
+
+    @Value("${jwt.refresh.max.expiration.time}")
+    private long jwtRefreshTokenMaxExpireTime;
+
+    @Value("${jwt.refresh.url}")
+    private String jwtRefreshUrl;
+
+    public long getJwtAccessExpirationTime() {
+        return jwtAccessExpirationTime;
+    }
+
+    public long getJwtRefreshExpirationTime() {
+        return jwtRefreshExpirationTime;
+    }
+
+    public long getJwtRefreshTokenMaxExpireTime() {
+        return jwtRefreshTokenMaxExpireTime;
+    }
+
+    public String getJwtRefreshUrl() {
+        return jwtRefreshUrl;
+    }
 
     @Bean
     public KeyStore keyStore() throws Exception {

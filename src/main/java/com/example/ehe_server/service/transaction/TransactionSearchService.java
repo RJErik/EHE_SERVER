@@ -1,9 +1,9 @@
 package com.example.ehe_server.service.transaction;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.TransactionSearchResponse;
 import com.example.ehe_server.entity.Transaction;
 import com.example.ehe_server.repository.TransactionRepository;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.transaction.TransactionSearchServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,16 +19,30 @@ import java.util.stream.Collectors;
 public class TransactionSearchService implements TransactionSearchServiceInterface {
 
     private final TransactionRepository transactionRepository;
-    private final LoggingServiceInterface loggingService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public TransactionSearchService(
-            TransactionRepository transactionRepository,
-            LoggingServiceInterface loggingService) {
+    public TransactionSearchService(TransactionRepository transactionRepository) {
         this.transactionRepository = transactionRepository;
-        this.loggingService = loggingService;
     }
 
+    @LogMessage(
+            messageKey = "log.message.transaction.search",
+            params = {
+                    "#userId",
+                    "#portfolioId",
+                    "#platform",
+                    "#symbol",
+                    "#fromTime",
+                    "#toTime",
+                    "#fromAmount",
+                    "#toAmount",
+                    "#fromPrice",
+                    "#toPrice",
+                    "#type",
+                    "#status",
+                    "#result.size()"
+            }
+    )
     @Override
     public List<TransactionSearchResponse> searchTransactions(
             Integer userId,
@@ -50,7 +64,7 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
             try {
                 transactionType = Transaction.TransactionType.valueOf(type);
             } catch (IllegalArgumentException e) {
-                loggingService.logAction("Invalid transaction type: " + type);
+                //Todo throw error
                 return List.of();
             }
         }
@@ -60,7 +74,7 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
             try {
                 transactionStatus = Transaction.Status.valueOf(status);
             } catch (IllegalArgumentException e) {
-                loggingService.logAction("Invalid transaction status: " + status);
+                //Todo throw error
                 return List.of();
             }
         }
@@ -82,7 +96,7 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
         );
 
         // Transform entities to DTOs
-        List<TransactionSearchResponse> responses = transactions.stream()
+        return transactions.stream()
                 .map(transaction -> new TransactionSearchResponse(
                         transaction.getTransactionId(),
                         transaction.getPortfolio().getUser().getUserId(),
@@ -97,10 +111,5 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
                         transaction.getTransactionDate().format(DATE_FORMATTER)
                 ))
                 .collect(Collectors.toList());
-
-        // Log success
-        loggingService.logAction("Transaction search completed, found " + responses.size() + " results");
-
-        return responses;
     }
 }

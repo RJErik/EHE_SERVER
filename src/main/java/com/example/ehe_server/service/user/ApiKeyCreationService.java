@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.user;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.ApiKeyCreationResponse;
 import com.example.ehe_server.entity.ApiKey;
 import com.example.ehe_server.entity.User;
@@ -32,8 +33,16 @@ public class ApiKeyCreationService implements ApiKeyCreationServiceInterface {
         this.userRepository = userRepository;
     }
 
+    @LogMessage(
+            messageKey = "log.message.user.apiKey.add",
+            params = {
+                    "#platformName",
+                    "#result.apiKeyId",
+                    "#result.maskedApiKeyValue",
+                    "#result.maskedSecretKey"
+            }
+    )
     @Override
-    @Transactional
     public ApiKeyCreationResponse createApiKey(Integer userId, String platformName, String apiKeyValue, String secretKey) {
         // Get current user ID from user context
         User user;

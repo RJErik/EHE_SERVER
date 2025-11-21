@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.auth;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
 import com.example.ehe_server.exception.custom.ExpiredVerificationTokenException;
@@ -11,7 +12,6 @@ import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.RegistrationVerificationServiceInterface;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,25 +23,25 @@ public class RegistrationVerificationService implements RegistrationVerification
 
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository;
-    private final LoggingServiceInterface loggingService;
     private final AdminRepository adminRepository;
     private final UserContextService userContextService;
 
     public RegistrationVerificationService(
             UserRepository userRepository,
             VerificationTokenRepository verificationTokenRepository,
-            LoggingServiceInterface loggingService,
             AdminRepository adminRepository,
             UserContextService userContextService) { // Inject EmailService
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
-        this.loggingService = loggingService;
         this.adminRepository = adminRepository;
         this.userContextService = userContextService;
     }
 
+    @LogMessage(
+            messageKey = "log.message.auth.registrationVerification",
+            params = {"#token"}
+    )
     @Override
-    @Transactional
     public void verifyRegistrationToken(String token) {
         Optional<VerificationToken> tokenOpt = verificationTokenRepository.findByToken(token);
 
@@ -89,7 +89,5 @@ public class RegistrationVerificationService implements RegistrationVerification
 
         userRepository.save(user);
         verificationTokenRepository.save(verificationToken); // Save updated token status
-
-        loggingService.logAction("User account successfully verified with token: " + token);
     }
 }

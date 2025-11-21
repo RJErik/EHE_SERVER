@@ -1,6 +1,5 @@
 package com.example.ehe_server.exception;
 
-import com.example.ehe_server.securityConfig.ApiErrorContextProperties;
 import com.example.ehe_server.exception.custom.*; // Assuming new exceptions are in this package
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import jakarta.servlet.http.HttpServletRequest;

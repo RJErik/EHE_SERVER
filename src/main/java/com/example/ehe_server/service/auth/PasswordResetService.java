@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.auth;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
 import com.example.ehe_server.exception.custom.InvalidPasswordFormatException;
@@ -15,7 +16,7 @@ import com.example.ehe_server.service.intf.auth.JwtRefreshTokenServiceInterface;
 import com.example.ehe_server.service.intf.auth.PasswordResetServiceInterface;
 import com.example.ehe_server.service.intf.auth.PasswordResetTokenValidationServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-import org.springframework.security.crypto.bcrypt.BCrypt;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +37,7 @@ public class PasswordResetService implements PasswordResetServiceInterface {
     private final AdminRepository adminRepository;
     private final JwtRefreshTokenServiceInterface jwtRefreshTokenService;
     private final UserContextService userContextService;
+    private final PasswordEncoder passwordEncoder;
 
     public PasswordResetService(
             UserRepository userRepository,
@@ -44,7 +46,8 @@ public class PasswordResetService implements PasswordResetServiceInterface {
             LoggingServiceInterface loggingService,
             AdminRepository adminRepository,
             JwtRefreshTokenServiceInterface jwtRefreshTokenService,
-            UserContextService userContextService) {
+            UserContextService userContextService,
+            PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.passwordResetTokenValidationService = passwordResetTokenValidationService;
@@ -52,10 +55,14 @@ public class PasswordResetService implements PasswordResetServiceInterface {
         this.adminRepository = adminRepository;
         this.jwtRefreshTokenService = jwtRefreshTokenService;
         this.userContextService = userContextService;
+        this.passwordEncoder = passwordEncoder;
     }
 
+    @LogMessage(
+            messageKey = "log.message.auth.passwordReset",
+            params = {"#token"}
+    )
     @Override
-    @Transactional
     public void resetPassword(String token, String newPassword) {
 
         // Validate token first
@@ -99,7 +106,7 @@ public class PasswordResetService implements PasswordResetServiceInterface {
         userContextService.setUser(userIdStr, role);
 
         // Update password
-        String passwordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+        String passwordHash = passwordEncoder.encode(newPassword);
         user.setPasswordHash(passwordHash);
 
         // If account was NONVERIFIED, activate it
@@ -116,7 +123,5 @@ public class PasswordResetService implements PasswordResetServiceInterface {
         verificationTokenRepository.save(verificationToken);
 
         jwtRefreshTokenService.removeAllUserTokens(user.getUserId());
-
-        loggingService.logAction("Password reset successful");
     }
 }

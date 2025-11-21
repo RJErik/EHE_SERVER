@@ -1,18 +1,20 @@
 package com.example.ehe_server.service.auth;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
 import com.example.ehe_server.exception.custom.*;
 import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
+import com.example.ehe_server.properties.VerificationTokenProperties;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.RegistrationServiceInterface;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.security.crypto.bcrypt.BCrypt;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,9 +32,8 @@ public class RegistrationService implements RegistrationServiceInterface {
     private final LoggingServiceInterface loggingService;
     private final UserContextService userContextService;
     private final AdminRepository adminRepository;
-
-    @Value("${app.verification.token.expiry-hours}") // Get expiry from config
-    private int tokenExpiryHours;
+    private final VerificationTokenProperties verificationTokenProperties;
+    private final PasswordEncoder passwordEncoder;
 
     // Validation patterns remain the same...
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
@@ -46,17 +47,24 @@ public class RegistrationService implements RegistrationServiceInterface {
             EmailServiceInterface emailService, // Add to constructor
             LoggingServiceInterface loggingService,
             UserContextService userContextService,
-            AdminRepository adminRepository) {
+            AdminRepository adminRepository,
+            VerificationTokenProperties verificationTokenProperties,
+            PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository; // Assign
         this.emailService = emailService; // Assign
         this.loggingService = loggingService;
         this.userContextService = userContextService;
         this.adminRepository = adminRepository;
+        this.verificationTokenProperties = verificationTokenProperties;
+        this.passwordEncoder = passwordEncoder;
     }
 
+    @LogMessage(
+            messageKey = "log.message.auth.registration",
+            params = {"#token"}
+    )
     @Override
-    @Transactional
     public void registerUser(String username, String email, String password) {
         // Validation logic remains the same...
         // Validate input fields
@@ -87,7 +95,7 @@ public class RegistrationService implements RegistrationServiceInterface {
         User newUser = new User();
         newUser.setUserName(username);
         newUser.setEmail(email);
-        newUser.setPasswordHash(BCrypt.hashpw(password, BCrypt.gensalt()));
+        newUser.setPasswordHash(passwordEncoder.encode(password));
         newUser.setAccountStatus(User.AccountStatus.NONVERIFIED); // <<<--- SET STATUS TO NONVERIFIED
         newUser.setRegistrationDate(LocalDateTime.now());
 
@@ -109,17 +117,10 @@ public class RegistrationService implements RegistrationServiceInterface {
 
         // --- NEW: Generate and save verification token ---
         String token = UUID.randomUUID().toString();
-        LocalDateTime expiryDate = LocalDateTime.now().plusHours(tokenExpiryHours);
+        LocalDateTime expiryDate = LocalDateTime.now().plusHours(verificationTokenProperties.getTokenExpiryHours());
         VerificationToken verificationToken = new VerificationToken(savedUser, token, VerificationToken.TokenType.REGISTRATION, expiryDate);
         verificationTokenRepository.save(verificationToken);
         // -------------------------------------------------
-
-        // Log successful registration attempt (pending verification)
-        loggingService.logAction("User registered successfully (pending verification). Token generated.");
-
-        // --- REMOVED: JWT Generation and Cookie Setting ---
-        // No automatic login on registration anymore
-        // --------------------------------------------------
 
         try {
             // Call the *synchronous* version of the email sending method

@@ -2,6 +2,8 @@ package com.example.ehe_server.filter;
 
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
+import com.example.ehe_server.properties.JwtProperties;
+import com.example.ehe_server.service.intf.auth.JwtClaimServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtTokenValidatorInterface;
 import jakarta.servlet.FilterChain;
@@ -9,7 +11,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -29,9 +30,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenValidatorInterface jwtTokenValidator;
     private final LoggingServiceInterface loggingService;
     private final UserRepository userRepository;
+    private final JwtProperties jwtConfig;
+    private final JwtClaimServiceInterface jwtClaimService;
 
-    @Value("${jwt.refresh.url}")
-    private String jwtRefreshUrl;
 
     private enum TokenType {
         ACCESS("jwt_access_token"),
@@ -51,10 +52,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     public JwtAuthenticationFilter(
             JwtTokenValidatorInterface jwtTokenValidator,
             LoggingServiceInterface loggingService,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            JwtProperties jwtConfig,
+            JwtClaimServiceInterface jwtClaimService) {
         this.jwtTokenValidator = jwtTokenValidator;
         this.loggingService = loggingService;
         this.userRepository = userRepository;
+        this.jwtConfig = jwtConfig;
+        this.jwtClaimService = jwtClaimService;
     }
 
     @Override
@@ -88,7 +93,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // If access token failed, maybe it's a refresh endpoint—try refresh token
             String refreshToken = extractTokenFromCookie(TokenType.REFRESH, request);
-            if (refreshToken != null && isTokenValid(refreshToken, TokenType.REFRESH) && path.equals(jwtRefreshUrl)) {
+            if (refreshToken != null && isTokenValid(refreshToken, TokenType.REFRESH) && path.equals(jwtConfig.getJwtRefreshUrl())) {
                 setUserAuthentication(refreshToken, path);
                 return;
             }
@@ -107,8 +112,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      */
     private void setUserAuthentication(String token, String path) {
         try {
-            Integer userId = jwtTokenValidator.getUserIdFromToken(token);
-            String role = jwtTokenValidator.getRoleFromToken(token);
+            Integer userId = jwtClaimService.getUserIdFromToken(token);
+            String role = jwtClaimService.getRoleFromToken(token);
 
             if (!areClaimsValid(userId, role)) {
                 loggingService.logAction("[" + path + "] JWT claims invalid: userId=" + userId + ", role=" + role);

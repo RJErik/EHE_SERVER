@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.automatictrade;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.AutomatedTradeRuleCreationResponse;
 import com.example.ehe_server.entity.*;
 import com.example.ehe_server.exception.custom.*;
@@ -8,7 +9,6 @@ import com.example.ehe_server.repository.PlatformStockRepository;
 import com.example.ehe_server.repository.PortfolioRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeRuleCreationServiceInterface;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +25,6 @@ public class AutomatedTradeRuleCreationService implements AutomatedTradeRuleCrea
     private final AutomatedTradeRuleRepository automatedTradeRuleRepository;
     private final PortfolioRepository portfolioRepository;
     private final PlatformStockRepository platformStockRepository;
-    private final LoggingServiceInterface loggingService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final UserRepository userRepository;
 
@@ -33,15 +32,30 @@ public class AutomatedTradeRuleCreationService implements AutomatedTradeRuleCrea
             AutomatedTradeRuleRepository automatedTradeRuleRepository,
             PortfolioRepository portfolioRepository,
             PlatformStockRepository platformStockRepository,
-            LoggingServiceInterface loggingService,
             UserRepository userRepository) {
         this.automatedTradeRuleRepository = automatedTradeRuleRepository;
         this.portfolioRepository = portfolioRepository;
         this.platformStockRepository = platformStockRepository;
-        this.loggingService = loggingService;
         this.userRepository = userRepository;
     }
 
+    @LogMessage(
+            messageKey = "log.message.automatedTradeRule.add",
+            params = {
+                    "#result.id",
+                    "#result.portfolioId",
+                    "#result.portfolioName",
+                    "#result.platform",
+                    "#result.symbol",
+                    "#result.conditionType",
+                    "#result.actionType",
+                    "#result.quantityType",
+                    "#result.quantity",
+                    "#result.thresholdValue",
+                    "#result.dateCreated",
+                    "#result.isActive"
+            }
+    )
     @Override
     public AutomatedTradeRuleCreationResponse createAutomatedTradeRule(
             Integer userId,
@@ -133,10 +147,6 @@ public class AutomatedTradeRuleCreationService implements AutomatedTradeRuleCrea
         newRule.setActive(true);
 
         AutomatedTradeRule savedRule = automatedTradeRuleRepository.save(newRule);
-
-        // Log success
-        loggingService.logAction("Added automated trade rule: " + platform + "/" + symbol + " " +
-                conditionType + " " + thresholdValue + " -> " + actionType);
 
         return new AutomatedTradeRuleCreationResponse(
                 savedRule.getAutomatedTradeRuleId(),

@@ -1,10 +1,10 @@
 package com.example.ehe_server.service.home;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.HomeLatestTransactionsResponse;
 import com.example.ehe_server.entity.Transaction;
 import com.example.ehe_server.repository.TransactionRepository;
 import com.example.ehe_server.service.intf.home.HomeLatestTransactionsServiceInterface;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -12,13 +12,10 @@ import java.util.List;
 
 @Service
 public class HomeLatestTransactionsService implements HomeLatestTransactionsServiceInterface {
-    private final LoggingServiceInterface loggingService;
     private final TransactionRepository transactionRepository;
     private final SecureRandom random = new SecureRandom();
 
-    public HomeLatestTransactionsService(LoggingServiceInterface loggingService,
-                                         TransactionRepository transactionRepository) {
-        this.loggingService = loggingService;
+    public HomeLatestTransactionsService(TransactionRepository transactionRepository) {
         this.transactionRepository = transactionRepository;
     }
 
@@ -72,11 +69,12 @@ public class HomeLatestTransactionsService implements HomeLatestTransactionsServ
         return firstName + " " + lastName;
     }
 
+    @LogMessage(messageKey = "log.message.home.latestTransaction")
     @Override
     public List<HomeLatestTransactionsResponse> getLatestTransactions() {
         List<Transaction> transactions = transactionRepository.findLast3CompletedTransactions();
 
-        List<HomeLatestTransactionsResponse> homeLatestTransactionsResponses = transactions.stream()
+        return transactions.stream()
                 .map(transaction -> new HomeLatestTransactionsResponse(
                         this.generatePseudonym(),
                         transaction.getPlatformStock().getPlatformName(),
@@ -85,7 +83,5 @@ public class HomeLatestTransactionsService implements HomeLatestTransactionsServ
                         transaction.getTransactionType().toString()
                 ))
                 .toList();
-        loggingService.logAction("Retrieved the latest transactions for home page.");
-        return homeLatestTransactionsResponses;
     }
 }

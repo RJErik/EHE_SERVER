@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.watchlist;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.WatchlistCreationResponse;
 import com.example.ehe_server.entity.PlatformStock;
 import com.example.ehe_server.entity.User;
@@ -10,7 +11,6 @@ import com.example.ehe_server.exception.custom.WatchlistItemAlreadyExistsExcepti
 import com.example.ehe_server.repository.PlatformStockRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.WatchlistItemRepository;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.watchlist.WatchlistCreationServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,20 +27,26 @@ public class WatchlistCreationService implements WatchlistCreationServiceInterfa
     private final WatchlistItemRepository watchlistItemRepository;
     private final PlatformStockRepository platformStockRepository;
     private final UserRepository userRepository;
-    private final LoggingServiceInterface loggingService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public WatchlistCreationService(
             WatchlistItemRepository watchlistItemRepository,
             PlatformStockRepository platformStockRepository,
-            UserRepository userRepository,
-            LoggingServiceInterface loggingService) {
+            UserRepository userRepository) {
         this.watchlistItemRepository = watchlistItemRepository;
         this.platformStockRepository = platformStockRepository;
         this.userRepository = userRepository;
-        this.loggingService = loggingService;
     }
 
+    @LogMessage(
+            messageKey = "log.message.watchlist.add",
+            params = {
+                    "#result.id",
+                    "#result.platform",
+                    "#result.symbol",
+                    "#result.dateAdded",
+            }
+    )
     @Override
     public WatchlistCreationResponse createWatchlistItem(Integer userId, String platform, String symbol) {
         // Get user
@@ -67,9 +73,6 @@ public class WatchlistCreationService implements WatchlistCreationServiceInterfa
         newItem.setPlatformStock(platformStock);
         newItem.setDateAdded(LocalDateTime.now());
         WatchlistItem savedItem = watchlistItemRepository.save(newItem);
-
-        // Log success
-        loggingService.logAction("Added item to watchlist: " + platform + "/" + symbol + " for user: " + userId);
 
         // Prepare and return success DTO
         return new WatchlistCreationResponse(

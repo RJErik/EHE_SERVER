@@ -1,11 +1,12 @@
 package com.example.ehe_server.service.portfolio;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.PortfolioSearchResponse;
 import com.example.ehe_server.dto.PortfolioValueResponse;
 import com.example.ehe_server.entity.Portfolio;
+import com.example.ehe_server.exception.custom.InvalidUserIdentifierException;
 import com.example.ehe_server.repository.PortfolioRepository;
 import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioSearchServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioValueServiceInterface;
 import org.springframework.stereotype.Service;
@@ -21,30 +22,34 @@ import java.util.stream.Collectors;
 public class PortfolioSearchService implements PortfolioSearchServiceInterface {
 
     private final PortfolioRepository portfolioRepository;
-    private final LoggingServiceInterface loggingService;
     private final PortfolioValueServiceInterface portfolioValueService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final UserRepository userRepository;
 
     public PortfolioSearchService(
             PortfolioRepository portfolioRepository,
-            LoggingServiceInterface loggingService,
             PortfolioValueServiceInterface portfolioValueService,
             UserRepository userRepository) {
         this.portfolioRepository = portfolioRepository;
-        this.loggingService = loggingService;
         this.portfolioValueService = portfolioValueService;
         this.userRepository = userRepository;
     }
 
+    @LogMessage(
+            messageKey = "log.message.portfolio.search",
+            params = {
+                    "#platform",
+                    "#minValue",
+                    "#maxValue",
+                    "#result.size()"}
+    )
     @Override
     public List<PortfolioSearchResponse> searchPortfolios(Integer userId, String platform,
                                                           BigDecimal minValue, BigDecimal maxValue) {
 
         // Validate user exists
         if (!userRepository.existsById(userId)) {
-            loggingService.logAction("Portfolio search: User not found");
-            return Collections.emptyList();
+            throw new InvalidUserIdentifierException("TODO");
         }
 
         // Get filtered portfolios using single query
@@ -54,7 +59,7 @@ public class PortfolioSearchService implements PortfolioSearchServiceInterface {
         );
 
         // Calculate values and filter by value range
-        List<PortfolioSearchResponse> portfoliosList = portfolios.stream()
+        return portfolios.stream()
                 .map(portfolio -> {
                     PortfolioValueResponse valueResult = portfolioValueService.calculatePortfolioValue(
                             userId,
@@ -73,13 +78,5 @@ public class PortfolioSearchService implements PortfolioSearchServiceInterface {
                 .filter(p -> (minValue == null || p.getValue().compareTo(minValue) >= 0) &&
                         (maxValue == null || p.getValue().compareTo(maxValue) <= 0))
                 .collect(Collectors.toList());
-
-        // Log success
-        loggingService.logAction("Searched portfolios with criteria - platform: " + platform +
-                ", minValue: " + minValue +
-                ", maxValue: " + maxValue +
-                ". Found " + portfoliosList.size() + " results.");
-
-        return portfoliosList;
     }
 }

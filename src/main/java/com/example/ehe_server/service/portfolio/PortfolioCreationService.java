@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.portfolio;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.PortfolioCreationResponse;
 import com.example.ehe_server.dto.PortfolioValueResponse;
 import com.example.ehe_server.entity.ApiKey;
@@ -8,7 +9,6 @@ import com.example.ehe_server.exception.custom.ApiKeyNotFoundException;
 import com.example.ehe_server.repository.ApiKeyRepository;
 import com.example.ehe_server.repository.PortfolioRepository;
 import com.example.ehe_server.service.audit.UserContextService;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioCreationServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioValueServiceInterface;
 import org.springframework.stereotype.Service;
@@ -25,7 +25,6 @@ public class PortfolioCreationService implements PortfolioCreationServiceInterfa
 
     private final PortfolioRepository portfolioRepository;
     private final ApiKeyRepository apiKeyRepository;
-    private final LoggingServiceInterface loggingService;
     private final PortfolioValueServiceInterface portfolioValueService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final UserContextService userContextService;
@@ -33,16 +32,25 @@ public class PortfolioCreationService implements PortfolioCreationServiceInterfa
     public PortfolioCreationService(
             PortfolioRepository portfolioRepository,
             ApiKeyRepository apiKeyRepository,
-            LoggingServiceInterface loggingService,
             PortfolioValueServiceInterface portfolioValueService,
             UserContextService userContextService) {
         this.portfolioRepository = portfolioRepository;
         this.apiKeyRepository = apiKeyRepository;
-        this.loggingService = loggingService;
         this.portfolioValueService = portfolioValueService;
         this.userContextService = userContextService;
     }
 
+    @LogMessage(
+            messageKey = "log.message.portfolio.add",
+            params = {
+                    "#apiKeyId",
+                    "#result.portfolioId",
+                    "#result.portfolioName",
+                    "#result.platformName",
+                    "#result.creationDate",
+                    "#result.totalValue"
+            }
+    )
     @Override
     public PortfolioCreationResponse createPortfolio(String portfolioName, Integer apiKeyId) {
         // Get current user ID from user context
@@ -72,12 +80,6 @@ public class PortfolioCreationService implements PortfolioCreationServiceInterfa
         // Calculate portfolio value
         PortfolioValueResponse valueResult = portfolioValueService.calculatePortfolioValue(userId, savedPortfolio.getPortfolioId());
         BigDecimal totalValue = valueResult.getTotalValue();
-
-        // Prepare success response
-
-
-        // Log success
-        loggingService.logAction("Created portfolio: " + portfolioName + " with API key from platform " + apiKey.getPlatformName());
 
         // Prepare and return success DTO
         return new PortfolioCreationResponse(

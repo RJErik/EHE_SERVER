@@ -1,10 +1,11 @@
 package com.example.ehe_server.service.auth;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.exception.custom.*;
 import com.example.ehe_server.repository.AdminRepository;
-import com.example.ehe_server.repository.JwtRefreshTokenRepository;
 import com.example.ehe_server.repository.UserRepository;
+import com.example.ehe_server.properties.JwtProperties;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.JwtRefreshTokenServiceInterface;
 import com.example.ehe_server.service.intf.auth.LogInServiceInterface;
@@ -12,10 +13,9 @@ import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtTokenGeneratorInterface;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCrypt;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -29,13 +29,8 @@ public class LogInService implements LogInServiceInterface {
     private final JwtRefreshTokenServiceInterface jwtRefreshTokenService;
     private final JwtTokenGeneratorInterface jwtTokenGenerator;
     private final CookieServiceInterface cookieService;
-    private final LoggingServiceInterface loggingService;
-
-    @Value("${jwt.refresh.expiration.time}")
-    private long jwtRefreshExpirationTime;
-
-    @Value("${jwt.refresh.max.expiration.time}")
-    private long jwtRefreshTokenMaxExpireTime;
+    private final JwtProperties jwtConfig;
+    private final PasswordEncoder passwordEncoder;
 
     // Email validation pattern
     private static final Pattern EMAIL_PATTERN =
@@ -44,21 +39,25 @@ public class LogInService implements LogInServiceInterface {
 
     public LogInService(UserRepository userRepository,
                         AdminRepository adminRepository,
-                        JwtRefreshTokenRepository jwtRefreshTokenRepository,
                         JwtRefreshTokenServiceInterface jwtRefreshTokenService,
                         JwtTokenGeneratorInterface jwtTokenGenerator,
                         CookieServiceInterface cookieService,
-                        LoggingServiceInterface loggingService,
-                        UserContextService userContextService) {
+                        UserContextService userContextService,
+                        JwtProperties jwtConfig,
+                        PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.adminRepository = adminRepository;
         this.jwtRefreshTokenService = jwtRefreshTokenService;
         this.jwtTokenGenerator = jwtTokenGenerator;
         this.cookieService = cookieService;
-        this.loggingService = loggingService;
         this.userContextService = userContextService;
+        this.jwtConfig = jwtConfig;
+        this.passwordEncoder = passwordEncoder;
     }
 
+    @LogMessage(
+            messageKey = "log.message.auth.login"
+    )
     @Override
     public void authenticateUser(String email, String password, HttpServletResponse response) {
         // Validate both fields are provided
@@ -128,16 +127,12 @@ public class LogInService implements LogInServiceInterface {
         cookieService.addJwtRefreshCookie(jwtRefreshToken, response);
 
         // Use the new service to save the refresh token
-        String refreshTokenHash = BCrypt.hashpw(jwtRefreshToken, BCrypt.gensalt());
+        String refreshTokenHash = passwordEncoder.encode(jwtRefreshToken);
         jwtRefreshTokenService.saveRefreshToken(
                 user,
                 refreshTokenHash,
-                jwtRefreshExpirationTime,
-                jwtRefreshTokenMaxExpireTime
+                jwtConfig.getJwtRefreshExpirationTime(),
+                jwtConfig.getJwtRefreshTokenMaxExpireTime()
         );
-
-
-        // Log successful login
-        loggingService.logAction("Login successful");
     }
 }

@@ -63,8 +63,6 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
                     return true;
                 }
             }
-            System.out.println("No refresh token found");
-
             // No matching hash found
             return false;
         } catch (SignatureException | MalformedJwtException | ExpiredJwtException e) {
@@ -72,51 +70,6 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
             return false;
         } catch (Exception e) {
             return false;
-        }
-    }
-
-
-    @Override
-    public Integer getUserIdFromToken(String token) {
-        try {
-            Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(publicKey)
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody();
-
-            return claims.get("user_id", Integer.class);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    @Override
-    public String getRoleFromToken(String token) {
-        try {
-            Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(publicKey)
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody();
-
-            // Debug - print all claims to see what's actually in the token
-            System.out.println("DEBUG - JWT Claims: " + claims.toString());
-
-            // Try direct access without type specification first
-            Object roleObj = claims.get("role");
-            System.out.println("DEBUG - Role object type: " + (roleObj != null ? roleObj.getClass().getName() : "null"));
-            System.out.println("DEBUG - Role object value: " + roleObj);
-
-            // Now get it with proper type casting
-            String role = claims.get("role", String.class);
-            System.out.println("DEBUG - Extracted role string: '" + role + "'");
-
-            return role;
-        } catch (Exception e) {
-            System.out.println("DEBUG - Exception extracting role: " + e.getMessage());
-            e.printStackTrace();
-            return null;
         }
     }
 }

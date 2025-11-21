@@ -1,6 +1,6 @@
 package com.example.ehe_server.service.alpaca;
 
-import com.example.ehe_server.securityConfig.AlpacaProperties;
+import com.example.ehe_server.properties.AlpacaProperties;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.fasterxml.jackson.databind.JsonNode;

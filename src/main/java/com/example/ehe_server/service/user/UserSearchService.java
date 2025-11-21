@@ -1,9 +1,9 @@
 package com.example.ehe_server.service.user;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.UserSearchResponse;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.user.UserSearchServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,13 +18,25 @@ import java.util.stream.Collectors;
 public class UserSearchService implements UserSearchServiceInterface {
 
     private final UserRepository userRepository;
-    private final LoggingServiceInterface loggingService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public UserSearchService(UserRepository userRepository, LoggingServiceInterface loggingService) {
+    public UserSearchService(UserRepository userRepository) {
         this.userRepository = userRepository;
-        this.loggingService = loggingService;
     }
+
+    @LogMessage(
+            messageKey = "log.message.user.search",
+            params = {
+                    "#userId",
+                    "#username",
+                    "#email",
+                    "#accountStatus",
+                    "#registrationDateToTime",
+                    "#registrationDateFromTime",
+                    "#result.size()"
+            }
+    )
+
     @Override
     public List<UserSearchResponse> searchUsers(Integer userId, String username, String email, String accountStatus, LocalDateTime registrationDateToTime, LocalDateTime registrationDateFromTime) {
 
@@ -34,7 +46,7 @@ public class UserSearchService implements UserSearchServiceInterface {
             try {
                 userStatus = User.AccountStatus.valueOf(accountStatus);
             } catch (IllegalArgumentException e) {
-                loggingService.logAction("Invalid account type: " + accountStatus);
+                //Todo throw error
                 return List.of();
             }
         }
@@ -47,7 +59,7 @@ public class UserSearchService implements UserSearchServiceInterface {
                 registrationDateToTime,
                 registrationDateFromTime);
 
-        List<UserSearchResponse> responses = users.stream()
+        return users.stream()
                 .map(item -> new UserSearchResponse(
                         item.getUserId(),
                         item.getUserName(),
@@ -56,10 +68,6 @@ public class UserSearchService implements UserSearchServiceInterface {
                         item.getRegistrationDate().format(DATE_FORMATTER)
                 ))
                 .collect(Collectors.toList());
-
-        loggingService.logAction("User search completed, found " + responses.size() + " results");
-
-        return responses;
 
     }
 }

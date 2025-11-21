@@ -1,12 +1,12 @@
 package com.example.ehe_server.controller;
 
 import com.example.ehe_server.dto.*;
+import com.example.ehe_server.properties.FrontendProperties;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.*;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
@@ -34,15 +34,7 @@ public class AuthController {
     private final EmailChangeVerificationServiceInterface emailChangeVerificationService;
     private final MessageSource messageSource;
     private final UserContextService userContextService;
-
-    @Value("${app.frontend.url}")
-    String frontendUrl;
-
-    @Value("${app.frontend.user.suffix}")
-    String userUrlSuffix;
-
-    @Value("${app.frontend.admin.suffix}")
-    String adminUrlSuffix;
+    private final FrontendProperties frontendProperties;
 
     public AuthController(
             LogInServiceInterface logInService,
@@ -54,7 +46,8 @@ public class AuthController {
             PasswordResetServiceInterface passwordResetService,
             EmailChangeVerificationServiceInterface emailChangeVerificationService,
             MessageSource messageSource,
-            UserContextService userContextService) {
+            UserContextService userContextService,
+            FrontendProperties frontendProperties) {
         this.logInService = logInService;
         this.registrationService = registrationService;
         this.registrationVerificationServiceInterface = registrationVerificationServiceInterface;
@@ -65,6 +58,7 @@ public class AuthController {
         this.emailChangeVerificationService = emailChangeVerificationService;
         this.messageSource = messageSource;
         this.userContextService = userContextService;
+        this.frontendProperties = frontendProperties;
     }
 
     @PostMapping("/login")
@@ -85,9 +79,9 @@ public class AuthController {
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         if(userContextService.getCurrentUserRole().contains("ROLE_ADMIN")) {
-            responseBody.put("redirectUrl", frontendUrl + adminUrlSuffix);
+            responseBody.put("redirectUrl", frontendProperties.getFrontEndUrl() + frontendProperties.getAdminUrlSuffix());
         } else {
-            responseBody.put("redirectUrl", frontendUrl + userUrlSuffix);
+            responseBody.put("redirectUrl", frontendProperties.getFrontEndUrl() + frontendProperties.getUserUrlSuffix());
         }
 
         // 4. Return the successful response

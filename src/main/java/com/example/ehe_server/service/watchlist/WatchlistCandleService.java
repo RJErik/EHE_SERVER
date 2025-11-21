@@ -40,7 +40,7 @@ public class WatchlistCandleService implements WatchlistCandleServiceInterface {
         List<WatchlistItem> watchlistItems = watchlistItemRepository.findByUser_UserId(userId);
 
         if (watchlistItems.isEmpty()) {
-            loggingService.logAction("Watchlist candles: No items found for user: " + userId);
+            //TODO throw error
             return Collections.emptyList();
         }
 

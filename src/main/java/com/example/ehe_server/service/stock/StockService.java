@@ -1,10 +1,10 @@
 package com.example.ehe_server.service.stock;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.StocksByPlatformResponse;
 import com.example.ehe_server.entity.PlatformStock;
 import com.example.ehe_server.exception.custom.PlatformNotFoundException;
 import com.example.ehe_server.repository.PlatformStockRepository;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.stock.StockServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,15 +17,18 @@ import java.util.stream.Collectors;
 public class StockService implements StockServiceInterface {
 
     private final PlatformStockRepository platformStockRepository;
-    private final LoggingServiceInterface loggingService;
 
-    public StockService(
-            PlatformStockRepository platformStockRepository,
-            LoggingServiceInterface loggingService) {
+    public StockService(PlatformStockRepository platformStockRepository) {
         this.platformStockRepository = platformStockRepository;
-        this.loggingService = loggingService;
     }
 
+    @LogMessage(
+            messageKey = "log.message.stock.stock.get",
+            params = {
+                    "#platformName",
+                    "#result.size()"
+            }
+    )
     @Override
     public StocksByPlatformResponse getStocksByPlatform(String platformName) {
         // Check if platform exists
@@ -40,9 +43,6 @@ public class StockService implements StockServiceInterface {
         List<String> stocks = platformStocks.stream()
                 .map(PlatformStock::getStockSymbol)
                 .collect(Collectors.toList());
-
-        // Log success
-        loggingService.logAction("Stocks retrieved successfully for platform: " + platformName);
 
         return new StocksByPlatformResponse(platformName, stocks);
     }

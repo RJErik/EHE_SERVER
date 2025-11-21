@@ -1,19 +1,19 @@
 package com.example.ehe_server.service.auth;
 
+import com.example.ehe_server.properties.JwtProperties;
 import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CookieService implements CookieServiceInterface {
 
-    @Value("${jwt.access.expiration.time}")
-    private long jwtAccessExpirationTime;
+    private final JwtProperties jwtConfig;
 
-    @Value("${jwt.refresh.expiration.time}")
-    private long jwtRefreshExpirationTime;
+    public CookieService(JwtProperties jwtConfig) {
+        this.jwtConfig = jwtConfig;
+    }
 
     @Override
     public void addJwtAccessCookie(String jwtToken, HttpServletResponse response) {
@@ -21,7 +21,7 @@ public class CookieService implements CookieServiceInterface {
         cookie.setHttpOnly(true);
         cookie.setSecure(false); //turn to true after development.
         cookie.setPath("/");
-        cookie.setMaxAge((int) (jwtAccessExpirationTime / 1000));
+        cookie.setMaxAge((int) (jwtConfig.getJwtAccessExpirationTime() / 1000));
         cookie.setAttribute("SameSite", "Strict");
 
         response.addCookie(cookie);
@@ -33,7 +33,7 @@ public class CookieService implements CookieServiceInterface {
         cookie.setHttpOnly(true);
         cookie.setSecure(false); //turn to true after development.
         cookie.setPath("/");
-        cookie.setMaxAge((int) (jwtRefreshExpirationTime / 1000));
+        cookie.setMaxAge((int) (jwtConfig.getJwtRefreshExpirationTime() / 1000));
         cookie.setAttribute("SameSite", "Strict");
 
         response.addCookie(cookie);

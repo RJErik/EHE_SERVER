@@ -1,9 +1,9 @@
 package com.example.ehe_server.service.user;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.UserInfoResponse;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.user.UserInfoServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,16 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class UserInfoService implements UserInfoServiceInterface {
 
-    private final LoggingServiceInterface loggingService;
     private final UserRepository userRepository;
 
-    public UserInfoService(
-            LoggingServiceInterface loggingService,
-            UserRepository userRepository) {
-        this.loggingService = loggingService;
+    public UserInfoService(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
+    @LogMessage(messageKey = "log.message.user.userInfo.get")
     @Override
     public UserInfoResponse getUserInfo(Integer userId) {
 
@@ -33,8 +30,6 @@ public class UserInfoService implements UserInfoServiceInterface {
             return null;
         }
 
-        // Log the successful user info retrieval
-        loggingService.logAction("User info retrieved successfully");
         // Return user info in a DTO
         return new UserInfoResponse(user.getUserName(), user.getEmail());
     }

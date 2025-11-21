@@ -6,12 +6,14 @@ import com.example.ehe_server.exception.custom.AccountAlreadyActiveException;
 import com.example.ehe_server.exception.custom.AccountSuspendedException;
 import com.example.ehe_server.exception.custom.EmailSendFailureException;
 import com.example.ehe_server.exception.custom.VerificationRateLimitExceededException;
+import com.example.ehe_server.properties.EmailProperties;
+import com.example.ehe_server.properties.FrontendProperties;
+import com.example.ehe_server.properties.VerificationTokenProperties;
 import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -36,26 +38,26 @@ public class EmailService implements EmailServiceInterface {
     private final VerificationTokenRepository verificationTokenRepository;
     private final AdminRepository adminRepository;
     private final UserContextService userContextService;
-
-    @Value("${spring.mail.username}")
-    private String mailFrom;
-
-    @Value("${app.frontend.url}")
-    private String frontendUrl;
-
-    @Value("${app.verification.token.expiry-hours}")
-    private long tokenExpiryHours;
+    private final FrontendProperties frontendProperties;
+    private final VerificationTokenProperties verificationTokenProperties;
+    private final EmailProperties emailProperties;
 
     public EmailService(JavaMailSender javaMailSender,
                         LoggingServiceInterface loggingService,
                         VerificationTokenRepository verificationTokenRepository,
                         AdminRepository adminRepository,
-                        UserContextService userContextService) {
+                        UserContextService userContextService,
+                        FrontendProperties frontendProperties,
+                        VerificationTokenProperties verificationTokenProperties,
+                        EmailProperties emailProperties) {
         this.javaMailSender = javaMailSender;
         this.loggingService = loggingService;
         this.verificationTokenRepository = verificationTokenRepository;
         this.adminRepository = adminRepository;
         this.userContextService = userContextService;
+        this.frontendProperties = frontendProperties;
+        this.verificationTokenProperties = verificationTokenProperties;
+        this.emailProperties = emailProperties;
     }
 
     @Override
@@ -71,7 +73,7 @@ public class EmailService implements EmailServiceInterface {
         userContextService.setUser(String.valueOf(user.getUserId()), role);
 
         String subject = "Verify your Email for Event Horizon Exchange";
-        String verificationUrl = frontendUrl + "/verify-registration?token=" + token; // Adjust path if needed
+        String verificationUrl = frontendProperties.getFrontEndUrl() + "/verify-registration?token=" + token; // Adjust path if needed
         String text = "Dear " + user.getUserName() + ",\n\n"
                 + "Thank you for registering. Please click the link below to verify your email address:\n"
                 + verificationUrl + "\n\n"
@@ -84,7 +86,7 @@ public class EmailService implements EmailServiceInterface {
     @Async // Optional
     public void sendSimpleMessage(String to, String subject, String text) throws MailException {
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailFrom);
+        message.setFrom(emailProperties.getUsername());
         message.setTo(to);
         message.setSubject(subject);
         message.setText(text);
@@ -142,7 +144,7 @@ public class EmailService implements EmailServiceInterface {
 
         // --- Generate and Save New Token ---
         String token = UUID.randomUUID().toString();
-        LocalDateTime expiryDate = LocalDateTime.now().plusHours(tokenExpiryHours);
+        LocalDateTime expiryDate = LocalDateTime.now().plusHours(verificationTokenProperties.getTokenExpiryHours());
         VerificationToken newToken = new VerificationToken(user, token, VerificationToken.TokenType.REGISTRATION, expiryDate);
         verificationTokenRepository.save(newToken);
         //SYSTEM SET HERE
@@ -172,11 +174,11 @@ public class EmailService implements EmailServiceInterface {
         userContextService.setUser(String.valueOf(user.getUserId()), role);
 
         String subject = "Password Reset for Event Horizon Exchange";
-        String resetUrl = frontendUrl + "/reset-password?token=" + token;
+        String resetUrl = frontendProperties.getFrontEndUrl() + "/reset-password?token=" + token;
         String text = "Dear " + user.getUserName() + ",\n\n"
                 + "We received a request to reset your password. Please click the link below to reset your password:\n"
                 + resetUrl + "\n\n"
-                + "This link will expire in " + (tokenExpiryHours / 2) + " hours.\n\n"
+                + "This link will expire in " + (verificationTokenProperties.getTokenExpiryHours() / 2) + " hours.\n\n"
                 + "If you did not request a password reset, please ignore this email or contact support if you have concerns.\n\n"
                 + "Regards,\nThe Event Horizon Exchange Team";
         sendSimpleMessage(recipientEmail, subject, text);
@@ -198,12 +200,12 @@ public class EmailService implements EmailServiceInterface {
         userContextService.setUser(String.valueOf(user.getUserId()), role);
 
         String subject = "Verify Email Change for Event Horizon Exchange";
-        String verificationUrl = frontendUrl + "/verify-email-change?token=" + token;
+        String verificationUrl = frontendProperties.getFrontEndUrl() + "/verify-email-change?token=" + token;
         String text = "Dear " + user.getUserName() + ",\n\n"
                 + "We received a request to change your email address to this one. "
                 + "Please click the link below to verify this email address and complete the change:\n"
                 + verificationUrl + "\n\n"
-                + "This link will expire in " + tokenExpiryHours + " hours.\n\n"
+                + "This link will expire in " + verificationTokenProperties.getTokenExpiryHours() + " hours.\n\n"
                 + "If you did not request this change, please ignore this email or contact support if you have concerns.\n\n"
                 + "Regards,\nThe Event Horizon Exchange Team";
         sendSimpleMessage(newEmail, subject, text);

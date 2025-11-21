@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.alert;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.AlertCreationResponse;
 import com.example.ehe_server.entity.Alert;
 import com.example.ehe_server.entity.PlatformStock;
@@ -10,7 +11,6 @@ import com.example.ehe_server.repository.AlertRepository;
 import com.example.ehe_server.repository.PlatformStockRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.alert.AlertCreationServiceInterface;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -25,21 +25,31 @@ public class AlertCreationService implements AlertCreationServiceInterface {
 
     private final AlertRepository alertRepository;
     private final PlatformStockRepository platformStockRepository;
-    private final LoggingServiceInterface loggingService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final UserRepository userRepository;
 
     public AlertCreationService(
             AlertRepository alertRepository,
             PlatformStockRepository platformStockRepository,
-            LoggingServiceInterface loggingService,
             UserRepository userRepository) {
         this.alertRepository = alertRepository;
         this.platformStockRepository = platformStockRepository;
-        this.loggingService = loggingService;
         this.userRepository = userRepository;
     }
 
+    @LogMessage(
+            messageKey = "log.message.alert.add",
+            params = {
+                    "#result.alertId",
+                    "#result.platform",
+                    "#result.symbol",
+                    "#result.conditionType",
+                    "#result.thresholdValue",
+                    "#result.dateCreated",
+                    "#result.active"
+            }
+    )
+    @Override
     public AlertCreationResponse createAlert(Integer userId, String platform, String symbol, String conditionTypeStr, BigDecimal thresholdValue) {
         // Validate threshold value
         if (thresholdValue == null || thresholdValue.compareTo(BigDecimal.ZERO) <= 0) {
@@ -60,7 +70,7 @@ public class AlertCreationService implements AlertCreationServiceInterface {
             throw new PlatformStockNotFoundException(platform, symbol);
         }
 
-        PlatformStock platformStock = platformStocks.get(0);
+        PlatformStock platformStock = platformStocks.getFirst();
 
         // Create new alert
         Alert newAlert = new Alert();
@@ -71,9 +81,6 @@ public class AlertCreationService implements AlertCreationServiceInterface {
         newAlert.setDateCreated(LocalDateTime.now());
         newAlert.setActive(true);
         Alert savedAlert = alertRepository.save(newAlert);
-
-        // Log success
-        loggingService.logAction("Added alert: " + platform + "/" + symbol + " " + conditionType + " " + thresholdValue);
 
         // Prepare success response
         return new AlertCreationResponse(

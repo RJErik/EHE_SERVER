@@ -1,15 +1,14 @@
 package com.example.ehe_server.service.alert;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.entity.Alert;
 import com.example.ehe_server.exception.custom.AlertNotFoundException;
 import com.example.ehe_server.exception.custom.UnauthorizedAlertAccessException;
 import com.example.ehe_server.repository.AlertRepository;
 import com.example.ehe_server.service.intf.alert.AlertRemovalServiceInterface;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.util.Optional;
 
 @Service
@@ -17,15 +16,16 @@ import java.util.Optional;
 public class AlertRemovalService implements AlertRemovalServiceInterface {
 
     private final AlertRepository alertRepository;
-    private final LoggingServiceInterface loggingService;
 
-    public AlertRemovalService(
-            AlertRepository alertRepository,
-            LoggingServiceInterface loggingService) {
+    public AlertRemovalService(AlertRepository alertRepository) {
         this.alertRepository = alertRepository;
-        this.loggingService = loggingService;
     }
 
+    @LogMessage(
+            messageKey = "log.message.alert.remove",
+            params = {"#alertId"}
+    )
+    @Override
     public void removeAlert(Integer userId, Integer alertId) {
         // Check if the alert exists
         Optional<Alert> alertOptional = alertRepository.findById(alertId);
@@ -40,16 +40,7 @@ public class AlertRemovalService implements AlertRemovalServiceInterface {
             throw new UnauthorizedAlertAccessException(userId, alertId);
         }
 
-        // Get alert details for logging
-        String platform = alert.getPlatformStock().getPlatformName();
-        String symbol = alert.getPlatformStock().getStockSymbol();
-        Alert.ConditionType conditionType = alert.getConditionType();
-        BigDecimal thresholdValue = alert.getThresholdValue();
-
         // Remove the alert
         alertRepository.delete(alert);
-
-        // Log success
-        loggingService.logAction("Removed alert: " + platform + "/" + symbol + " " + conditionType + " " + thresholdValue + " (ID: " + alertId + ")");
     }
 }

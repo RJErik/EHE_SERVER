@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.user;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.UserUpdateResponse;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.exception.custom.*;
@@ -7,7 +8,7 @@ import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.auth.JwtRefreshTokenServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.user.UserUpdateServiceInterface;
-import org.springframework.security.crypto.bcrypt.BCrypt;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,7 @@ public class UserUpdateService implements UserUpdateServiceInterface {
     private final UserRepository userRepository;
     private final JwtRefreshTokenServiceInterface jwtRefreshTokenService;
     private final LoggingServiceInterface loggingService;
+    private final PasswordEncoder passwordEncoder;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -31,11 +33,24 @@ public class UserUpdateService implements UserUpdateServiceInterface {
 
     public UserUpdateService(UserRepository userRepository,
                              LoggingServiceInterface loggingService,
-                             JwtRefreshTokenServiceInterface jwtRefreshTokenService) {
+                             JwtRefreshTokenServiceInterface jwtRefreshTokenService,
+                             PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.jwtRefreshTokenService = jwtRefreshTokenService;
         this.loggingService = loggingService;
+        this.passwordEncoder = passwordEncoder;
     }
+    @LogMessage(
+            messageKey = "log.message.user.update",
+            params = {
+                    "#userId",
+                    "#username",
+                    "#email",
+                    "#accountStatus",
+                    "#result.registrationDate"
+            }
+    )
+
     @Override
     public UserUpdateResponse updateUserInfo(Integer userId, String username, String email, String password, String accountStatus) {
 
@@ -79,7 +94,7 @@ public class UserUpdateService implements UserUpdateServiceInterface {
             if (!PASSWORD_PATTERN.matcher(password).matches()) {
                 throw new InvalidPasswordFormatException();
             } else {
-                user.setPasswordHash(BCrypt.hashpw(password, BCrypt.gensalt()));
+                user.setPasswordHash(passwordEncoder.encode(password));
             }
         }
 

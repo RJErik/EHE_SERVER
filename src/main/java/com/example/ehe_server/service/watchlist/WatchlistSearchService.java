@@ -1,10 +1,9 @@
 package com.example.ehe_server.service.watchlist;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.WatchlistSearchResponse;
 import com.example.ehe_server.entity.WatchlistItem;
-import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.WatchlistItemRepository;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.watchlist.WatchlistSearchServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,17 +17,20 @@ import java.util.stream.Collectors;
 public class WatchlistSearchService implements WatchlistSearchServiceInterface {
 
     private final WatchlistItemRepository watchlistItemRepository;
-    private final LoggingServiceInterface loggingService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public WatchlistSearchService(
-            WatchlistItemRepository watchlistItemRepository,
-            UserRepository userRepository,
-            LoggingServiceInterface loggingService) {
+    public WatchlistSearchService(WatchlistItemRepository watchlistItemRepository) {
         this.watchlistItemRepository = watchlistItemRepository;
-        this.loggingService = loggingService;
     }
 
+    @LogMessage(
+            messageKey = "log.message.watchlist.search",
+            params = {
+                    "#platform",
+                    "#symbol",
+                    "#result.size()"
+            }
+    )
     @Override
     public List<WatchlistSearchResponse> searchWatchlistItems(Integer userId, String platform, String symbol) {
         // Single query handles all filter combinations
@@ -38,10 +40,8 @@ public class WatchlistSearchService implements WatchlistSearchServiceInterface {
                 (symbol != null && !symbol.trim().isEmpty()) ? symbol : null
         );
 
-        loggingService.logAction("Searching watchlist for user: " + userId + " with platform=" + platform + " and symbol=" + symbol);
-
         // Transform to response DTOs
-        List<WatchlistSearchResponse> responses = watchlistItems.stream()
+        return watchlistItems.stream()
                 .map(item -> new WatchlistSearchResponse(
                         item.getWatchlistItemId(),
                         item.getPlatformStock().getPlatformName(),
@@ -49,9 +49,5 @@ public class WatchlistSearchService implements WatchlistSearchServiceInterface {
                         item.getDateAdded().format(DATE_FORMATTER)
                 ))
                 .collect(Collectors.toList());
-
-        loggingService.logAction("Watchlist search successful for user: " + userId + ", found " + responses.size() + " items");
-
-        return responses;
     }
 }

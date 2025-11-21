@@ -2,6 +2,7 @@ package com.example.ehe_server.filter;
 
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
+import com.example.ehe_server.service.intf.auth.JwtClaimServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtTokenValidatorInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.messaging.Message;
@@ -26,14 +27,17 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     private final JwtTokenValidatorInterface jwtTokenValidator;
     private final UserRepository userRepository;
     private final LoggingServiceInterface loggingService;
+    private final JwtClaimServiceInterface jwtClaimService;
 
     public WebSocketAuthInterceptor(
             JwtTokenValidatorInterface jwtTokenValidator,
             UserRepository userRepository,
-            LoggingServiceInterface loggingService) {
+            LoggingServiceInterface loggingService,
+            JwtClaimServiceInterface jwtClaimService) {
         this.jwtTokenValidator = jwtTokenValidator;
         this.userRepository = userRepository;
         this.loggingService = loggingService;
+        this.jwtClaimService = jwtClaimService;
     }
 
     @Override
@@ -108,8 +112,8 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
      */
     private void setWebSocketAuthentication(String token, StompHeaderAccessor accessor) {
         try {
-            Integer userId = jwtTokenValidator.getUserIdFromToken(token);
-            String role = jwtTokenValidator.getRoleFromToken(token);
+            Integer userId = jwtClaimService.getUserIdFromToken(token);
+            String role = jwtClaimService.getRoleFromToken(token);
 
             if (!areClaimsValid(userId, role)) {
                 loggingService.logAction("[WebSocket/CONNECT] JWT claims invalid: userId=" + userId + ", role=" + role);

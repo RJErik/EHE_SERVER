@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.automatictrade;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.AutomatedTradeRuleSearchResponse;
 import com.example.ehe_server.entity.AutomatedTradeRule;
 import com.example.ehe_server.exception.custom.InvalidActionTypeException;
@@ -7,7 +8,6 @@ import com.example.ehe_server.exception.custom.InvalidConditionTypeException;
 import com.example.ehe_server.exception.custom.InvalidQuantityTypeException;
 import com.example.ehe_server.repository.AutomatedTradeRuleRepository;
 import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeRuleSearchServiceInterface;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,16 +21,23 @@ import java.util.stream.Collectors;
 public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearchServiceInterface {
 
     private final AutomatedTradeRuleRepository automatedTradeRuleRepository;
-    private final LoggingServiceInterface loggingService;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public AutomatedTradeRuleSearchService(
-            AutomatedTradeRuleRepository automatedTradeRuleRepository,
-            LoggingServiceInterface loggingService) {
+    public AutomatedTradeRuleSearchService(AutomatedTradeRuleRepository automatedTradeRuleRepository) {
         this.automatedTradeRuleRepository = automatedTradeRuleRepository;
-        this.loggingService = loggingService;
     }
 
+    @LogMessage(
+            messageKey = "log.message.automatedTradeRule.search",
+            params = {
+                    "#portfolioId",
+                    "#platform",
+                    "#symbol",
+                    "#conditionTypeStr",
+                    "#actionTypeStr",
+                    "#quantityTypeStr",
+                    "#result.size()"}
+    )
     @Override
     public List<AutomatedTradeRuleSearchResponse> searchAutomatedTradeRules(
             Integer userId,
@@ -73,24 +80,6 @@ public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearch
             }
         }
 
-        // Log the search parameters
-        StringBuilder searchParams = new StringBuilder("Searching automated trade rules with filters: ");
-        if (portfolioId != null) searchParams.append("portfolioId=").append(portfolioId).append(", ");
-        if (platform != null && !platform.trim().isEmpty())
-            searchParams.append("platform=").append(platform).append(", ");
-        if (symbol != null && !symbol.trim().isEmpty()) searchParams.append("symbol=").append(symbol).append(", ");
-        if (conditionType != null) searchParams.append("conditionType=").append(conditionType).append(", ");
-        if (actionType != null) searchParams.append("actionType=").append(actionType).append(", ");
-        if (quantityType != null) searchParams.append("quantityType=").append(quantityType).append(", ");
-        if (minThresholdValue != null) searchParams.append("minThreshold=").append(minThresholdValue).append(", ");
-        if (maxThresholdValue != null) searchParams.append("maxThreshold=").append(maxThresholdValue).append(", ");
-
-        String logMessage = searchParams.toString();
-        if (logMessage.endsWith(", ")) {
-            logMessage = logMessage.substring(0, logMessage.length() - 2);
-        }
-        loggingService.logAction(logMessage);
-
         // Execute single database query with all filters
         List<AutomatedTradeRule> filteredRules = automatedTradeRuleRepository.searchAutomatedTradeRules(
                 userId,
@@ -105,7 +94,7 @@ public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearch
         );
 
         // Transform to response format
-        List<AutomatedTradeRuleSearchResponse> rulesList = filteredRules.stream()
+        return filteredRules.stream()
                 .map(rule -> {
                     AutomatedTradeRuleSearchResponse dto = new AutomatedTradeRuleSearchResponse();
                     dto.setId(rule.getAutomatedTradeRuleId());
@@ -123,10 +112,5 @@ public class AutomatedTradeRuleSearchService implements AutomatedTradeRuleSearch
                     return dto;
                 })
                 .collect(Collectors.toList());
-
-        // Log success
-        loggingService.logAction("Automated trade rule search successful, found " + rulesList.size() + " rules");
-
-        return rulesList;
     }
 }

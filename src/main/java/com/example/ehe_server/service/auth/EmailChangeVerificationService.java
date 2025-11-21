@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.auth;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.entity.EmailChangeRequest;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
@@ -9,7 +10,6 @@ import com.example.ehe_server.repository.EmailChangeRequestRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.auth.EmailChangeVerificationServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +23,6 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailChangeRequestRepository emailChangeRequestRepository;
     private final UserRepository userRepository;
-    private final LoggingServiceInterface loggingService;
     private final UserContextService userContextService;
     private final AdminRepository adminRepository;
 
@@ -31,19 +30,21 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
             VerificationTokenRepository verificationTokenRepository,
             EmailChangeRequestRepository emailChangeRequestRepository,
             UserRepository userRepository,
-            LoggingServiceInterface loggingService,
             UserContextService userContextService,
             AdminRepository adminRepository) {
         this.verificationTokenRepository = verificationTokenRepository;
         this.emailChangeRequestRepository = emailChangeRequestRepository;
         this.userRepository = userRepository;
-        this.loggingService = loggingService;
         this.userContextService = userContextService;
         this.adminRepository = adminRepository;
     }
 
+
+    @LogMessage(
+            messageKey = "log.message.auth.emailChangeVerification",
+            params = {"#token"}
+    )
     @Override
-    @Transactional
     public void validateEmailChange(String token) {
 
         // Find the token
@@ -115,7 +116,5 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
         // Mark token as used
         verificationToken.setStatus(VerificationToken.TokenStatus.USED);
         verificationTokenRepository.save(verificationToken);
-
-        loggingService.logAction("Email successfully changed to: " + newEmail);
     }
 }

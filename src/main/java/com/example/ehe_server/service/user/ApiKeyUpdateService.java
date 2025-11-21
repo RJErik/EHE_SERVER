@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.user;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.ApiKeyUpdateResponse;
 import com.example.ehe_server.entity.ApiKey;
 import com.example.ehe_server.entity.User;
@@ -35,8 +36,15 @@ public class ApiKeyUpdateService implements ApiKeyUpdateServiceInterface {
         this.userRepository = userRepository;
     }
 
+    @LogMessage(
+            messageKey = "log.message.user.apiKey.update",
+            params = {
+                    "#result.apiKeyId",
+                    "#result.platformName",
+                    "#result.maskedApiKeyValue",
+                    "#result.maskedSecretKey"}
+    )
     @Override
-    @Transactional
     public ApiKeyUpdateResponse updateApiKey(Integer userId, Integer apiKeyId, String platformName, String apiKeyValue, String secretKey) {
         // Check if user exists and is active
         User user;

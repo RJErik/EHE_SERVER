@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.alert;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.AlertSearchResponse;
 import com.example.ehe_server.entity.Alert;
 import com.example.ehe_server.exception.custom.InvalidConditionTypeException;
@@ -28,6 +29,14 @@ public class AlertSearchService implements AlertSearchServiceInterface {
         this.loggingService = loggingService;
     }
 
+    @LogMessage(
+            messageKey = "log.message.alert.search",
+            params = {
+                    "#platform",
+                    "#symbol",
+                    "#conditionTypeStr",
+                    "#result.size()"}
+    )
     @Override
     public List<AlertSearchResponse> searchAlerts(Integer userId, String platform, String symbol, String conditionTypeStr) {
         // Parse condition type if provided

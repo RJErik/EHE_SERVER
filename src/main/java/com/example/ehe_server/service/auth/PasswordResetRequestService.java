@@ -6,6 +6,7 @@ import com.example.ehe_server.exception.custom.InvalidEmailFormatException;
 import com.example.ehe_server.exception.custom.MissingEmailException;
 import com.example.ehe_server.exception.custom.PasswordResetRateLimitException;
 import com.example.ehe_server.exception.custom.UserNotFoundException;
+import com.example.ehe_server.properties.VerificationTokenProperties;
 import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
@@ -13,7 +14,6 @@ import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.PasswordResetRequestServiceInterface;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,9 +39,7 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
     private final LoggingServiceInterface loggingService;
     private final AdminRepository adminRepository;
     private final UserContextService userContextService;
-
-    @Value("${app.verification.token.expiry-hours}")
-    private long tokenExpiryHours;
+    private final VerificationTokenProperties verificationTokenProperties;
 
     public PasswordResetRequestService(
             UserRepository userRepository,
@@ -49,17 +47,18 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
             EmailServiceInterface emailService,
             LoggingServiceInterface loggingService,
             AdminRepository adminRepository,
-            UserContextService userContextService) {
+            UserContextService userContextService,
+            VerificationTokenProperties verificationTokenProperties) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.emailService = emailService;
         this.loggingService = loggingService;
         this.adminRepository = adminRepository;
         this.userContextService = userContextService;
+        this.verificationTokenProperties = verificationTokenProperties;
     }
 
     @Override
-    @Transactional
     public void requestPasswordResetForUnauthenticatedUser(String email) {
         // Validate email format
         if (email == null || email.trim().isEmpty()) {
@@ -100,7 +99,6 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
     }
 
     @Override
-    @Transactional
     public void requestPasswordResetForAuthenticatedUser(Integer userId) {
         // Find user by ID (authenticated user context)
         var userOpt = userRepository.findById(userId);
@@ -148,7 +146,7 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
         // Create new token - with shorter expiry for password resets
         String token = UUID.randomUUID().toString();
         // Use half the standard expiry time for password resets
-        LocalDateTime expiryDate = LocalDateTime.now().plusHours(tokenExpiryHours / 2);
+        LocalDateTime expiryDate = LocalDateTime.now().plusHours(verificationTokenProperties.getTokenExpiryHours() / 2);
         VerificationToken newToken = new VerificationToken(
                 user, token, VerificationToken.TokenType.PASSWORD_RESET, expiryDate);
         verificationTokenRepository.save(newToken);

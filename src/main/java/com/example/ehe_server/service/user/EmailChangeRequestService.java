@@ -4,6 +4,7 @@ import com.example.ehe_server.entity.EmailChangeRequest;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
 import com.example.ehe_server.exception.custom.*;
+import com.example.ehe_server.properties.VerificationTokenProperties;
 import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.EmailChangeRequestRepository;
 import com.example.ehe_server.repository.UserRepository;
@@ -12,7 +13,6 @@ import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.user.EmailChangeRequestServiceInterface;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,9 +40,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
     private final LoggingServiceInterface loggingService;
     private final UserContextService userContextService;
     private final AdminRepository adminRepository;
-
-    @Value("${app.verification.token.expiry-hours}")
-    private long tokenExpiryHours;
+    private final VerificationTokenProperties verificationTokenProperties;
 
     public EmailChangeRequestService(
             UserRepository userRepository,
@@ -51,7 +49,8 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
             EmailServiceInterface emailService,
             LoggingServiceInterface loggingService,
             UserContextService userContextService,
-            AdminRepository adminRepository) {
+            AdminRepository adminRepository,
+            VerificationTokenProperties verificationTokenProperties) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.emailChangeRequestRepository = emailChangeRequestRepository;
@@ -59,6 +58,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
         this.loggingService = loggingService;
         this.userContextService = userContextService;
         this.adminRepository = adminRepository;
+        this.verificationTokenProperties = verificationTokenProperties;
     }
 
     @Override
@@ -134,7 +134,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
 
         // Create new token
         String token = UUID.randomUUID().toString();
-        LocalDateTime expiryDate = LocalDateTime.now().plusHours(tokenExpiryHours);
+        LocalDateTime expiryDate = LocalDateTime.now().plusHours(verificationTokenProperties.getTokenExpiryHours());
         VerificationToken newToken = new VerificationToken(
                 user, token, VerificationToken.TokenType.EMAIL_CHANGE, expiryDate);
         verificationTokenRepository.save(newToken);

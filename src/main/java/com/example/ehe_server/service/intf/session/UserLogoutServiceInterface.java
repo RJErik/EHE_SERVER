@@ -1,4 +1,4 @@
-package com.example.ehe_server.service.intf.user;
+package com.example.ehe_server.service.intf.session;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

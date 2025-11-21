@@ -1,10 +1,10 @@
 package com.example.ehe_server.service.watchlist;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.entity.WatchlistItem;
 import com.example.ehe_server.exception.custom.UnauthorizedWatchlistAccessException;
 import com.example.ehe_server.exception.custom.WatchlistItemNotFoundException;
 import com.example.ehe_server.repository.WatchlistItemRepository;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.watchlist.WatchlistRemovalServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,15 +16,15 @@ import java.util.Optional;
 public class WatchlistRemovalService implements WatchlistRemovalServiceInterface {
 
     private final WatchlistItemRepository watchlistItemRepository;
-    private final LoggingServiceInterface loggingService;
 
-    public WatchlistRemovalService(
-            WatchlistItemRepository watchlistItemRepository,
-            LoggingServiceInterface loggingService) {
+    public WatchlistRemovalService(WatchlistItemRepository watchlistItemRepository) {
         this.watchlistItemRepository = watchlistItemRepository;
-        this.loggingService = loggingService;
     }
 
+    @LogMessage(
+            messageKey = "log.message.watchlist.remove",
+            params = {"#result.watchlistItemId",}
+    )
     @Override
     public void removeWatchlistItem(Integer userId, Integer watchlistItemId) {
         // Check if the watchlist item exists
@@ -41,11 +41,6 @@ public class WatchlistRemovalService implements WatchlistRemovalServiceInterface
         }
 
         // Remove the watchlist item
-        String platform = watchlistItem.getPlatformStock().getPlatformName();
-        String symbol = watchlistItem.getPlatformStock().getStockSymbol();
         watchlistItemRepository.delete(watchlistItem);
-
-        // Log success
-        loggingService.logAction("Removed item from watchlist: " + platform + "/" + symbol + " (ID: " + watchlistItemId + ")");
     }
 }

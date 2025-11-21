@@ -1,11 +1,11 @@
 package com.example.ehe_server.service.user;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.ApiKeyRetrievalResponse;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.ApiKeyRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.user.ApiKeyRetrievalServiceInterface;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,18 +17,19 @@ import java.util.stream.Collectors;
 public class ApiKeyRetrievalService implements ApiKeyRetrievalServiceInterface {
 
     private final ApiKeyRepository apiKeyRepository;
-    private final LoggingServiceInterface loggingService;
     private final UserRepository userRepository;
 
     public ApiKeyRetrievalService(
             ApiKeyRepository apiKeyRepository,
-            LoggingServiceInterface loggingService,
             UserRepository userRepository) {
         this.apiKeyRepository = apiKeyRepository;
-        this.loggingService = loggingService;
         this.userRepository = userRepository;
     }
 
+    @LogMessage(
+            messageKey = "log.message.user.apiKey.get",
+            params = {"#result.size()"}
+    )
     @Override
     public List<ApiKeyRetrievalResponse> getApiKeys(Integer userId) {
         // Get current user ID from user context
@@ -41,7 +42,11 @@ public class ApiKeyRetrievalService implements ApiKeyRetrievalServiceInterface {
 
 
         // Retrieve API keys for the user and map them to ApiKeyRetrievalResponse DTOs
-        List<ApiKeyRetrievalResponse> apiKeyDtos = apiKeyRepository.findByUser_UserId(user.getUserId())
+        // Mask the API key value
+        // Mask the secret key value if it exists
+
+        // Return the DTO
+        return apiKeyRepository.findByUser_UserId(user.getUserId())
                 .stream()
                 .map(apiKey -> {
                     ApiKeyRetrievalResponse dto = new ApiKeyRetrievalResponse();
@@ -61,11 +66,6 @@ public class ApiKeyRetrievalService implements ApiKeyRetrievalServiceInterface {
                     return dto;
                 })
                 .collect(Collectors.toList());
-
-        loggingService.logAction("Retrieved " + apiKeyDtos.size() + " API keys successfully");
-
-        // Return the DTO
-        return apiKeyDtos;
     }
 
     // Helper method to mask API key values

@@ -1,6 +1,6 @@
 package com.example.ehe_server.service.user;
 
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.service.intf.user.UserValidationServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,16 +9,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class UserValidationService implements UserValidationServiceInterface {
 
-    private final LoggingServiceInterface loggingService;
-
-    public UserValidationService(
-            LoggingServiceInterface loggingService) {
-        this.loggingService = loggingService;
+    public UserValidationService() {
     }
 
+    @LogMessage(messageKey = "log.message.user.verifyUser")
     @Override
     public void verifyUser() {
-        // Log the action
-        loggingService.logAction("User verification successful.");
     }
 }

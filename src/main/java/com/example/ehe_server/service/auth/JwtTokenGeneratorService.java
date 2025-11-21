@@ -1,9 +1,9 @@
 package com.example.ehe_server.service.auth;
 
+import com.example.ehe_server.properties.JwtProperties;
 import com.example.ehe_server.service.intf.auth.JwtTokenGeneratorInterface;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.security.interfaces.RSAPrivateKey;
@@ -13,21 +13,18 @@ import java.util.Date;
 public class JwtTokenGeneratorService implements JwtTokenGeneratorInterface {
 
     private final RSAPrivateKey privateKey;
+    private final JwtProperties jwtConfig;
 
-    @Value("${jwt.access.expiration.time}")
-    private long jwtAccessExpirationTime;
 
-    @Value("${jwt.refresh.expiration.time}")
-    private long jwtRefreshExpirationTime;
-
-    public JwtTokenGeneratorService(RSAPrivateKey privateKey) {
+    public JwtTokenGeneratorService(RSAPrivateKey privateKey, JwtProperties jwtConfig) {
         this.privateKey = privateKey;
+        this.jwtConfig = jwtConfig;
     }
 
     @Override
     public String generateAccessToken(Integer userId, String role) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtAccessExpirationTime);
+        Date expiryDate = new Date(now.getTime() + jwtConfig.getJwtAccessExpirationTime());
 
         return Jwts.builder()
                 .claim("user_id", userId)
@@ -41,7 +38,7 @@ public class JwtTokenGeneratorService implements JwtTokenGeneratorInterface {
     @Override
     public String generateRefreshToken(Integer userId, String role) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtRefreshExpirationTime);
+        Date expiryDate = new Date(now.getTime() + jwtConfig.getJwtRefreshExpirationTime());
 
         return Jwts.builder()
                 .claim("user_id", userId)
