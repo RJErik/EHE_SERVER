@@ -16,13 +16,14 @@ public class ApiKey {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "platform_name", nullable = false, length = 100)
-    private String platformName;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "platform_id", nullable = false)
+    private Platform platform;
 
     @Column(name = "api_key_value", nullable = false)
     private String apiKeyValue;
 
-    @Column(name = "secret_key")
+    @Column(name = "secret_key", nullable = false)
     private String secretKey;
 
     @Column(name = "date_added", nullable = false,
@@ -47,12 +48,12 @@ public class ApiKey {
         this.user = user;
     }
 
-    public String getPlatformName() {
-        return platformName;
+    public Platform getPlatform() {
+        return platform;
     }
 
-    public void setPlatformName(String platformName) {
-        this.platformName = platformName;
+    public void setPlatform(Platform platform) {
+        this.platform = platform;
     }
 
     public String getApiKeyValue() {

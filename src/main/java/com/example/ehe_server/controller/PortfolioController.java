@@ -6,8 +6,10 @@ import com.example.ehe_server.service.intf.portfolio.*;
 import com.example.ehe_server.service.portfolio.PortfolioByPlatformService;
 import com.example.ehe_server.service.portfolio.PortfolioDetailsService;
 import com.example.ehe_server.service.portfolio.PortfolioValueService;
+import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/user")
+@RequestMapping("/api/user/portfolios")
 public class PortfolioController {
 
     private final PortfolioRetrievalServiceInterface portfolioRetrievalService;
@@ -51,212 +53,196 @@ public class PortfolioController {
     }
 
     /**
-     * Endpoint to retrieve all portfolios for the current user with their calculated values
-     *
-     * @return List of portfolios with values and success status
+     * GET /api/user/portfolios
+     * Retrieve all portfolios for the current user
      */
-    @GetMapping("/portfolios")
+    @GetMapping
     public ResponseEntity<Map<String, Object>> getPortfolios() {
-        // Call automated trade rule retrieval service
-        List<PortfolioRetrievalResponse> portfolioRetrievalResponses = portfolioRetrievalService.getPortfolios(userContextService.getCurrentUserId());
+        List<PortfolioResponse> portfolioRetrievalResponses =
+                portfolioRetrievalService.getPortfolios(userContextService.getCurrentUserId());
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.portfolio.get", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.portfolio.get",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("portfolios", portfolioRetrievalResponses);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
     /**
-     * Endpoint to create a new portfolio for the user
-     *
-     * @param request Contains portfolio name and API key ID
-     * @return Success status and details of created portfolio
+     * POST /api/user/portfolios
+     * Create a new portfolio
      */
-    @PostMapping("/portfolios")
-    public ResponseEntity<Map<String, Object>> createPortfolio(@RequestBody PortfolioCreationRequest request) {
-        // Call automated trade rule retrieval service
-        PortfolioCreationResponse portfolioCreationResponse = portfolioCreationService.createPortfolio(
+    @PostMapping
+    public ResponseEntity<Map<String, Object>> createPortfolio(
+            @Valid @RequestBody PortfolioCreationRequest request) {
+
+        PortfolioResponse portfolioCreationResponse = portfolioCreationService.createPortfolio(
+                userContextService.getCurrentUserId(),
                 request.getPortfolioName(),
                 request.getApiKeyId());
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.portfolio.add", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.portfolio.add",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("portfolio", portfolioCreationResponse);
 
-        // 4. Return the successful response
+        // 201 Created for resource creation
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
+    }
+
+    /**
+     * DELETE /api/user/portfolios/{portfolioId}
+     * Delete a portfolio by ID
+     */
+    @DeleteMapping("/{portfolioId}")
+    public ResponseEntity<Map<String, Object>> removePortfolio(@PathVariable Integer portfolioId) {
+        portfolioRemovalService.removePortfolio(userContextService.getCurrentUserId(), portfolioId);
+
+        String successMessage = messageSource.getMessage(
+                "success.message.portfolio.remove",
+                null,
+                LocaleContextHolder.getLocale()
+        );
+
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+
         return ResponseEntity.ok(responseBody);
     }
 
     /**
-     * Endpoint to delete a portfolio and all its holdings
-     *
-     * @param request Contains the portfolio ID to delete
-     * @return Success status and confirmation message
+     * GET /api/user/portfolios/search?platform=X&minValue=100&maxValue=1000
+     * Search portfolios with filters
      */
-    @DeleteMapping("/portfolios")
-    public ResponseEntity<Map<String, Object>> removePortfolio(@RequestBody PortfolioRemovalRequest request) {
-        // Call automated trade rule retrieval service
-        portfolioRemovalService.removePortfolio(request.getPortfolioId());
+    @GetMapping("/search")
+    public ResponseEntity<Map<String, Object>> searchPortfolio(@ModelAttribute PortfolioSearchRequest request) {
+        List<PortfolioResponse> portfolioSearchResponses = portfolioSearchService.searchPortfolios(
+                userContextService.getCurrentUserId(),
+                request.getPlatform(),
+                request.getMinValue(),
+                request.getMaxValue());
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.portfolio.remove", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.portfolio.search",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
-        responseBody.put("success", true);
-        responseBody.put("message", successMessage);
-
-        // 4. Return the successful response
-        return ResponseEntity.ok(responseBody);
-    }
-
-    @PostMapping("/portfolios/search")
-    public ResponseEntity<Map<String, Object>> searchPortfolio(@RequestBody PortfolioSearchRequest request) {
-        // Call automated trade rule retrieval service
-        List<PortfolioSearchResponse> portfolioSearchResponses = portfolioSearchService.searchPortfolios(userContextService.getCurrentUserId(), request.getPlatform(), request.getMinValue(), request.getMaxValue());
-
-        // 2. Fetch the success message from messages.properties
-        String successMessage = messageSource.getMessage(
-                "success.message.portfolio.search", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
-        );
-
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("portfolios", portfolioSearchResponses);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
-    //LOOK OVER PATH, RESPONSE
+    /**
+     * PUT /api/user/portfolios/{portfolioId}/holdings
+     * Update holdings for a specific portfolio (sync with exchange)
+     */
+    @PutMapping("/{portfolioId}/holdings")
+    public ResponseEntity<Map<String, Object>> updateHoldings(@PathVariable Integer portfolioId) {
+        HoldingsUpdateResponse holdingsUpdateResponse =
+                portfolioValueService.updateHoldings(userContextService.getCurrentUserId(), portfolioId);
 
-    @PostMapping("/portfolios/update-holdings")
-    public ResponseEntity<Map<String, Object>> updateHoldings(@RequestBody PortfolioUpdateHoldingsRequest request) {
-        // Call portfolio value service to update holdings
-        HoldingsUpdateResponse holdingsUpdateResponse = portfolioValueService.updateHoldings(userContextService.getCurrentUserId(), request.getPortfolioId());
-
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.portfolio.holdings.updated", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.portfolio.holdings.updated",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("holdings", holdingsUpdateResponse);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
-    //LOOK OVER PATH, RESPONSE, TECHNICALLY NOT USED In THE FRONTEND
-
     /**
-     * Endpoint to get the current value of a portfolio
-     *
-     * @return Success status and portfolio value details
+     * GET /api/user/portfolios/{portfolioId}/value
+     * Get the calculated value of a portfolio
      */
-    @PostMapping("/portfolios/value")
-    public ResponseEntity<Map<String, Object>> getPortfolioValue(@RequestBody PortfolioValueRequest request) {
-        // Call portfolio value service to calculate value
-        PortfolioValueResponse portfolioValueResponse = portfolioValueService.calculatePortfolioValue(userContextService.getCurrentUserId(), request.getPortfolioId());
+    @GetMapping("/{portfolioId}/value")
+    public ResponseEntity<Map<String, Object>> getPortfolioValue(@PathVariable Integer portfolioId) {
+        PortfolioValueResponse portfolioValueResponse =
+                portfolioValueService.calculatePortfolioValue(userContextService.getCurrentUserId(), portfolioId);
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.portfolio.value.get", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.portfolio.value.get",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("portfolioValue", portfolioValueResponse);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
-    //LOOK OVER PATH, RESPONSE
-
     /**
-     * Endpoint to get detailed information about a portfolios
-     *
-     * @return Success status and detailed portfolio information including holdings
+     * GET /api/user/portfolios/{portfolioId}/details
+     * Get detailed information about a portfolio including holdings
      */
-    @PostMapping("/portfolios/details")
-    public ResponseEntity<Map<String, Object>> getPortfolioDetails(@RequestBody PortfolioDetailsRequest request) {
-        // Call portfolio details service
-        PortfolioDetailsResponse portfolioDetailsResponse = portfolioDetailsService.getPortfolioDetails(userContextService.getCurrentUserId(), request.getPortfolioId());
+    @GetMapping("/{portfolioId}/details")
+    public ResponseEntity<Map<String, Object>> getPortfolioDetails(@PathVariable Integer portfolioId) {
+        PortfolioDetailsResponse portfolioDetailsResponse =
+                portfolioDetailsService.getPortfolioDetails(userContextService.getCurrentUserId(), portfolioId);
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.portfolio.details.get", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.portfolio.details.get",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("portfolio", portfolioDetailsResponse);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
-    @PostMapping("/portfolios/by-platform")
-    public ResponseEntity<Map<String, Object>> getPortfoliosByPlatform(@RequestBody PortfolioByPlatformRequest request) {
-        // Call portfolio service
-        List<PortfolioByPlatformResponse> portfolioByPlatformResponses = portfolioByPlatformService.getPortfoliosByPlatform(userContextService.getCurrentUserId(), request.getPlatform());
+    /**
+     * GET /api/user/portfolios/by-platform?platform=BINANCE
+     * Get portfolios filtered by platform
+     */
+    @GetMapping("/by-platform")
+    public ResponseEntity<Map<String, Object>> getPortfoliosByPlatform(
+            @RequestParam String platform) {
 
-        // 2. Fetch the success message from messages.properties
+        List<PortfolioByPlatformResponse> portfolioByPlatformResponses =
+                portfolioByPlatformService.getPortfoliosByPlatform(
+                        userContextService.getCurrentUserId(),
+                        platform);
+
         String successMessage = messageSource.getMessage(
-                "success.message.portfolio.platforms.get", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.portfolio.platforms.get",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("portfolios", portfolioByPlatformResponses);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 }

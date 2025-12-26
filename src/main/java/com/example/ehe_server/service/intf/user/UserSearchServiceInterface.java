@@ -1,15 +1,15 @@
 package com.example.ehe_server.service.intf.user;
 
-import com.example.ehe_server.dto.UserSearchResponse;
+import com.example.ehe_server.dto.UserResponse;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 public interface UserSearchServiceInterface {
-    List<UserSearchResponse> searchUsers(Integer userId,
-                                         String username,
-                                         String email,
-                                         String accountStatus,
-                                         LocalDateTime registrationDateToTime,
-                                         LocalDateTime registrationDateFromTime);
+    List<UserResponse> searchUsers(Integer userId,
+                                   String username,
+                                   String email,
+                                   String accountStatus,
+                                   LocalDateTime registrationDateToTime,
+                                   LocalDateTime registrationDateFromTime);
 }

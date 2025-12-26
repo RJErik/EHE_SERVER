@@ -1,7 +1,7 @@
 package com.example.ehe_server.service.user;
 
 import com.example.ehe_server.annotation.LogMessage;
-import com.example.ehe_server.dto.UserRetrievalResponse;
+import com.example.ehe_server.dto.UserResponse;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.user.UserRetrievalServiceInterface;
@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 public class UserRetrievalService implements UserRetrievalServiceInterface {
     private final UserRepository userRepository;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -27,12 +27,13 @@ public class UserRetrievalService implements UserRetrievalServiceInterface {
             params = {"#result.size()"}
     )
     @Override
-    public List<UserRetrievalResponse> getUsers() {
-        List<User> users = userRepository.findAll();
+    public List<UserResponse> getUsers() {
+        // Get all users excluding admins, ordered by registration date
+        List<User> users = userRepository.findAllNonAdminsOrderByRegistrationDateDesc();
 
         // Transform entities to DTOs
         return users.stream()
-                .map(item -> new UserRetrievalResponse(
+                .map(item -> new UserResponse(
                         item.getUserId(),
                         item.getUserName(),
                         item.getEmail(),

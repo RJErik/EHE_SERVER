@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.binance;
 
+import com.example.ehe_server.service.intf.binance.BinanceAccountServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -20,7 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service
-public class BinanceAccountService {
+public class BinanceAccountService implements BinanceAccountServiceInterface {
 
     private final RestTemplate restTemplate;
     private final LoggingServiceInterface loggingService;
@@ -29,8 +30,8 @@ public class BinanceAccountService {
     private static final String ORDER_ENDPOINT = "/api/v3/order";
     private static final String HMAC_SHA256 = "HmacSHA256";
 
-    public BinanceAccountService(LoggingServiceInterface loggingService) {
-        this.restTemplate = new RestTemplate();
+    public BinanceAccountService(LoggingServiceInterface loggingService, RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
         this.loggingService = loggingService;
     }
 

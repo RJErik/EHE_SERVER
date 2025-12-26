@@ -1,6 +1,7 @@
 package com.example.ehe_server.service.binance;
 
 import com.example.ehe_server.service.audit.UserContextService;
+import com.example.ehe_server.service.intf.binance.BinanceWebSocketClientInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,7 +20,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Service
-public class BinanceWebSocketClient extends TextWebSocketHandler {
+public class BinanceWebSocketClient extends TextWebSocketHandler implements BinanceWebSocketClientInterface {
     private final ObjectMapper objectMapper;
     private final LoggingServiceInterface loggingService;
     private final UserContextService userContextService;

@@ -1,6 +1,6 @@
 package com.example.ehe_server.service.intf.automatictrade;
 
-import com.example.ehe_server.dto.AutomatedTradeRuleRetrievalResponse;
+import com.example.ehe_server.dto.AutomatedTradeRuleResponse;
 
 import java.util.List;
 
@@ -13,5 +13,5 @@ public interface AutomatedTradeRuleRetrievalServiceInterface {
      * @param userId The user that has initiated the service
      * @return Map containing success status and list of automated trade rules
      */
-    List<AutomatedTradeRuleRetrievalResponse> getAutomatedTradeRules(Integer userId);
+    List<AutomatedTradeRuleResponse> getAutomatedTradeRules(Integer userId);
 }

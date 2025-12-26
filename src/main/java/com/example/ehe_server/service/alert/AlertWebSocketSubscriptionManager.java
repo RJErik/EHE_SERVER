@@ -6,17 +6,19 @@ import com.example.ehe_server.entity.Alert;
 import com.example.ehe_server.entity.JwtRefreshToken;
 import com.example.ehe_server.entity.MarketCandle;
 import com.example.ehe_server.entity.PlatformStock;
-import com.example.ehe_server.exception.custom.InvalidSubscriptionIdException;
-import com.example.ehe_server.exception.custom.SubscriptionNotFoundException;
+import com.example.ehe_server.exception.custom.*;
 import com.example.ehe_server.repository.AlertRepository;
 import com.example.ehe_server.repository.JwtRefreshTokenRepository;
 import com.example.ehe_server.repository.MarketCandleRepository;
+import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.audit.UserContextService;
+import com.example.ehe_server.service.intf.alert.AlertWebSocketSubscriptionManagerInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-import jakarta.transaction.Transactional;
+import com.example.ehe_server.service.websocket.WebSocketSessionRegistry;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -26,21 +28,29 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Transactional
-public class AlertWebSocketSubscriptionManager {
+public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscriptionManagerInterface {
 
     private final UserContextService userContextService;
     private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
+    private final WebSocketSessionRegistry sessionRegistry;
+    private final AlertRepository alertRepository;
+    private final MarketCandleRepository marketCandleRepository;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final LoggingServiceInterface loggingService;
+    private final UserRepository userRepository;
 
     private static class AlertSubscription {
         private final String id;
         private final Integer userId;
+        private final String sessionId;
         private final String destination;
         private boolean initialCheckCompleted;
         private LocalDateTime lastCheckedMinuteCandle;
 
-        public AlertSubscription(String id, Integer userId, String destination) {
+        public AlertSubscription(String id, Integer userId, String sessionId, String destination) {
             this.id = id;
             this.userId = userId;
+            this.sessionId = sessionId;
             this.destination = destination;
             this.initialCheckCompleted = false;
             this.lastCheckedMinuteCandle = null;
@@ -53,6 +63,10 @@ public class AlertWebSocketSubscriptionManager {
 
         public Integer getUserId() {
             return userId;
+        }
+
+        public String getSessionId() {
+            return sessionId;
         }
 
         public String getDestination() {
@@ -76,11 +90,8 @@ public class AlertWebSocketSubscriptionManager {
         }
     }
 
-    private final AlertRepository alertRepository;
-    private final MarketCandleRepository marketCandleRepository;
-    private final SimpMessagingTemplate messagingTemplate;
-    private final LoggingServiceInterface loggingService;
     private final Map<String, AlertSubscription> activeSubscriptions = new ConcurrentHashMap<>();
+    private final Map<String, Set<String>> sessionToSubscriptionIds = new ConcurrentHashMap<>();
 
     public AlertWebSocketSubscriptionManager(
             AlertRepository alertRepository,
@@ -88,29 +99,63 @@ public class AlertWebSocketSubscriptionManager {
             SimpMessagingTemplate messagingTemplate,
             LoggingServiceInterface loggingService,
             UserContextService userContextService,
-            JwtRefreshTokenRepository jwtRefreshTokenRepository) {
+            JwtRefreshTokenRepository jwtRefreshTokenRepository,
+            WebSocketSessionRegistry sessionRegistry,
+            UserRepository userRepository) {
         this.alertRepository = alertRepository;
         this.marketCandleRepository = marketCandleRepository;
         this.messagingTemplate = messagingTemplate;
         this.loggingService = loggingService;
         this.userContextService = userContextService;
         this.jwtRefreshTokenRepository = jwtRefreshTokenRepository;
+        this.sessionRegistry = sessionRegistry;
+        this.userRepository = userRepository;
     }
 
     /**
-     * Create a new subscription for alerts and return its ID
+     * Create a new subscription for alerts and return its ID.
+     * Validates all parameters individually before creating the subscription.
      */
-    public AlertSubscriptionResponse createSubscription(Integer userId, String destination) {
+    public AlertSubscriptionResponse createSubscription(
+            Integer userId,
+            String sessionId,
+            String destination) {
+
+        // Validate each parameter individually
+        validateUserId(userId);
+        validateSessionId(sessionId);
+        validateDestination(destination);
+        validateUserExists(userId);
+
         String subscriptionId = UUID.randomUUID().toString();
 
         AlertSubscription subscription = new AlertSubscription(
                 subscriptionId,
                 userId,
+                sessionId,
                 destination);
 
         activeSubscriptions.put(subscriptionId, subscription);
 
-        loggingService.logAction("Created alert subscription: " + subscriptionId);
+        // Track by session
+        boolean isFirstForSession = sessionToSubscriptionIds
+                .computeIfAbsent(sessionId, k -> ConcurrentHashMap.newKeySet())
+                .isEmpty();
+        sessionToSubscriptionIds.get(sessionId).add(subscriptionId);
+
+        // Register cleanup callback with registry (only once per session)
+        if (isFirstForSession) {
+            sessionRegistry.registerSessionCleanup(sessionId, () -> {
+                System.out.println("[AlertManager] Cleaning up alert subscriptions for session: " + sessionId);
+                cleanupSessionSubscriptions(sessionId);
+            });
+        }
+
+        System.out.println("Created subscription: " + subscriptionId + " for session: " + sessionId);
+        System.out.println("Total active subscriptions: " + activeSubscriptions.size());
+
+        loggingService.logAction("Created alert subscription: " + subscriptionId +
+                " for user: " + userId + ", session: " + sessionId);
 
         // Start the initial check process asynchronously
         new Thread(() -> performInitialAlertCheck(subscription)).start();
@@ -119,7 +164,47 @@ public class AlertWebSocketSubscriptionManager {
     }
 
     /**
-     * Cancel a subscription
+     * Validates that userId is not null.
+     * Throws MissingUserIdException if validation fails.
+     */
+    private void validateUserId(Integer userId) {
+        if (userId == null) {
+            throw new MissingUserIdException();
+        }
+    }
+
+    /**
+     * Validates that sessionId is not null or empty.
+     * Throws MissingSessionIdException if validation fails.
+     */
+    private void validateSessionId(String sessionId) {
+        if (sessionId == null || sessionId.trim().isEmpty()) {
+            throw new MissingSessionIdException();
+        }
+    }
+
+    /**
+     * Validates that destination is not null or empty.
+     * Throws MissingDestinationException if validation fails.
+     */
+    private void validateDestination(String destination) {
+        if (destination == null || destination.trim().isEmpty()) {
+            throw new MissingDestinationException();
+        }
+    }
+
+    /**
+     * Validates that the user exists in the database.
+     * Throws UserNotFoundException if the user does not exist.
+     */
+    private void validateUserExists(Integer userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new UserNotFoundException(userId);
+        }
+    }
+
+    /**
+     * Cancel a subscription (explicit unsubscribe)
      */
     public void cancelSubscription(String subscriptionId) {
         if (subscriptionId == null) {
@@ -131,7 +216,41 @@ public class AlertWebSocketSubscriptionManager {
             throw new SubscriptionNotFoundException(subscriptionId);
         }
 
+        // Remove from session tracking
+        String sessionId = removed.getSessionId();
+        if (sessionId != null) {
+            Set<String> sessionSubs = sessionToSubscriptionIds.get(sessionId);
+            if (sessionSubs != null) {
+                sessionSubs.remove(subscriptionId);
+                if (sessionSubs.isEmpty()) {
+                    sessionToSubscriptionIds.remove(sessionId);
+                }
+            }
+        }
+
+        System.out.println("Cancelled subscription: " + subscriptionId);
+        System.out.println("Remaining active subscriptions: " + activeSubscriptions.size());
+
         loggingService.logAction("Cancelled alert subscription: " + subscriptionId);
+    }
+
+    /**
+     * Called automatically by WebSocketSessionRegistry when session disconnects
+     */
+    private void cleanupSessionSubscriptions(String sessionId) {
+        Set<String> subIds = sessionToSubscriptionIds.remove(sessionId);
+
+        if (subIds != null && !subIds.isEmpty()) {
+            subIds.forEach(subId -> {
+                AlertSubscription removed = activeSubscriptions.remove(subId);
+                if (removed != null) {
+                    System.out.println("[AlertManager] Auto-removed subscription: " + subId);
+                }
+            });
+
+            System.out.println("[AlertManager] Session cleanup complete. Removed " + subIds.size() + " subscriptions");
+            loggingService.logAction("Auto-cleaned " + subIds.size() + " alert subscriptions for session " + sessionId);
+        }
     }
 
     /**
@@ -140,7 +259,7 @@ public class AlertWebSocketSubscriptionManager {
     private void performInitialAlertCheck(AlertSubscription subscription) {
         try {
             // Get user's active alerts
-            List<Alert> userAlerts = alertRepository.findByUser_UserIdAndActiveTrue(subscription.getUserId());
+            List<Alert> userAlerts = alertRepository.findByUser_UserId(subscription.getUserId());
 
             if (userAlerts.isEmpty()) {
                 loggingService.logAction("No active alerts found for initial check");
@@ -161,7 +280,7 @@ public class AlertWebSocketSubscriptionManager {
                 PlatformStock platformStock = alert.getPlatformStock();
 
                 loggingService.logAction("Checking alert #" + alert.getAlertId() + " for " +
-                        platformStock.getPlatformName() + ":" + platformStock.getStockSymbol() +
+                        platformStock.getPlatform().getPlatformName() + ":" + platformStock.getStock().getStockName() +
                         " starting from " + checkStartTime);
 
                 // Start checking with 1-minute candles
@@ -218,9 +337,8 @@ public class AlertWebSocketSubscriptionManager {
                 // Send alert notification
                 sendAlertNotification(alert, candle, subscription);
 
-                // Deactivate the alert (it's been triggered)
-                alert.setActive(false);
-                alertRepository.save(alert);
+                // Delete alert after it has been triggered
+                alertRepository.delete(alert);
 
                 loggingService.logAction("Alert #" + alert.getAlertId() + " deactivated after triggering");
 
@@ -274,8 +392,8 @@ public class AlertWebSocketSubscriptionManager {
 
         notification.setSuccess(true);
         notification.setAlertId(alert.getAlertId());
-        notification.setPlatformName(alert.getPlatformStock().getPlatformName());
-        notification.setStockSymbol(alert.getPlatformStock().getStockSymbol());
+        notification.setPlatformName(alert.getPlatformStock().getPlatform().getPlatformName());
+        notification.setStockSymbol(alert.getPlatformStock().getStock().getStockName());
         notification.setConditionType(alert.getConditionType().toString());
         notification.setThresholdValue(alert.getThresholdValue());
         notification.setSubscriptionId(subscription.getId());
@@ -297,7 +415,7 @@ public class AlertWebSocketSubscriptionManager {
         // Send the notification to the client
         messagingTemplate.convertAndSendToUser(
                 subscription.getUserId().toString(),
-                "/queue/alerts", // Note: don't include "/user" here
+                "/queue/alerts",
                 notification
         );
     }
@@ -307,14 +425,18 @@ public class AlertWebSocketSubscriptionManager {
      */
     private String formatAlertMessage(Alert alert, MarketCandle candle) {
         String action = alert.getConditionType() == Alert.ConditionType.PRICE_ABOVE ? "crossed above" : "dropped below";
-        String symbol = alert.getPlatformStock().getStockSymbol();
-        String platform = alert.getPlatformStock().getPlatformName();
+        String symbol = alert.getPlatformStock().getStock().getStockName();
+        String platform = alert.getPlatformStock().getPlatform().getPlatformName();
         BigDecimal threshold = alert.getThresholdValue();
         BigDecimal triggerPrice = alert.getConditionType() == Alert.ConditionType.PRICE_ABOVE ?
                 candle.getHighPrice() : candle.getLowPrice();
 
+        // Strip trailing zeros from BigDecimal values
+        String formattedThreshold = threshold.stripTrailingZeros().toPlainString();
+        String formattedTriggerPrice = triggerPrice.stripTrailingZeros().toPlainString();
+
         return "ALERT TRIGGERED: " + platform + " " + symbol + " price " + action + " " +
-                threshold + " (actual: " + triggerPrice + ") at " + candle.getTimestamp();
+                formattedThreshold + " (actual: " + formattedTriggerPrice + ") at " + candle.getTimestamp();
     }
 
     /**
@@ -371,7 +493,8 @@ public class AlertWebSocketSubscriptionManager {
         for (AlertSubscription subscription : activeSubscriptions.values()) {
             List<JwtRefreshToken> userTokens = jwtRefreshTokenRepository.findByUser_UserId(subscription.getUserId());
             if (userTokens == null || userTokens.isEmpty()) {
-                System.out.println("User " + subscription.getUserId() + " has no refresh tokens. Disconnecting subscription " + subscription.getId());
+                System.out.println("User " + subscription.getUserId() +
+                        " has no refresh tokens. Disconnecting subscription " + subscription.getId());
                 subscriptionsToRemove.add(subscription.getId());
             }
         }
@@ -403,6 +526,7 @@ public class AlertWebSocketSubscriptionManager {
             if (!subscription.isInitialCheckCompleted()) {
                 continue;
             }
+
             // Get the last checked minute
             LocalDateTime lastChecked = subscription.getLastCheckedMinuteCandle();
 
@@ -411,7 +535,7 @@ public class AlertWebSocketSubscriptionManager {
                 loggingService.logAction("Performing minute alert check at " + currentMinute);
 
                 // Get user's active alerts
-                List<Alert> activeAlerts = alertRepository.findByUser_UserIdAndActiveTrue(subscription.getUserId());
+                List<Alert> activeAlerts = alertRepository.findByUser_UserId(subscription.getUserId());
 
                 if (!activeAlerts.isEmpty()) {
                     loggingService.logAction("Checking " + activeAlerts.size() + " active alerts for latest minute");
@@ -427,7 +551,8 @@ public class AlertWebSocketSubscriptionManager {
 
                         if (latestCandle != null) {
                             if (lastChecked == null || latestCandle.getTimestamp().isAfter(lastChecked.minusHours(2))) {
-                                loggingService.logAction("Found new candle at " + latestCandle.getTimestamp() + " for alert #" + alert.getAlertId());
+                                loggingService.logAction("Found new candle at " + latestCandle.getTimestamp() +
+                                        " for alert #" + alert.getAlertId());
 
                                 // Check if alert condition is met
                                 boolean alertTriggered = checkAlertCondition(alert, latestCandle);
@@ -438,20 +563,17 @@ public class AlertWebSocketSubscriptionManager {
                                     // Send alert notification
                                     sendAlertNotification(alert, latestCandle, subscription);
 
-                                    // Deactivate the alert (it's been triggered)
-                                    alert.setActive(false);
-                                    alertRepository.save(alert);
+                                    // Delete alert after it has been triggered
+                                    alertRepository.delete(alert);
                                 }
                             }
                         }
                     }
-
                 }
             }
 
             // Update the last checked minute
             subscription.setLastCheckedMinuteCandle(currentMinute);
-
         }
     }
 }

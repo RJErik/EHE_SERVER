@@ -28,7 +28,7 @@ public class VerificationToken {
     private User user;
 
     @Column(nullable = false, unique = true)
-    private String token;
+    private String tokenHash;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "token_type", nullable = false, length = 50)
@@ -49,10 +49,10 @@ public class VerificationToken {
         this.issueDate = LocalDateTime.now(); // Default issue date
     }
 
-    public VerificationToken(User user, String token, TokenType tokenType, LocalDateTime expiryDate) {
+    public VerificationToken(User user, String tokenHash, TokenType tokenType, LocalDateTime expiryDate) {
         this(); // Call default constructor
         this.user = user;
-        this.token = token;
+        this.tokenHash = tokenHash;
         this.tokenType = tokenType;
         this.expiryDate = expiryDate;
     }
@@ -74,12 +74,12 @@ public class VerificationToken {
         this.user = user;
     }
 
-    public String getToken() {
-        return token;
+    public String getTokenHash() {
+        return tokenHash;
     }
 
-    public void setToken(String token) {
-        this.token = token;
+    public void setTokenHash(String tokenHash) {
+        this.tokenHash = tokenHash;
     }
 
     public TokenType getTokenType() {

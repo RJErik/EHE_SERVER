@@ -3,7 +3,9 @@ package com.example.ehe_server.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "platform_stock")
+@Table(name = "platform_stock", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"platform_id", "stock_id"})
+})
 public class PlatformStock {
 
     @Id
@@ -11,11 +13,13 @@ public class PlatformStock {
     @Column(name = "platform_stock_id")
     private Integer platformStockId;
 
-    @Column(name = "platform_name", nullable = false, length = 100)
-    private String platformName;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "platform_id", nullable = false)
+    private Platform platform;
 
-    @Column(name = "stock_symbol", nullable = false, length = 50)
-    private String stockSymbol;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "stock_id", nullable = false)
+    private Stock stock;
 
     // Getters and setters
     public Integer getPlatformStockId() {
@@ -26,19 +30,27 @@ public class PlatformStock {
         this.platformStockId = platformStockId;
     }
 
-    public String getPlatformName() {
-        return platformName;
+    public Platform getPlatform() {
+        return platform;
     }
 
-    public void setPlatformName(String platformName) {
-        this.platformName = platformName;
+    public void setPlatform(Platform platform) {
+        this.platform = platform;
     }
 
-    public String getStockSymbol() {
-        return stockSymbol;
+    public Stock getStock() {
+        return stock;
     }
 
-    public void setStockSymbol(String stockSymbol) {
-        this.stockSymbol = stockSymbol;
+    public void setStock(Stock stock) {
+        this.stock = stock;
+    }
+
+    public Integer getPlatformId() {
+        return platform != null ? platform.getPlatformId() : null;
+    }
+
+    public Integer getStockId() {
+        return stock != null ? stock.getStockId() : null;
     }
 }

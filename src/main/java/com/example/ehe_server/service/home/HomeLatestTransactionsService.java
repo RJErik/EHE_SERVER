@@ -72,13 +72,13 @@ public class HomeLatestTransactionsService implements HomeLatestTransactionsServ
     @LogMessage(messageKey = "log.message.home.latestTransaction")
     @Override
     public List<HomeLatestTransactionsResponse> getLatestTransactions() {
-        List<Transaction> transactions = transactionRepository.findLast3CompletedTransactions();
+        List<Transaction> transactions = transactionRepository.findTop3ByStatusOrderByTransactionDateDesc(Transaction.Status.COMPLETED);
 
         return transactions.stream()
                 .map(transaction -> new HomeLatestTransactionsResponse(
                         this.generatePseudonym(),
-                        transaction.getPlatformStock().getPlatformName(),
-                        transaction.getPlatformStock().getStockSymbol(),
+                        transaction.getPlatformStock().getPlatform().getPlatformName(),
+                        transaction.getPlatformStock().getStock().getStockName(),
                         transaction.getQuantity(),
                         transaction.getTransactionType().toString()
                 ))

@@ -11,13 +11,15 @@ import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.EmailChangeVerificationServiceInterface;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
-@Transactional
+@Transactional(noRollbackFor = ExpiredVerificationTokenException.class)
 public class EmailChangeVerificationService implements EmailChangeVerificationServiceInterface {
 
     private final VerificationTokenRepository verificationTokenRepository;
@@ -25,20 +27,22 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
     private final UserRepository userRepository;
     private final UserContextService userContextService;
     private final AdminRepository adminRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public EmailChangeVerificationService(
             VerificationTokenRepository verificationTokenRepository,
             EmailChangeRequestRepository emailChangeRequestRepository,
             UserRepository userRepository,
             UserContextService userContextService,
-            AdminRepository adminRepository) {
+            AdminRepository adminRepository,
+            PasswordEncoder passwordEncoder) {
         this.verificationTokenRepository = verificationTokenRepository;
         this.emailChangeRequestRepository = emailChangeRequestRepository;
         this.userRepository = userRepository;
         this.userContextService = userContextService;
         this.adminRepository = adminRepository;
+        this.passwordEncoder = passwordEncoder;
     }
-
 
     @LogMessage(
             messageKey = "log.message.auth.emailChangeVerification",
@@ -47,74 +51,83 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
     @Override
     public void validateEmailChange(String token) {
 
-        // Find the token
-        Optional<VerificationToken> tokenOpt = verificationTokenRepository.findByToken(token);
+        // Input validation checks
+        if (token == null || token.trim().isEmpty()) {
+            throw new MissingVerificationTokenException(); // New Check
+        }
 
-        if (tokenOpt.isEmpty()) {
+        // Token lookup
+        VerificationToken verificationToken = findTokenByPlainValue(
+                token
+        );
+
+        if (verificationToken == null) {
             throw new InvalidVerificationTokenException(token);
         }
 
-        VerificationToken verificationToken = tokenOpt.get();
+
+        // Audit Context Setup
         User user = verificationToken.getUser();
-        String userIdStr = String.valueOf(user.getUserId());
-
-        // Set audit context
-        // Check if user is an admin
         boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+        String role = isAdmin ? "ADMIN" : "USER";
+        userContextService.setUser(String.valueOf(user.getUserId()), role);
 
-        // Create roles list based on user status
-        String role = "USER"; // All authenticated users have USER role
-
-        if (isAdmin) {
-            role = "ADMIN"; // Add ADMIN role if user is in Admin table
-        }
-        userContextService.setUser(userIdStr, role);
-
-        // Check token status
+        // Token Logic Validation
         if (verificationToken.getStatus() != VerificationToken.TokenStatus.ACTIVE) {
             throw new InactiveTokenException(token, verificationToken.getStatus().toString());
         }
 
-        // Check token type
         if (verificationToken.getTokenType() != VerificationToken.TokenType.EMAIL_CHANGE) {
             throw new TokenTypeMismatchException(token, VerificationToken.TokenType.EMAIL_CHANGE, verificationToken.getTokenType());
         }
 
-        // Check if token is expired
         if (verificationToken.isExpired()) {
             verificationToken.setStatus(VerificationToken.TokenStatus.EXPIRED);
             verificationTokenRepository.save(verificationToken);
-
             throw new ExpiredVerificationTokenException(token);
         }
 
-        // Check user status
+        // User Account Validation
         if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-            throw new InactiveAccountException(userIdStr, user.getAccountStatus().toString());
+            throw new InactiveAccountException(String.valueOf(user.getUserId()), user.getAccountStatus().toString());
         }
 
-        // Find email change request
-        Optional<EmailChangeRequest> requestOpt = emailChangeRequestRepository.findByVerificationToken(verificationToken);
+        // Request Logic Validation
+        EmailChangeRequest emailChangeRequest = emailChangeRequestRepository.findByVerificationToken(verificationToken)
+                .orElseThrow(() -> new EmailChangeRequestNotFoundException(token));
 
-        if (requestOpt.isEmpty()) {
-            throw new EmailChangeRequestNotFoundException(token);
-        }
-
-        EmailChangeRequest emailChangeRequest = requestOpt.get();
         String newEmail = emailChangeRequest.getNewEmail();
 
-        // Check if the new email is already in use by another user
+        // Check for email collision
         Optional<User> existingUserWithEmail = userRepository.findByEmail(newEmail);
         if (existingUserWithEmail.isPresent() && !existingUserWithEmail.get().getUserId().equals(user.getUserId())) {
             throw new EmailAlreadyInUseException(newEmail);
         }
 
-        // Update user's email
+        // Invalidate existing active tokens
+        List<VerificationToken> activeTokens = verificationTokenRepository.findByUser_UserIdAndTokenTypeAndStatus(
+                user.getUserId(), VerificationToken.TokenType.EMAIL_CHANGE, VerificationToken.TokenStatus.ACTIVE);
+
+        activeTokens.forEach(activeToken -> activeToken.setStatus(VerificationToken.TokenStatus.INVALIDATED));
+
+        // Execution and Persistence
         user.setEmail(newEmail);
         userRepository.save(user);
 
-        // Mark token as used
         verificationToken.setStatus(VerificationToken.TokenStatus.USED);
         verificationTokenRepository.save(verificationToken);
     }
+
+    private VerificationToken findTokenByPlainValue(String plainToken) {
+        List<VerificationToken> activeTokens = verificationTokenRepository.findByTokenTypeAndStatus(
+                VerificationToken.TokenType.EMAIL_CHANGE,
+                VerificationToken.TokenStatus.ACTIVE
+        );
+
+        return activeTokens.stream()
+                .filter(token -> passwordEncoder.matches(plainToken, token.getTokenHash()))
+                .findFirst()
+                .orElse(null);
+    }
+
 }

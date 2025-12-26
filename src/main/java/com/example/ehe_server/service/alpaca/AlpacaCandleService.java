@@ -1,9 +1,13 @@
 package com.example.ehe_server.service.alpaca;
 
 import com.example.ehe_server.entity.MarketCandle;
+import com.example.ehe_server.entity.Platform;
 import com.example.ehe_server.entity.PlatformStock;
+import com.example.ehe_server.entity.Stock;
 import com.example.ehe_server.repository.MarketCandleRepository;
+import com.example.ehe_server.repository.PlatformRepository;
 import com.example.ehe_server.repository.PlatformStockRepository;
+import com.example.ehe_server.repository.StockRepository;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -23,7 +27,9 @@ public class AlpacaCandleService {
 
     private final AlpacaDataApiClient apiClient;
     private final MarketCandleRepository candleRepository;
-    private final PlatformStockRepository stockRepository;
+    private final PlatformStockRepository platformStockRepository;
+    private final PlatformRepository platformRepository;
+    private final StockRepository stockRepository;
     private final ObjectMapper objectMapper;
     private final LoggingServiceInterface loggingService;
     private final UserContextService userContextService;
@@ -31,12 +37,16 @@ public class AlpacaCandleService {
     public AlpacaCandleService(
             AlpacaDataApiClient apiClient,
             MarketCandleRepository candleRepository,
-            PlatformStockRepository stockRepository,
+            PlatformStockRepository platformStockRepository,
+            PlatformRepository platformRepository,
+            StockRepository stockRepository,
             ObjectMapper objectMapper,
             LoggingServiceInterface loggingService,
             UserContextService userContextService) {
         this.apiClient = apiClient;
         this.candleRepository = candleRepository;
+        this.platformStockRepository = platformStockRepository;
+        this.platformRepository = platformRepository;
         this.stockRepository = stockRepository;
         this.objectMapper = objectMapper;
         this.loggingService = loggingService;
@@ -433,18 +443,27 @@ public class AlpacaCandleService {
     }
 
     private PlatformStock getOrCreateStock(String symbol) {
-        List<PlatformStock> stocks = stockRepository.findByPlatformNameAndStockSymbol(
+        // Try to find existing platform stock
+        List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockName(
                 PLATFORM_NAME, symbol);
 
         if (!stocks.isEmpty()) {
             return stocks.get(0);
         }
 
-        PlatformStock stock = new PlatformStock();
-        stock.setPlatformName(PLATFORM_NAME);
-        stock.setStockSymbol(symbol);
-        return stockRepository.save(stock);
+        // Create new stock entry - need to find or create Platform and Stock entities
+        Platform platform = platformRepository.findByPlatformName(PLATFORM_NAME)
+                .orElseThrow(() -> new RuntimeException("Platform not found: " + PLATFORM_NAME));
+
+        Stock stock = stockRepository.findByStockName(symbol)
+                .orElseThrow(() -> new RuntimeException("Stock not found: " + symbol));
+
+        PlatformStock platformStock = new PlatformStock();
+        platformStock.setPlatform(platform);
+        platformStock.setStock(stock);
+        return platformStockRepository.save(platformStock);
     }
+
 
     /**
      * Determines if a symbol is crypto based on the presence of "/"

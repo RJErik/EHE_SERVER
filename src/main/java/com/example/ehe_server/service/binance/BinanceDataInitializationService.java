@@ -3,6 +3,9 @@ package com.example.ehe_server.service.binance;
 import com.example.ehe_server.entity.PlatformStock;
 import com.example.ehe_server.repository.PlatformStockRepository;
 import com.example.ehe_server.service.audit.UserContextService;
+import com.example.ehe_server.service.intf.binance.BinanceCandleServiceInterface;
+import com.example.ehe_server.service.intf.binance.BinanceDataInitializationServiceInterface;
+import com.example.ehe_server.service.intf.binance.BinanceWebSocketClientInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import jakarta.annotation.PostConstruct;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -15,11 +18,11 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class BinanceDataInitializationService {
+public class BinanceDataInitializationService implements BinanceDataInitializationServiceInterface {
     private static final String PLATFORM_NAME = "Binance";
 
-    private final BinanceCandleService candleService;
-    private final BinanceWebSocketClient webSocketClient;
+    private final BinanceCandleServiceInterface candleService;
+    private final BinanceWebSocketClientInterface webSocketClient;
     private final PlatformStockRepository stockRepository;
     private final LoggingServiceInterface loggingService;
     private final UserContextService userContextService;
@@ -29,8 +32,8 @@ public class BinanceDataInitializationService {
     private final Map<String, Boolean> historicalSyncInProgress = new ConcurrentHashMap<>();
 
     public BinanceDataInitializationService(
-            BinanceCandleService candleService,
-            BinanceWebSocketClient webSocketClient,
+            BinanceCandleServiceInterface candleService,
+            BinanceWebSocketClientInterface webSocketClient,
             PlatformStockRepository stockRepository,
             LoggingServiceInterface loggingService,
             UserContextService userContextService) {
@@ -54,14 +57,14 @@ public class BinanceDataInitializationService {
             userContextService.setUser("SYSTEM", "SYSTEM");
             loggingService.logAction("Starting async Binance data synchronization");
 
-            List<PlatformStock> stocks = stockRepository.findByPlatformName(PLATFORM_NAME);
+            List<PlatformStock> stocks = stockRepository.findByPlatformPlatformName(PLATFORM_NAME);
 
             if (!stocks.isEmpty()) {
                 loggingService.logAction("Found " + stocks.size() + " Binance symbols. Starting initialization...");
 
                 // Initialize each symbol
                 for (PlatformStock stock : stocks) {
-                    setupSymbol(stock.getStockSymbol());
+                    setupSymbol(stock.getStock().getStockName());
                 }
             } else {
                 loggingService.logAction("No Binance symbols found in database");
@@ -128,9 +131,9 @@ public class BinanceDataInitializationService {
         try {
             loggingService.logAction("Running daily maintenance");
 
-            List<PlatformStock> stocks = stockRepository.findByPlatformName(PLATFORM_NAME);
+            List<PlatformStock> stocks = stockRepository.findByPlatformPlatformName(PLATFORM_NAME);
             for (PlatformStock stock : stocks) {
-                String symbol = stock.getStockSymbol();
+                String symbol = stock.getStock().getStockName();
 
                 // Skip if syncing or not live
                 if (historicalSyncInProgress.getOrDefault(symbol, false)) {
@@ -197,8 +200,8 @@ public class BinanceDataInitializationService {
     }
 
     private PlatformStock getStock(String symbol) {
-        List<PlatformStock> stocks = stockRepository.findByPlatformNameAndStockSymbol(
+        List<PlatformStock> stocks = stockRepository.findByPlatformPlatformNameAndStockStockName(
                 PLATFORM_NAME, symbol);
-        return stocks.isEmpty() ? null : stocks.get(0);
+        return stocks.isEmpty() ? null : stocks.getFirst();
     }
 }

@@ -2,10 +2,11 @@ package com.example.ehe_server.controller;
 
 import com.example.ehe_server.dto.websocket.AutomatedTradeSubscriptionResponse;
 import com.example.ehe_server.dto.websocket.AutomatedTradeUnsubscriptionRequest;
-import com.example.ehe_server.service.automatictrade.AutomatedTradeWebSocketSubscriptionManager;
 import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
+import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeWebSocketSubscriptionManagerInterface;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.annotation.SendToUser;
@@ -18,12 +19,12 @@ import java.util.Map;
 @Controller
 public class AutomatedTradeWebSocketController {
 
-    private final AutomatedTradeWebSocketSubscriptionManager automatedTradeWebSocketSubscriptionManager;
+    private final AutomatedTradeWebSocketSubscriptionManagerInterface automatedTradeWebSocketSubscriptionManager;
     private final WebSocketAuthServiceInterface webSocketAuthService;
     private final MessageSource messageSource;
 
     public AutomatedTradeWebSocketController(
-            AutomatedTradeWebSocketSubscriptionManager automatedTradeWebSocketSubscriptionManager,
+            AutomatedTradeWebSocketSubscriptionManagerInterface automatedTradeWebSocketSubscriptionManager,
             WebSocketAuthServiceInterface webSocketAuthService,
             MessageSource messageSource) {
         this.automatedTradeWebSocketSubscriptionManager = automatedTradeWebSocketSubscriptionManager;
@@ -33,7 +34,7 @@ public class AutomatedTradeWebSocketController {
 
     @MessageMapping("/automated-trades/subscribe")
     @SendToUser("/queue/automated-trades")
-    public Map<String, Object> subscribeToAutomatedTrades(StompHeaderAccessor headerAccessor) {
+    public Map<String, Object> subscribeToAutomatedTrades(@Header("simpSessionId") String sessionId, StompHeaderAccessor headerAccessor) {
 
         Map<String, Object> response = new HashMap<>();
 
@@ -43,6 +44,7 @@ public class AutomatedTradeWebSocketController {
         // Create subscription for this user
         AutomatedTradeSubscriptionResponse automatedTradeSubscriptionResponse = automatedTradeWebSocketSubscriptionManager.createSubscription(
                 userId,
+                sessionId,
                 "/user/queue/automated-trades");
 
         String successMessage = messageSource.getMessage(

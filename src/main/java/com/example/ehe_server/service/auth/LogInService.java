@@ -12,10 +12,9 @@ import com.example.ehe_server.service.intf.auth.LogInServiceInterface;
 import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtTokenGeneratorInterface;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.transaction.Transactional;
-import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -31,11 +30,11 @@ public class LogInService implements LogInServiceInterface {
     private final CookieServiceInterface cookieService;
     private final JwtProperties jwtConfig;
     private final PasswordEncoder passwordEncoder;
-
-    // Email validation pattern
-    private static final Pattern EMAIL_PATTERN =
-            Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     private final UserContextService userContextService;
+
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{8,72}$");
+    private static final int EMAIL_MAX_LENGTH = 255;
 
     public LogInService(UserRepository userRepository,
                         AdminRepository adminRepository,
@@ -60,38 +59,48 @@ public class LogInService implements LogInServiceInterface {
     )
     @Override
     public void authenticateUser(String email, String password, HttpServletResponse response) {
-        // Validate both fields are provided
-        if ((email == null || email.trim().isEmpty()) &&
-                (password == null || password.trim().isEmpty())) {
+
+        // Input validation checks
+        if ((email == null || email.trim().isEmpty()) && (password == null || password.trim().isEmpty())) {
             throw new MissingLoginCredentialsException();
         }
 
-        // Validate email is provided
         if (email == null || email.trim().isEmpty()) {
             throw new MissingEmailException();
         }
 
-        // Validate password is provided
         if (password == null || password.trim().isEmpty()) {
             throw new MissingPasswordException();
         }
 
-        // Validate email format
-        if (!EMAIL_PATTERN.matcher(email).matches()) {
+        if (email.length() > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.matcher(email).matches()) {
             throw new InvalidEmailFormatException(email);
         }
 
-        // Find user by email hash
-        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (!PASSWORD_PATTERN.matcher(password).matches()) {
+            throw new InvalidPasswordFormatException();
+        }
 
+        // Database integrity checks
+        Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
-            throw new InvalidEmailFormatException(email).withActionLink("registering.", "register");
+            throw new UserEmailNotFoundWithPasswordMessageException(email);
         }
 
         User user = userOpt.get();
 
-        // Check account status
+        // Credential verification
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new InvalidCredentialsException(email);
+        }
 
+        // Role determination and context setup
+        boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+        String role = isAdmin ? "ADMIN" : "USER";
+
+        userContextService.setUser(String.valueOf(user.getUserId()), role);
+
+        // Account status verification
         if (user.getAccountStatus() == User.AccountStatus.NONVERIFIED) {
             throw new NonVerifiedAccountException(email, user.getAccountStatus().toString()).withResendButton();
         }
@@ -100,33 +109,13 @@ public class LogInService implements LogInServiceInterface {
             throw new InactiveAccountException(email, user.getAccountStatus().toString());
         }
 
-        // Verify password
-        if (!BCrypt.checkpw(password, user.getPasswordHash())) {
-            throw new InvalidCredentialsException(email);
-        }
-
-        // Check if user is an admin
-        boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
-
-        // Create roles list based on user status
-        String role = "USER"; // All authenticated users have USER role
-
-        if (isAdmin) {
-            role = "ADMIN"; // Add ADMIN role if user is in Admin table
-        }
-
-        // Update audit context with authenticated user and roles
-        userContextService.setUser(String.valueOf(user.getUserId()), role);
-
-        // Generate JWT token with user ID and roles
+        // Token generation and execution
         String jwtAccessToken = jwtTokenGenerator.generateAccessToken(user.getUserId(), role);
         String jwtRefreshToken = jwtTokenGenerator.generateRefreshToken(user.getUserId(), role);
 
-        // Create JWT cookie
         cookieService.addJwtAccessCookie(jwtAccessToken, response);
         cookieService.addJwtRefreshCookie(jwtRefreshToken, response);
 
-        // Use the new service to save the refresh token
         String refreshTokenHash = passwordEncoder.encode(jwtRefreshToken);
         jwtRefreshTokenService.saveRefreshToken(
                 user,

@@ -1,6 +1,13 @@
 package com.example.ehe_server.service.intf.auth;
 
+import com.example.ehe_server.service.auth.JwtClaimService;
+
 public interface JwtClaimServiceInterface {
-    Integer getUserIdFromToken(String token);
-    String getRoleFromToken(String token); // Changed from List<String> getRolesFromToken
+
+    /**
+     * Parses the JWT and extracts all necessary claims (ID and Role) in one operation.
+     * Returns null if the token is invalid, expired, or empty.
+     */
+    JwtClaimService.TokenDetails parseTokenDetails(String token);
+
 }

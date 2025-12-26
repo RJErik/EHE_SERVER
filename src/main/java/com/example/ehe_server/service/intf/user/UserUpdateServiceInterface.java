@@ -1,10 +1,7 @@
 package com.example.ehe_server.service.intf.user;
 
-import com.example.ehe_server.dto.UserUpdateResponse;
-import com.example.ehe_server.entity.User;
-
-import java.time.LocalDateTime;
+import com.example.ehe_server.dto.UserResponse;
 
 public interface UserUpdateServiceInterface {
-    UserUpdateResponse updateUserInfo(Integer userId, String username, String email, String password, String accountStatus);
+    UserResponse updateUserInfo(Integer userId, String username, String email, String password, String accountStatus);
 }

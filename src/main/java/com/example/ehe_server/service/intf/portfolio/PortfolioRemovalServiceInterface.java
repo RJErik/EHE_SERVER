@@ -6,5 +6,5 @@ public interface PortfolioRemovalServiceInterface {
      * @param portfolioId The ID of the portfolio to delete
      * @return Map containing success status and deletion confirmation
      */
-    void removePortfolio(Integer portfolioId);
+    void removePortfolio(Integer userId, Integer portfolioId);
 }

@@ -1,6 +1,6 @@
 package com.example.ehe_server.service.intf.alert;
 
-import com.example.ehe_server.dto.AlertRetrievalResponse;
+import com.example.ehe_server.dto.AlertResponse;
 
 import java.util.List;
 import java.util.Map;
@@ -14,5 +14,5 @@ public interface AlertRetrievalServiceInterface {
      *  @param userId The ID of who makes this request
      * @return Map containing success status and list of alerts
      */
-    List<AlertRetrievalResponse> getAlerts(Integer userId);
+    List<AlertResponse> getAlerts(Integer userId);
 }

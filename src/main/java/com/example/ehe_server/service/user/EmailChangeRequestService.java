@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.user;
 
+import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.entity.EmailChangeRequest;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
@@ -10,18 +11,16 @@ import com.example.ehe_server.repository.EmailChangeRequestRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
-import com.example.ehe_server.service.intf.email.EmailServiceInterface;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
+import com.example.ehe_server.service.intf.email.EmailSenderServiceInterface;
 import com.example.ehe_server.service.intf.user.EmailChangeRequestServiceInterface;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -32,44 +31,49 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
 
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    private static final int EMAIL_MAX_LENGTH = 255;
 
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailChangeRequestRepository emailChangeRequestRepository;
-    private final EmailServiceInterface emailService;
-    private final LoggingServiceInterface loggingService;
+    private final EmailSenderServiceInterface emailSenderService;
     private final UserContextService userContextService;
     private final AdminRepository adminRepository;
     private final VerificationTokenProperties verificationTokenProperties;
+    private final PasswordEncoder passwordEncoder;
 
     public EmailChangeRequestService(
             UserRepository userRepository,
             VerificationTokenRepository verificationTokenRepository,
             EmailChangeRequestRepository emailChangeRequestRepository,
-            EmailServiceInterface emailService,
-            LoggingServiceInterface loggingService,
+            EmailSenderServiceInterface emailSenderService,
             UserContextService userContextService,
             AdminRepository adminRepository,
-            VerificationTokenProperties verificationTokenProperties) {
+            VerificationTokenProperties verificationTokenProperties,
+            PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.emailChangeRequestRepository = emailChangeRequestRepository;
-        this.emailService = emailService;
-        this.loggingService = loggingService;
+        this.emailSenderService = emailSenderService;
         this.userContextService = userContextService;
         this.adminRepository = adminRepository;
         this.verificationTokenProperties = verificationTokenProperties;
+        this.passwordEncoder = passwordEncoder;
     }
 
+    @LogMessage(messageKey = "log.message.user.emailChangeRequest")
     @Override
-    @Transactional
     public void requestEmailChange(Integer userId, String newEmail) {
         // Validate email format
+        if (userId == null) {
+            throw new MissingUserIdException();
+        }
+
         if (newEmail == null || newEmail.trim().isEmpty()) {
             throw new MissingEmailException();
         }
 
-        if (!EMAIL_PATTERN.matcher(newEmail).matches()) {
+        if (newEmail.length() > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.matcher(newEmail).matches()) {
             throw new InvalidEmailFormatException(newEmail);
         }
 
@@ -118,41 +122,19 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
             throw new EmailChangeRateLimitExceededException(RATE_LIMIT_MINUTES).withResendButton();
         }
 
-        // Invalidate existing active tokens
-        List<VerificationToken> oldTokens = verificationTokenRepository.findByUser_UserIdAndTokenType(
-                user.getUserId(), VerificationToken.TokenType.EMAIL_CHANGE);
-
-        List<VerificationToken> tokensToUpdate = oldTokens.stream()
-                .filter(token -> token.getStatus() == VerificationToken.TokenStatus.ACTIVE)
-                .peek(token -> token.setStatus(VerificationToken.TokenStatus.INVALIDATED))
-                .collect(Collectors.toList());
-
-        if (!tokensToUpdate.isEmpty()) {
-            verificationTokenRepository.saveAll(tokensToUpdate);
-            loggingService.logAction("Invalidated " + tokensToUpdate.size() + " previous active email change token(s)");
-        }
-
         // Create new token
-        String token = UUID.randomUUID().toString();
+        String plainToken = UUID.randomUUID().toString();
+        String hashedToken = passwordEncoder.encode(plainToken);
         LocalDateTime expiryDate = LocalDateTime.now().plusHours(verificationTokenProperties.getTokenExpiryHours());
         VerificationToken newToken = new VerificationToken(
-                user, token, VerificationToken.TokenType.EMAIL_CHANGE, expiryDate);
+                user, hashedToken, VerificationToken.TokenType.EMAIL_CHANGE, expiryDate);
         verificationTokenRepository.save(newToken);
 
         // Create email change request
         EmailChangeRequest emailChangeRequest = new EmailChangeRequest(newToken, newEmail);
         emailChangeRequestRepository.save(emailChangeRequest);
 
-        loggingService.logAction("Generated new email change token and request");
-
         // Send email with verification link
-        try {
-            emailService.sendEmailChangeVerificationEmail(user, token, newEmail);
-        } catch (Exception e) {
-            // Log failure
-            loggingService.logError("Failed to send email change verification email", e);
-            // Throw to trigger transaction rollback
-            throw e;
-        }
+        emailSenderService.sendEmailChangeVerificationEmail(user, plainToken, newEmail);
     }
 }

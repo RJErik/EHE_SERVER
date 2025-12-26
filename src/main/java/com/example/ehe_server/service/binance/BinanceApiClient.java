@@ -1,5 +1,6 @@
 package com.example.ehe_server.service.binance;
 
+import com.example.ehe_server.service.intf.binance.BinanceApiClientInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -11,7 +12,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class BinanceApiClient {
+public class BinanceApiClient implements BinanceApiClientInterface {
     private final RestTemplate restTemplate;
     private static final String API_BASE_URL = "https://api.binance.com";
     private final LoggingServiceInterface loggingService;

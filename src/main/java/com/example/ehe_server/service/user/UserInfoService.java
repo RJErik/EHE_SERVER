@@ -3,13 +3,15 @@ package com.example.ehe_server.service.user;
 import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.UserInfoResponse;
 import com.example.ehe_server.entity.User;
+import com.example.ehe_server.exception.custom.MissingUserIdException;
+import com.example.ehe_server.exception.custom.UserNotFoundException;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.user.UserInfoServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 public class UserInfoService implements UserInfoServiceInterface {
 
     private final UserRepository userRepository;
@@ -22,15 +24,16 @@ public class UserInfoService implements UserInfoServiceInterface {
     @Override
     public UserInfoResponse getUserInfo(Integer userId) {
 
-        // Get current user ID from user context
-        User user;
-        if (userRepository.existsById(userId)) {
-            user = userRepository.findById(userId).get();
-        } else {
-            return null;
+        // Input validation checks
+        if (userId == null) {
+            throw new MissingUserIdException();
         }
 
-        // Return user info in a DTO
+        // Database integrity checks
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        // Response mapping
         return new UserInfoResponse(user.getUserName(), user.getEmail());
     }
 }

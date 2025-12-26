@@ -1,6 +1,6 @@
 package com.example.ehe_server.service.intf.portfolio;
 
-import com.example.ehe_server.dto.PortfolioRetrievalResponse;
+import com.example.ehe_server.dto.PortfolioResponse;
 
 import java.util.List;
 
@@ -13,5 +13,5 @@ public interface PortfolioRetrievalServiceInterface {
      * @param userId The user that has initiated the service
      * @return Map containing success status and list of portfolios with values
      */
-    List<PortfolioRetrievalResponse> getPortfolios(Integer userId);
+    List<PortfolioResponse> getPortfolios(Integer userId);
 }

@@ -1,9 +1,9 @@
 package com.example.ehe_server.service.intf.alert;
 
-import com.example.ehe_server.dto.AlertSearchResponse;
+import com.example.ehe_server.dto.AlertResponse;
 
 import java.util.List;
 
 public interface AlertSearchServiceInterface {
-    List<AlertSearchResponse> searchAlerts(Integer userId, String platform, String symbol, String conditionType);
+    List<AlertResponse> searchAlerts(Integer userId, String platform, String symbol, String conditionType);
 }

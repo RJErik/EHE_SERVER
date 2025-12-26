@@ -3,6 +3,7 @@ package com.example.ehe_server.filter;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.properties.JwtProperties;
+import com.example.ehe_server.service.auth.JwtClaimService;
 import com.example.ehe_server.service.intf.auth.JwtClaimServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtTokenValidatorInterface;
@@ -112,8 +113,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      */
     private void setUserAuthentication(String token, String path) {
         try {
-            Integer userId = jwtClaimService.getUserIdFromToken(token);
-            String role = jwtClaimService.getRoleFromToken(token);
+            JwtClaimService.TokenDetails tokenDetails = jwtClaimService.parseTokenDetails(token);
+            Integer userId = tokenDetails.getUserId();
+            String role = tokenDetails.getRole();
 
             if (!areClaimsValid(userId, role)) {
                 loggingService.logAction("[" + path + "] JWT claims invalid: userId=" + userId + ", role=" + role);

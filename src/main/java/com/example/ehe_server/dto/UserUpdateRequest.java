@@ -1,35 +1,35 @@
 package com.example.ehe_server.dto;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Size;
+
 import java.util.Objects;
 
+/**
+ * Request body for updating a user.
+ * Note: userId is now passed via path parameter, not in the body.
+ */
 public class UserUpdateRequest {
-    private Integer userId;
-    private String userName;
-    private String email;
-    private String password;
-    private String accountStatus;
-    private String registrationDate;
 
-    public UserUpdateRequest(Integer userId, String userName, String email, String password, String accountStatus, String registrationDate) {
-        this.userId = userId;
-        this.userName = userName;
-        this.email = email;
-        this.password = password;
-        this.accountStatus = accountStatus;
-        this.registrationDate = registrationDate;
-    }
+    private String userName;
+
+    private String email;
+
+    private String password;
+
+    private String accountStatus;
 
     public UserUpdateRequest() {
     }
 
-    public Integer getUserId() {
-        return userId;
+    public UserUpdateRequest(String userName, String email, String password, String accountStatus) {
+        this.userName = userName;
+        this.email = email;
+        this.password = password;
+        this.accountStatus = accountStatus;
     }
 
-    public void setUserId(Integer userId) {
-        this.userId = userId;
-    }
-
+    // Getters and Setters
     public String getUserName() {
         return userName;
     }
@@ -62,35 +62,28 @@ public class UserUpdateRequest {
         this.accountStatus = accountStatus;
     }
 
-    public String getRegistrationDate() {
-        return registrationDate;
-    }
-
-    public void setRegistrationDate(String registrationDate) {
-        this.registrationDate = registrationDate;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
         UserUpdateRequest that = (UserUpdateRequest) o;
-        return Objects.equals(userId, that.userId) && Objects.equals(userName, that.userName) && Objects.equals(email, that.email) && Objects.equals(password, that.password) && Objects.equals(accountStatus, that.accountStatus) && Objects.equals(registrationDate, that.registrationDate);
+        return Objects.equals(userName, that.userName) &&
+                Objects.equals(email, that.email) &&
+                Objects.equals(password, that.password) &&
+                Objects.equals(accountStatus, that.accountStatus);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(userId, userName, email, password, accountStatus, registrationDate);
+        return Objects.hash(userName, email, password, accountStatus);
     }
 
     @Override
     public String toString() {
         return "UserUpdateRequest{" +
-                "userId=" + userId +
-                ", userName='" + userName + '\'' +
+                "userName='" + userName + '\'' +
                 ", email='" + email + '\'' +
                 ", password='" + password + '\'' +
                 ", accountStatus='" + accountStatus + '\'' +
-                ", registrationDate='" + registrationDate + '\'' +
                 '}';
     }
 }

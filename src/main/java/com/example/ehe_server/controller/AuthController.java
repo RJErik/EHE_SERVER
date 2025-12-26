@@ -4,18 +4,13 @@ import com.example.ehe_server.dto.*;
 import com.example.ehe_server.properties.FrontendProperties;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.*;
-import com.example.ehe_server.service.intf.email.EmailServiceInterface;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.example.ehe_server.dto.PasswordResetRequest;
-import com.example.ehe_server.dto.ResetPasswordRequest;
-import com.example.ehe_server.service.intf.auth.PasswordResetRequestServiceInterface;
-import com.example.ehe_server.service.intf.auth.PasswordResetTokenValidationServiceInterface;
-import com.example.ehe_server.service.intf.auth.PasswordResetServiceInterface;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -26,8 +21,8 @@ public class AuthController {
 
     private final LogInServiceInterface logInService;
     private final RegistrationServiceInterface registrationService;
-    private final RegistrationVerificationServiceInterface registrationVerificationServiceInterface;
-    private final EmailServiceInterface emailService;
+    private final RegistrationVerificationServiceInterface registrationVerificationService;
+    private final RegistrationVerificationResendServiceInterface registrationVerificationResendService;
     private final PasswordResetRequestServiceInterface passwordResetRequestService;
     private final PasswordResetTokenValidationServiceInterface passwordResetTokenValidationService;
     private final PasswordResetServiceInterface passwordResetService;
@@ -39,8 +34,8 @@ public class AuthController {
     public AuthController(
             LogInServiceInterface logInService,
             RegistrationServiceInterface registrationService,
-            RegistrationVerificationServiceInterface registrationVerificationServiceInterface,
-            EmailServiceInterface emailService,
+            RegistrationVerificationServiceInterface registrationVerificationService,
+            RegistrationVerificationResendServiceInterface registrationVerificationResendService,
             PasswordResetRequestServiceInterface passwordResetRequestService,
             PasswordResetTokenValidationServiceInterface passwordResetTokenValidationService,
             PasswordResetServiceInterface passwordResetService,
@@ -50,8 +45,8 @@ public class AuthController {
             FrontendProperties frontendProperties) {
         this.logInService = logInService;
         this.registrationService = registrationService;
-        this.registrationVerificationServiceInterface = registrationVerificationServiceInterface;
-        this.emailService = emailService;
+        this.registrationVerificationService = registrationVerificationService;
+        this.registrationVerificationResendService = registrationVerificationResendService;
         this.passwordResetRequestService = passwordResetRequestService;
         this.passwordResetTokenValidationService = passwordResetTokenValidationService;
         this.passwordResetService = passwordResetService;
@@ -61,183 +56,198 @@ public class AuthController {
         this.frontendProperties = frontendProperties;
     }
 
+    /**
+     * POST /api/auth/login
+     * Authenticate user and create session
+     */
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request,
-                                                     HttpServletResponse response) {
-        // Call alert retrieval service
+    public ResponseEntity<Map<String, Object>> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletResponse response) {
+
         logInService.authenticateUser(request.getEmail(), request.getPassword(), response);
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.auth.login", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.auth.login",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
-        if(userContextService.getCurrentUserRole().contains("ROLE_ADMIN")) {
-            responseBody.put("redirectUrl", frontendProperties.getFrontEndUrl() + frontendProperties.getAdminUrlSuffix());
+
+        if (userContextService.getCurrentUserRole().contains("ROLE_ADMIN")) {
+            responseBody.put("redirectUrl", frontendProperties.getUrl() + frontendProperties.getAdmin());
         } else {
-            responseBody.put("redirectUrl", frontendProperties.getFrontEndUrl() + frontendProperties.getUserUrlSuffix());
+            String fullUrl = frontendProperties.getUrl() + frontendProperties.getUser().getSuffix();
+            responseBody.put("redirectUrl", fullUrl);
         }
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
+    /**
+     * POST /api/auth/register
+     * Register a new user account
+     * Returns 201 Created since a new resource (user) is created
+     */
     @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegistrationRequest request) {
-        // Call alert retrieval service
-        registrationService.registerUser(request.getUsername(), request.getEmail(), request.getPassword());
 
-        // 2. Fetch the success message from messages.properties
-        String successMessage = messageSource.getMessage(
-                "success.message.auth.registration", // The key from your properties file
-                new Object[]{request.getEmail()},                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+        registrationService.registerUser(
+                request.getUsername(),
+                request.getEmail(),
+                request.getPassword()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        String successMessage = messageSource.getMessage(
+                "success.message.auth.registration",
+                new Object[]{request.getEmail()},
+                LocaleContextHolder.getLocale()
+        );
+
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("showResendButton", true);
 
-        // 4. Return the successful response
-        return ResponseEntity.ok(responseBody);
+        // 201 Created - a new user resource was created
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 
-    @PostMapping("/resend-verification")
-    public ResponseEntity<Map<String, Object>> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
-        String email = request.getEmail();
-        // Call alert retrieval service
-        emailService.resendVerificationEmail(userContextService.getCurrentHumanUser(), email);
+    /**
+     * POST /api/auth/verification/resend
+     * Resend registration verification email
+     */
+    @PostMapping("/verification/resend")
+    public ResponseEntity<Map<String, Object>> resendVerification(
+            @Valid @RequestBody ResendVerificationRequest request) {
 
-        // 2. Fetch the success message from messages.properties
+        registrationVerificationResendService.resendVerificationEmail(request.getEmail());
+
         String successMessage = messageSource.getMessage(
-                "success.message.auth.resendVerificationEmail", // The key from your properties file
-                new Object[]{request.getEmail()},                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.auth.resendVerificationEmail",
+                new Object[]{request.getEmail()},
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
-
     }
 
-    @GetMapping("/verify_registration")
-    public ResponseEntity<Map<String, Object>> verifyRegistration(@RequestParam("token") String token) {
-        // Call alert retrieval service
-        registrationVerificationServiceInterface.verifyRegistrationToken(token);
+    /**
+     * GET /api/auth/verification?token=xxx
+     * Verify registration token (typically called from email link)
+     */
+    @GetMapping("/verification")
+    public ResponseEntity<Map<String, Object>> verifyRegistration(@RequestParam String token) {
 
-        // 2. Fetch the success message from messages.properties
+        registrationVerificationService.verifyRegistrationToken(token);
+
         String successMessage = messageSource.getMessage(
-                "success.message.auth.registrationVerification", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.auth.registrationVerification",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
-    // Add these endpoints to AuthController class
-    @PostMapping("/forgot-password")
+    /**
+     * POST /api/auth/password/forgot
+     * Request password reset email
+     */
+    @PostMapping("/password/forgot")
     public ResponseEntity<Map<String, Object>> requestPasswordReset(
             @Valid @RequestBody PasswordResetRequest request) {
-        // Call alert retrieval service
+
         passwordResetRequestService.requestPasswordResetForUnauthenticatedUser(request.getEmail());
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.auth.passwordResetRequest", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.auth.passwordResetRequest",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
-    @GetMapping("/reset-password/validate")
-    public ResponseEntity<Map<String, Object>> validatePasswordResetToken(@RequestParam("token") String token) {
-        // Call alert retrieval service
+    /**
+     * GET /api/auth/password/validate?token=xxx
+     * Validate password reset token before showing reset form
+     */
+    @GetMapping("/password/validate")
+    public ResponseEntity<Map<String, Object>> validatePasswordResetToken(@RequestParam String token) {
+
         passwordResetTokenValidationService.validatePasswordResetToken(token);
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.auth.passwordResetTokenValidation", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.auth.passwordResetTokenValidation",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
-    @PostMapping("/reset-password")
-    public ResponseEntity<Map<String, Object>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
-        // Call alert retrieval service
+    /**
+     * POST /api/auth/password/reset
+     * Reset password with valid token
+     */
+    @PostMapping("/password/reset")
+    public ResponseEntity<Map<String, Object>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
         passwordResetService.resetPassword(request.getToken(), request.getPassword());
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.auth.passwordReset", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.auth.passwordReset",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
-    @GetMapping("/verify-email-change")
-    public ResponseEntity<Map<String, Object>> validateEmailChange(@RequestParam("token") String token) {
-        // Call alert retrieval service
+    /**
+     * GET /api/auth/email/verify?token=xxx
+     * Verify email change token
+     */
+    @GetMapping("/email/verify")
+    public ResponseEntity<Map<String, Object>> validateEmailChange(@RequestParam String token) {
+
         emailChangeVerificationService.validateEmailChange(token);
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.auth.emailChangeVerification", // The key from your properties file
-                new Object[]{token},                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.auth.emailChangeVerification",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
-
 }

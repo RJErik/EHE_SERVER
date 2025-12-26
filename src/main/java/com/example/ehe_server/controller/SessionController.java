@@ -2,17 +2,15 @@ package com.example.ehe_server.controller;
 
 import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.session.UserLogoutServiceInterface;
-import com.example.ehe_server.service.intf.stock.JwtTokenRenewalServiceInterface;
-import com.example.ehe_server.service.intf.user.*;
+import com.example.ehe_server.service.intf.session.UserValidationServiceInterface;
+import com.example.ehe_server.service.intf.session.JwtTokenRenewalServiceInterface;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -20,6 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/session")
 public class SessionController {
+
     private final UserValidationServiceInterface userValidationService;
     private final UserLogoutServiceInterface userLogoutService;
     private final UserContextServiceInterface userContextService;
@@ -39,66 +38,86 @@ public class SessionController {
         this.messageSource = messageSource;
     }
 
-    @GetMapping("/verify-user")
+    /**
+     * GET /api/session
+     * Verify/retrieve current session status.
+     *
+     * Changed from: GET /api/session/verify-user
+     * Reason: "verify-user" is a verb. GET on the resource itself implies
+     * "get current session state" which includes validation.
+     */
+    @GetMapping
     public ResponseEntity<Map<String, Object>> verifyUser() {
-        // Call automated trade rule retrieval service
         userValidationService.verifyUser();
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.user.verifyUser", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.session.verifyUser",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
-    @PostMapping("/logout")
-    public ResponseEntity<Map<String, Object>> logout(HttpServletRequest request, HttpServletResponse response) {
-        // Call automated trade rule retrieval service
+    /**
+     * DELETE /api/session
+     * End/destroy the current session (logout).
+     *
+     * Changed from: POST /api/session/logout
+     * Reason: Logout is "deleting" the session resource. DELETE is the
+     * appropriate HTTP method for resource removal.
+     */
+    @DeleteMapping
+    public ResponseEntity<Map<String, Object>> logout(
+            HttpServletRequest request,
+            HttpServletResponse response) {
+
         userLogoutService.logoutUser(userContextService.getCurrentUserId(), request, response);
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.user.logout", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.session.logout",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        // 4. Return the successful response
+        // 200 OK with body, or could use 204 No Content without body
         return ResponseEntity.ok(responseBody);
     }
 
-    @PostMapping("/renew-token")
-    public ResponseEntity<Map<String, Object>> renewToken(HttpServletRequest request, HttpServletResponse response) {
-        // Call automated trade rule retrieval service
+    /**
+     * POST /api/session/token
+     * Create/refresh a new JWT token.
+     *
+     * Changed from: POST /api/session/renew-token
+     * Reason: "renew-token" contains a verb. POST to /token represents
+     * "create a new token" which is what renewal does.
+     */
+    @PostMapping("/token")
+    public ResponseEntity<Map<String, Object>> renewToken(
+            HttpServletRequest request,
+            HttpServletResponse response) {
+
         jwtTokenRenewalService.renewToken(userContextService.getCurrentUserId(), request, response);
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.user.jwtTokenRenewal", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.session.jwtTokenRenewal",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        // 4. Return the successful response
-        return ResponseEntity.ok(responseBody);
+        // 201 Created is appropriate for token creation
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 }

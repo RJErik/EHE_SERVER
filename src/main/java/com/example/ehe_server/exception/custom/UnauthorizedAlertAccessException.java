@@ -1,9 +1,7 @@
 package com.example.ehe_server.exception.custom;
 
-import com.example.ehe_server.exception.custom.AuthorizationException;
-
-public class UnauthorizedAlertAccessException extends AuthorizationException {
+public class UnauthorizedAlertAccessException extends ResourceNotFoundException {
     public UnauthorizedAlertAccessException(Integer userId, Integer alertId) {
-        super("error.message.unauthorizedAlertAccess", "error.logDetail.unauthorizedAlertAccess", userId, alertId);
+        super("error.message.alertNotFound", "error.logDetail.unauthorizedAlertAccess", userId, alertId);
     }
 }

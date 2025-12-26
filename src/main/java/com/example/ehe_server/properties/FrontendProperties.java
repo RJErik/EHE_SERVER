@@ -7,53 +7,54 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "app.frontend")
 public class FrontendProperties {
 
-    /**
-     * Maps to: app.frontend.url
-     */
-    private String frontEndUrl;
+    // 1. Rename to match "app.frontend.url"
+    private String url;
 
-    /**
-     * Maps to: app.frontend.user.*
-     */
-    private PathConfig userUrlSuffix = new PathConfig();
+    // 2. Rename to match "app.frontend.user.*"
+    private PathConfig user = new PathConfig();
 
-    /**
-     * Maps to: app.frontend.admin.*
-     */
-    private PathConfig adminUrlSuffix = new PathConfig();
+    // 3. Rename to match "app.frontend.admin.*"
+    private PathConfig admin = new PathConfig();
 
-    // --- Getters and Setters ---
+    private String verifyRegistrationPath;
+    private String resetPasswordPath;
+    private String verifyEmailChangePath;
 
-    public String getFrontEndUrl() {
-        return frontEndUrl;
+    // --- Corrected Getters and Setters ---
+
+    public String getUrl() {
+        return url;
     }
 
-    public void setFrontEndUrl(String frontEndUrl) {
-        this.frontEndUrl = frontEndUrl;
+    public void setUrl(String url) {
+        this.url = url;
     }
 
-    public PathConfig getUserUrlSuffix() {
-        return userUrlSuffix;
+    public PathConfig getUser() {
+        return user;
     }
 
-    public void setUserUrlSuffix(PathConfig userUrlSuffix) {
-        this.userUrlSuffix = userUrlSuffix;
+    public void setUser(PathConfig user) {
+        this.user = user;
     }
 
-    public PathConfig getAdminUrlSuffix() {
-        return adminUrlSuffix;
+    public PathConfig getAdmin() {
+        return admin;
     }
 
-    public void setAdminUrlSuffix(PathConfig adminUrlSuffix) {
-        this.adminUrlSuffix = adminUrlSuffix;
+    public void setAdmin(PathConfig admin) {
+        this.admin = admin;
     }
 
-    // --- Static Inner Class for Nested Properties ---
+    // Keep the other getters/setters the same...
+    public String getVerifyRegistrationPath() { return verifyRegistrationPath; }
+    public void setVerifyRegistrationPath(String verifyRegistrationPath) { this.verifyRegistrationPath = verifyRegistrationPath; }
+    public String getResetPasswordPath() { return resetPasswordPath; }
+    public void setResetPasswordPath(String resetPasswordPath) { this.resetPasswordPath = resetPasswordPath; }
+    public String getVerifyEmailChangePath() { return verifyEmailChangePath; }
+    public void setVerifyEmailChangePath(String verifyEmailChangePath) { this.verifyEmailChangePath = verifyEmailChangePath; }
 
     public static class PathConfig {
-        /**
-         * Maps to: .suffix
-         */
         private String suffix;
 
         public String getSuffix() {

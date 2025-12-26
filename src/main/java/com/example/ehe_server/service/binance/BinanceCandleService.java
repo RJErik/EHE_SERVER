@@ -1,10 +1,16 @@
 package com.example.ehe_server.service.binance;
 
 import com.example.ehe_server.entity.MarketCandle;
+import com.example.ehe_server.entity.Platform;
 import com.example.ehe_server.entity.PlatformStock;
+import com.example.ehe_server.entity.Stock;
 import com.example.ehe_server.repository.MarketCandleRepository;
+import com.example.ehe_server.repository.PlatformRepository;
 import com.example.ehe_server.repository.PlatformStockRepository;
+import com.example.ehe_server.repository.StockRepository;
 import com.example.ehe_server.service.audit.UserContextService;
+import com.example.ehe_server.service.intf.binance.BinanceApiClientInterface;
+import com.example.ehe_server.service.intf.binance.BinanceCandleServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,7 +23,7 @@ import java.time.*;
 import java.util.*;
 
 @Service
-public class BinanceCandleService {
+public class BinanceCandleService implements BinanceCandleServiceInterface {
     private static final String PLATFORM_NAME = "Binance";
     private static final int MAX_CANDLES_PER_REQUEST = 1000;
     private static final int WEEK_IN_MINUTES = 7 * 24 * 60;
@@ -27,22 +33,29 @@ public class BinanceCandleService {
     private static final int UPDATE_TARGET_TIME_EVERY_N_BATCHES = 5;
     private static final int UPDATE_TARGET_TIME_AFTER_MINUTES = 15;
 
-    private final BinanceApiClient apiClient;
+    private final BinanceApiClientInterface apiClient;
     private final MarketCandleRepository candleRepository;
     private final PlatformStockRepository stockRepository;
+    private final PlatformRepository platformRepository;
+    private final StockRepository stockRepositoryForStock;
     private final ObjectMapper objectMapper;
     private final LoggingServiceInterface loggingService;
     private final UserContextService userContextService;
 
     public BinanceCandleService(
-            BinanceApiClient apiClient,
+            BinanceApiClientInterface apiClient,
             MarketCandleRepository candleRepository,
             PlatformStockRepository stockRepository,
+            PlatformRepository platformRepository,
+            StockRepository stockRepositoryForStock,
             ObjectMapper objectMapper,
-            LoggingServiceInterface loggingService, UserContextService userContextService) {
+            LoggingServiceInterface loggingService,
+            UserContextService userContextService) {
         this.apiClient = apiClient;
         this.candleRepository = candleRepository;
         this.stockRepository = stockRepository;
+        this.platformRepository = platformRepository;
+        this.stockRepositoryForStock = stockRepositoryForStock;
         this.objectMapper = objectMapper;
         this.loggingService = loggingService;
         this.userContextService = userContextService;
@@ -140,7 +153,6 @@ public class BinanceCandleService {
 
     private void fetchCandlesInRange(PlatformStock stock, String symbol,
                                      Instant startInstant, Instant endInstant) {
-        // ... (code remains the same until the while loop) ...
         boolean useDynamicEnd = (endInstant == null);
         Instant targetEndTime = useDynamicEnd ? Instant.now() : endInstant;
 
@@ -220,8 +232,6 @@ public class BinanceCandleService {
         }
         loggingService.logAction("Completed data fetch for " + symbol + ". Total candles fetched: " + totalCandlesFetched);
     }
-
-    // ... The rest of the file (findEarliestAvailableData, checkForCandles, parseCandles, aggregateCandles, etc.) remains unchanged ...
 
     /**
      * Finds the earliest available data point for a symbol using the week-by-week strategy
@@ -456,8 +466,7 @@ public class BinanceCandleService {
     }
 
     private LocalDateTime calculateTimeframeStart(LocalDateTime time, int minutes) {
-        // Calculate the start of the timeframe this minute belongs
-        // to
+        // Calculate the start of the timeframe this minute belongs to
         int minuteOfDay = time.getHour() * 60 + time.getMinute();
         int timeframeIndex = minuteOfDay / minutes;
 
@@ -509,7 +518,7 @@ public class BinanceCandleService {
         }
         try {
             System.out.println("=== PROCESSING REALTIME CANDLE START ===");
-            System.out.println("Stock: " + stock.getStockSymbol() + " (ID: " + stock.getPlatformStockId() + ")");
+            System.out.println("Stock: " + stock.getStock().getStockName() + " (ID: " + stock.getPlatformStockId() + ")");
             // Extract candle fields from the websocket data
             JsonNode k = candleData.get("k");
             long openTime = k.get("t").asLong();
@@ -593,7 +602,7 @@ public class BinanceCandleService {
             System.out.println("=== EXCEPTION IN PROCESSING REALTIME CANDLE ===");
             System.out.println("Exception type: " + e.getClass().getSimpleName());
             System.out.println("Exception message: " + e.getMessage());
-            System.out.println("Stock: " + (stock != null ? stock.getStockSymbol() : "null"));
+            System.out.println("Stock: " + (stock != null ? stock.getStock().getStockName() : "null"));
             System.out.println("Thread: " + Thread.currentThread().getName());
 
             if (e.getCause() != null) {
@@ -609,20 +618,29 @@ public class BinanceCandleService {
         }
     }
 
-
-
+    @Transactional
     private PlatformStock getOrCreateStock(String symbol) {
         // Find existing stock or create a new one if needed
-        List<PlatformStock> stocks = stockRepository.findByPlatformNameAndStockSymbol(
+        List<PlatformStock> stocks = stockRepository.findByPlatformPlatformNameAndStockStockName(
                 PLATFORM_NAME, symbol);
         if (!stocks.isEmpty()) {
             return stocks.get(0);
         }
 
-        // Create new stock entry
-        PlatformStock stock = new PlatformStock();
-        stock.setPlatformName(PLATFORM_NAME);
-        stock.setStockSymbol(symbol);
-        return stockRepository.save(stock);
+        // Create new stock entry - need to find or create Platform and Stock entities
+        Platform platform = platformRepository.findByPlatformName(PLATFORM_NAME)
+                .orElseThrow(() -> new RuntimeException("Platform not found: " + PLATFORM_NAME));
+
+        Stock stock = stockRepositoryForStock.findByStockName(symbol)
+                .orElseGet(() -> {
+                    Stock newStock = new Stock();
+                    newStock.setStockName(symbol);
+                    return stockRepositoryForStock.save(newStock);
+                });
+
+        PlatformStock platformStock = new PlatformStock();
+        platformStock.setPlatform(platform);
+        platformStock.setStock(stock);
+        return stockRepository.save(platformStock);
     }
 }

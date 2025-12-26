@@ -1,61 +1,199 @@
 package com.example.ehe_server.exception;
 
-import com.example.ehe_server.exception.custom.*; // Assuming new exceptions are in this package
+import com.example.ehe_server.exception.custom.*;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
+import com.example.ehe_server.annotation.validation.ExceptionInstantiator;
+import com.example.ehe_server.annotation.validation.ValidationMetadata;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.HandlerMapping;
 
 import java.text.MessageFormat;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 @ControllerAdvice
 public class RestGlobalExceptionHandler {
-    // Keys for default messages from messages.properties
+
     private static final String DEFAULT_ERROR_MESSAGE_KEY = "error.message.default";
     private static final String DEFAULT_LOG_DETAIL_KEY = "error.logDetail.default";
+    private static final String VALUE_PLACEHOLDER = "$value";
 
     private final LoggingServiceInterface loggingService;
     private final MessageSource messageSource;
+    private final ExceptionInstantiator exceptionInstantiator;
 
     public RestGlobalExceptionHandler(
             LoggingServiceInterface loggingService,
-            MessageSource messageSource) {
+            MessageSource messageSource,
+            ExceptionInstantiator exceptionInstantiator) {
         this.loggingService = loggingService;
         this.messageSource = messageSource;
+        this.exceptionInstantiator = exceptionInstantiator;
     }
 
-    // Catch all custom exceptions and delegate to a common builder
-    @ExceptionHandler(CustomBaseException.class)
-    public ResponseEntity<Map<String, Object>> handleCustomBaseException(CustomBaseException ex, HttpServletRequest request) {
-        HttpStatus status = determineHttpStatus(ex);
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidationException(
+            MethodArgumentNotValidException ex,
+            HttpServletRequest request) {
 
-        // Resolve default messages
-        String defaultLogMessage = messageSource.getMessage(DEFAULT_LOG_DETAIL_KEY, null, "Default log message", LocaleContextHolder.getLocale());
-        String defaultUserMessage = messageSource.getMessage(DEFAULT_ERROR_MESSAGE_KEY, null, "An error occurred.", LocaleContextHolder.getLocale());
-
-        // 1. Get the HTTP method and URL pattern
-        String method = request.getMethod(); // GET, POST, DELETE, etc.
-        String bestMatchPattern = (String) request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        String method = request.getMethod();
+        String bestMatchPattern = (String) request.getAttribute(
+                HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
         String prefix = getContextPrefix(method, bestMatchPattern);
 
-        // 2. Resolve, format, and log the detailed error message WITH the prefix
-        String logPattern = messageSource.getMessage(ex.getLogDetailKey(), null, defaultLogMessage, LocaleContextHolder.getLocale());
-        String logMessage = MessageFormat.format(logPattern, ex.getLogArgs());
+        Locale locale = LocaleContextHolder.getLocale();
+
+        List<String> userMessages = new ArrayList<>();
+        List<String> logMessages = new ArrayList<>();
+        Map<String, String> actionLink = null;
+        boolean showResendButton = false;
+
+        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
+            String rawMessage = fieldError.getDefaultMessage();
+            Object rejectedValue = fieldError.getRejectedValue();
+
+            if (ValidationMetadata.isValidJson(rawMessage)) {
+                ValidationMetadata metadata = ValidationMetadata.fromJson(rawMessage);
+
+                if (metadata != null) {
+                    processValidationMetadata(
+                            metadata,
+                            rejectedValue,
+                            locale,
+                            userMessages,
+                            logMessages
+                    );
+
+                    if (actionLink == null && metadata.hasActionLink()) {
+                        actionLink = Map.of(
+                                "text", metadata.getActionLinkText(),
+                                "target", metadata.getActionLinkTarget()
+                        );
+                    }
+
+                    if (metadata.isShowResendButton()) {
+                        showResendButton = true;
+                    }
+
+                    continue;
+                }
+            }
+
+            userMessages.add(rawMessage);
+            logMessages.add(rawMessage);
+        }
+
+        String aggregatedUserMessage = prefix + " " + String.join(" ", userMessages);
+        String aggregatedLogMessage = prefix + " " + String.join(" ", logMessages);
+
+        loggingService.logAction(aggregatedLogMessage);
+
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("success", false);
+        errorResponse.put("message", aggregatedUserMessage);
+
+        if (actionLink != null) {
+            errorResponse.put("actionLink", actionLink);
+        }
+        if (showResendButton) {
+            errorResponse.put("showResendButton", true);
+        }
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    private void processValidationMetadata(
+            ValidationMetadata metadata,
+            Object rejectedValue,
+            Locale locale,
+            List<String> userMessages,
+            List<String> logMessages) {
+
+        Optional<CustomBaseException> exceptionOpt = exceptionInstantiator
+                .instantiate(metadata.getExceptionClass());
+
+        if (exceptionOpt.isEmpty()) {
+            userMessages.add("Validation error occurred.");
+            logMessages.add("Could not instantiate exception: " + metadata.getExceptionClass());
+            return;
+        }
+
+        CustomBaseException exception = exceptionOpt.get();
+
+        Object[] logParams = buildParams(metadata.getParams(), rejectedValue);
+
+        String userMessage = resolveMessage(
+                exception.getMessage(),
+                new Object[]{},
+                DEFAULT_ERROR_MESSAGE_KEY,
+                locale
+        );
+        userMessages.add(userMessage);
+
+        String logMessage = resolveMessage(
+                exception.getLogDetailKey(),
+                logParams,
+                DEFAULT_LOG_DETAIL_KEY,
+                locale
+        );
+        logMessages.add(logMessage);
+    }
+
+    private Object[] buildParams(String[] annotationParams, Object rejectedValue) {
+        if (annotationParams == null || annotationParams.length == 0) {
+            return new Object[]{};
+        }
+
+        List<Object> params = new ArrayList<>();
+
+        for (String param : annotationParams) {
+            if (VALUE_PLACEHOLDER.equals(param)) {
+                params.add(rejectedValue != null ? rejectedValue : "null");
+            } else {
+                params.add(param);
+            }
+        }
+
+        return params.toArray();
+    }
+
+    @ExceptionHandler(CustomBaseException.class)
+    public ResponseEntity<Map<String, Object>> handleCustomBaseException(
+            CustomBaseException ex,
+            HttpServletRequest request) {
+
+        HttpStatus status = determineHttpStatus(ex);
+        Locale locale = LocaleContextHolder.getLocale();
+
+        String method = request.getMethod();
+        String bestMatchPattern = (String) request.getAttribute(
+                HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        String prefix = getContextPrefix(method, bestMatchPattern);
+
+        String logMessage = resolveMessage(
+                ex.getLogDetailKey(),
+                ex.getLogArgs(),
+                DEFAULT_LOG_DETAIL_KEY,
+                locale
+        );
         String finalLogMessage = prefix + " " + logMessage;
-        loggingService.logError(finalLogMessage, ex);
+        loggingService.logAction(finalLogMessage);
 
-        // 3. Resolve and format the user-facing message WITH the prefix
-        String baseUserMessage = messageSource.getMessage(ex.getMessage(), null, defaultUserMessage, LocaleContextHolder.getLocale());
-        String finalUserMessage = prefix + " " + baseUserMessage;
+        String userMessage = resolveMessage(
+                ex.getMessage(),
+                new Object[]{},
+                DEFAULT_ERROR_MESSAGE_KEY,
+                locale
+        );
+        String finalUserMessage = prefix + " " + userMessage;
 
-        // 4. Build the response body
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("success", false);
         errorResponse.put("message", finalUserMessage);
@@ -70,46 +208,6 @@ public class RestGlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, status);
     }
 
-    /**
-     * Resolves the error context prefix with fallback chain:
-     * 1. Try METHOD.PATTERN (e.g., POST./api/user/alerts)
-     * 2. Try just PATTERN (e.g., /api/user/alerts)
-     * 3. Fall back to default
-     */
-    private String getContextPrefix(String method, String pattern) {
-        // Try method-specific key first
-        String methodSpecificKey = "error.context." + method + "." + pattern;
-        String prefix = messageSource.getMessage(methodSpecificKey, null, null, LocaleContextHolder.getLocale());
-
-        // If not found, try pattern-only key
-        if (prefix == null) {
-            String patternOnlyKey = "error.context." + pattern;
-            prefix = messageSource.getMessage(patternOnlyKey, null, null, LocaleContextHolder.getLocale());
-        }
-
-        // If still not found, use default
-        if (prefix == null) {
-            prefix = messageSource.getMessage("error.context.default", null, "An error occurred:", LocaleContextHolder.getLocale());
-        }
-
-        return prefix;
-    }
-
-    /**
-     * Determines the appropriate HTTP status code based on the exception's category.
-     */
-    private HttpStatus determineHttpStatus(CustomBaseException ex) {
-        if (ex instanceof ValidationException) return HttpStatus.BAD_REQUEST; // 400
-        if (ex instanceof AuthorizationException) return HttpStatus.FORBIDDEN; // 403
-        if (ex instanceof ResourceNotFoundException) return HttpStatus.NOT_FOUND; // 404
-        if (ex instanceof BusinessRuleException) return HttpStatus.CONFLICT; // 409
-        if (ex instanceof ExternalServiceException) return HttpStatus.SERVICE_UNAVAILABLE; // 503
-        return HttpStatus.INTERNAL_SERVER_ERROR; // Default fallback
-    }
-
-    /**
-     * Handles all other unexpected exceptions as a final catch-all.
-     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
         loggingService.logError("Unhandled exception: " + ex.getMessage(), ex);
@@ -119,5 +217,45 @@ public class RestGlobalExceptionHandler {
         errorResponse.put("message", "An unexpected error occurred. Please contact support.");
 
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    private String resolveMessage(String key, Object[] args, String defaultKey, Locale locale) {
+        String defaultMessage = messageSource.getMessage(
+                defaultKey, null, "An error occurred.", locale);
+
+        String pattern = messageSource.getMessage(key, null, defaultMessage, locale);
+
+        if (args != null && args.length > 0) {
+            return MessageFormat.format(pattern, args);
+        }
+        return pattern;
+    }
+
+    private String getContextPrefix(String method, String pattern) {
+        Locale locale = LocaleContextHolder.getLocale();
+
+        String methodSpecificKey = "error.context." + method + "." + pattern;
+        String prefix = messageSource.getMessage(methodSpecificKey, null, null, locale);
+
+        if (prefix == null && pattern != null) {
+            String patternOnlyKey = "error.context." + pattern;
+            prefix = messageSource.getMessage(patternOnlyKey, null, null, locale);
+        }
+
+        if (prefix == null) {
+            prefix = messageSource.getMessage(
+                    "error.context.default", null, "An error occurred:", locale);
+        }
+
+        return prefix;
+    }
+
+    private HttpStatus determineHttpStatus(CustomBaseException ex) {
+        if (ex instanceof ValidationException) return HttpStatus.BAD_REQUEST;
+        if (ex instanceof AuthorizationException) return HttpStatus.FORBIDDEN;
+        if (ex instanceof ResourceNotFoundException) return HttpStatus.NOT_FOUND;
+        if (ex instanceof BusinessRuleException) return HttpStatus.CONFLICT;
+        if (ex instanceof ExternalServiceException) return HttpStatus.SERVICE_UNAVAILABLE;
+        return HttpStatus.INTERNAL_SERVER_ERROR;
     }
 }

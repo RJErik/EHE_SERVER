@@ -7,11 +7,12 @@ import com.example.ehe_server.entity.PlatformStock;
 import com.example.ehe_server.entity.Transaction;
 import com.example.ehe_server.exception.custom.ApiKeyMissingException;
 import com.example.ehe_server.exception.custom.InvalidQuantityTypeException;
+import com.example.ehe_server.exception.custom.PlatformStockNotFoundException;
 import com.example.ehe_server.exception.custom.PortfolioNotFoundException;
 import com.example.ehe_server.repository.PortfolioRepository;
 import com.example.ehe_server.repository.PlatformStockRepository;
 import com.example.ehe_server.repository.TransactionRepository;
-import com.example.ehe_server.service.binance.BinanceAccountService;
+import com.example.ehe_server.service.intf.binance.BinanceAccountServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.trade.TradingServiceInterface;
 import org.springframework.stereotype.Service;
@@ -29,7 +30,7 @@ public class TradingService implements TradingServiceInterface {
 
     private final PortfolioRepository portfolioRepository;
     private final LoggingServiceInterface loggingService;
-    private final BinanceAccountService binanceAccountService;
+    private final BinanceAccountServiceInterface binanceAccountService;
     private final TransactionRepository transactionRepository;
     private final PlatformStockRepository platformStockRepository;
 
@@ -40,7 +41,7 @@ public class TradingService implements TradingServiceInterface {
     public TradingService(
             PortfolioRepository portfolioRepository,
             LoggingServiceInterface loggingService,
-            BinanceAccountService binanceAccountService,
+            BinanceAccountServiceInterface binanceAccountService,
             TransactionRepository transactionRepository,
             PlatformStockRepository platformStockRepository) {
         this.portfolioRepository = portfolioRepository;
@@ -60,7 +61,7 @@ public class TradingService implements TradingServiceInterface {
         // Check if portfolio exists and belongs to the user
         Optional<Portfolio> portfolioOptional = portfolioRepository.findByPortfolioIdAndUser_UserId(portfolioId, userId);
         if (portfolioOptional.isEmpty()) {
-            throw new PortfolioNotFoundException(portfolioId, userId);
+            throw new PortfolioNotFoundException(portfolioId);
         }
 
         Portfolio portfolio = portfolioOptional.get();
@@ -78,9 +79,13 @@ public class TradingService implements TradingServiceInterface {
         String apiKeyValue = encryptedApiKey;
         String secretKeyValue = encryptedSecretKey;
 
+        String platformName = apiKey.getPlatform().getPlatformName();
+
         // Get PlatformStock entity for transaction record (using original stockSymbol from parameter)
         PlatformStock platformStock = platformStockRepository
-                .findByStockSymbol(stockSymbol).getFirst();
+                .findByStockNameAndPlatformName(stockSymbol, platformName)
+                .orElseThrow(() -> new PlatformStockNotFoundException(stockSymbol, platformName));
+
 
         // Make sure the stock symbol includes USDT if needed for Binance API
         String binanceSymbol = stockSymbol;
@@ -100,7 +105,7 @@ public class TradingService implements TradingServiceInterface {
             throw new InvalidQuantityTypeException(quantityType);
         }
 
-        Transaction transaction = null;
+        Transaction transaction;
 
         try {
             // Execute the order
@@ -127,18 +132,17 @@ public class TradingService implements TradingServiceInterface {
             transaction.setPortfolio(portfolio);
             transaction.setPlatformStock(platformStock);
             transaction.setTransactionType("BUY".equalsIgnoreCase(action) ?
-                    Transaction.TransactionType.Buy : Transaction.TransactionType.Sell);
+                    Transaction.TransactionType.BUY : Transaction.TransactionType.SELL);
             transaction.setQuantity(executedQty);
             transaction.setPrice(averagePrice);
-            transaction.setTransactionDate(LocalDateTime.now());
 
             // Set status based on order result
             if ("FILLED".equals(orderStatus)) {
-                transaction.setStatus(Transaction.Status.Completed);
+                transaction.setStatus(Transaction.Status.COMPLETED);
             } else if ("REJECTED".equals(orderStatus) || "EXPIRED".equals(orderStatus)) {
-                transaction.setStatus(Transaction.Status.Failed);
+                transaction.setStatus(Transaction.Status.FAILED);
             } else {
-                transaction.setStatus(Transaction.Status.Pending);
+                transaction.setStatus(Transaction.Status.PENDING);
             }
 
             transaction = transactionRepository.save(transaction);
@@ -167,11 +171,10 @@ public class TradingService implements TradingServiceInterface {
             transaction.setPortfolio(portfolio);
             transaction.setPlatformStock(platformStock);
             transaction.setTransactionType("BUY".equalsIgnoreCase(action) ?
-                    Transaction.TransactionType.Buy : Transaction.TransactionType.Sell);
+                    Transaction.TransactionType.BUY : Transaction.TransactionType.SELL);
             transaction.setQuantity(quantity != null ? quantity : BigDecimal.ZERO);
             transaction.setPrice(BigDecimal.ZERO);
-            transaction.setTransactionDate(LocalDateTime.now());
-            transaction.setStatus(Transaction.Status.Failed);
+            transaction.setStatus(Transaction.Status.FAILED);
 
             transactionRepository.save(transaction);
 

@@ -2,6 +2,7 @@ package com.example.ehe_server.repository;
 
 import com.example.ehe_server.entity.PlatformStock;
 import com.example.ehe_server.entity.WatchlistItem;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,14 +13,14 @@ import java.util.Optional;
 
 @Repository
 public interface WatchlistItemRepository extends JpaRepository<WatchlistItem, Integer> {
+    @EntityGraph(attributePaths = {"platformStock", "platformStock.platform", "platformStock.stock"})
     List<WatchlistItem> findByUser_UserId(Integer userId);
 
-    List<WatchlistItem> findByUser_UserIdAndPlatformStock_PlatformName(Integer userId, String platform);
-
+    @EntityGraph(attributePaths = {"platformStock", "platformStock.platform", "platformStock.stock"})
     @Query("SELECT wi FROM WatchlistItem wi WHERE " +
             "wi.user.userId = :userId AND " +
-            "(:platform IS NULL OR wi.platformStock.platformName = :platform) AND " +
-            "(:symbol IS NULL OR wi.platformStock.stockSymbol = :symbol)")
+            "(:platform IS NULL OR wi.platformStock.platform.platformName = :platform) AND " +
+            "(:symbol IS NULL OR wi.platformStock.stock.stockSymbol = :symbol)")
     List<WatchlistItem> searchWatchlistItems(
             @Param("userId") Integer userId,
             @Param("platform") String platform,

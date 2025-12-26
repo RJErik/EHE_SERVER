@@ -23,6 +23,10 @@ public class JwtTokenGeneratorService implements JwtTokenGeneratorInterface {
 
     @Override
     public String generateAccessToken(Integer userId, String role) {
+        if (userId == null || (role == null || role.trim().isEmpty())) {
+            throw new IllegalArgumentException("Access token generation failed: userId and role cannot be null or empty.");
+        }
+
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtConfig.getJwtAccessExpirationTime());
 
@@ -37,6 +41,10 @@ public class JwtTokenGeneratorService implements JwtTokenGeneratorInterface {
 
     @Override
     public String generateRefreshToken(Integer userId, String role) {
+        if (userId == null || (role == null || role.trim().isEmpty())) {
+            throw new IllegalArgumentException("Refresh token generation failed: userId and role cannot be null or empty.");
+        }
+
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtConfig.getJwtRefreshExpirationTime());
 

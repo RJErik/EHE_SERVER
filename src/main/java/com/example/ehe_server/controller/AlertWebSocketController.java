@@ -3,10 +3,11 @@ package com.example.ehe_server.controller;
 import com.example.ehe_server.dto.websocket.AlertSubscriptionResponse;
 import com.example.ehe_server.dto.websocket.AlertUnsubscriptionRequest;
 import com.example.ehe_server.dto.websocket.AlertUnsubscriptionResponse;
-import com.example.ehe_server.service.alert.AlertWebSocketSubscriptionManager;
+import com.example.ehe_server.service.intf.alert.AlertWebSocketSubscriptionManagerInterface;
 import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.annotation.SendToUser;
@@ -19,12 +20,12 @@ import java.util.Map;
 @Controller
 public class AlertWebSocketController {
 
-    private final AlertWebSocketSubscriptionManager alertWebSocketSubscriptionManager;
+    private final AlertWebSocketSubscriptionManagerInterface alertWebSocketSubscriptionManager;
     private final WebSocketAuthServiceInterface webSocketAuthService;
     private final MessageSource messageSource;
 
     public AlertWebSocketController(
-            AlertWebSocketSubscriptionManager alertWebSocketSubscriptionManager,
+            AlertWebSocketSubscriptionManagerInterface alertWebSocketSubscriptionManager,
             WebSocketAuthServiceInterface webSocketAuthService,
             MessageSource messageSource) {
         this.alertWebSocketSubscriptionManager = alertWebSocketSubscriptionManager;
@@ -34,7 +35,7 @@ public class AlertWebSocketController {
 
     @MessageMapping("/alerts/subscribe")
     @SendToUser("/queue/alerts")
-    public Map<String, Object> subscribeToAlerts(StompHeaderAccessor headerAccessor) {
+    public Map<String, Object> subscribeToAlerts(@Header("simpSessionId") String sessionId, StompHeaderAccessor headerAccessor) {
 
         Map<String, Object> response = new HashMap<>();
 
@@ -44,6 +45,7 @@ public class AlertWebSocketController {
         // Create subscription for this user
         AlertSubscriptionResponse alertSubscriptionResponse = alertWebSocketSubscriptionManager.createSubscription(
                 userId,
+                sessionId,
                 "/user/queue/alerts");
 
         String successMessage = messageSource.getMessage(

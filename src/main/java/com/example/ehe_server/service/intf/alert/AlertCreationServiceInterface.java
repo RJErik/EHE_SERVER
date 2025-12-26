@@ -1,6 +1,6 @@
 package com.example.ehe_server.service.intf.alert;
 
-import com.example.ehe_server.dto.AlertCreationResponse;
+import com.example.ehe_server.dto.AlertResponse;
 
 import java.math.BigDecimal;
 
@@ -14,5 +14,5 @@ public interface AlertCreationServiceInterface {
      * @param thresholdValue The threshold value for the alert
      * @return Map containing success status and created alert details
      */
-    AlertCreationResponse createAlert(Integer userId, String platform, String symbol, String conditionTypeStr, BigDecimal thresholdValue);
+    AlertResponse createAlert(Integer userId, String platform, String symbol, String conditionTypeStr, BigDecimal thresholdValue);
 }

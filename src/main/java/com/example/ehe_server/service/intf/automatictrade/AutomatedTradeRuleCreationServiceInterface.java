@@ -1,9 +1,8 @@
 package com.example.ehe_server.service.intf.automatictrade;
 
-import com.example.ehe_server.dto.AutomatedTradeRuleCreationResponse;
+import com.example.ehe_server.dto.AutomatedTradeRuleResponse;
 
 import java.math.BigDecimal;
-import java.util.Map;
 
 public interface AutomatedTradeRuleCreationServiceInterface {
     /**
@@ -19,7 +18,7 @@ public interface AutomatedTradeRuleCreationServiceInterface {
      * @param thresholdValue The threshold value for the condition
      * @return Map containing success status and created rule details
      */
-    AutomatedTradeRuleCreationResponse createAutomatedTradeRule(
+    AutomatedTradeRuleResponse createAutomatedTradeRule(
             Integer userId,
             Integer portfolioId,
             String platform,

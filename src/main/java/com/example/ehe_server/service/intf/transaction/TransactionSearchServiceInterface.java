@@ -1,5 +1,7 @@
 package com.example.ehe_server.service.intf.transaction;
 
+import com.example.ehe_server.dto.PaginatedResponse;
+import com.example.ehe_server.dto.TransactionResponse;
 import com.example.ehe_server.dto.TransactionSearchResponse;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -25,7 +27,7 @@ public interface TransactionSearchServiceInterface {
      * @param status Optional status filter
      * @return List of matching transactions
      */
-    List<TransactionSearchResponse> searchTransactions(
+    PaginatedResponse<TransactionResponse> searchTransactions(
             Integer userId,
             Integer portfolioId,  // ADD THIS
             String platform,
@@ -37,6 +39,8 @@ public interface TransactionSearchServiceInterface {
             BigDecimal fromPrice,
             BigDecimal toPrice,
             String type,
-            String status
+            String status,
+            Integer size,
+            Integer page
     );
 }

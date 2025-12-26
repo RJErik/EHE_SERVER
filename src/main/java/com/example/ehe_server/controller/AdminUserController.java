@@ -4,25 +4,24 @@ import com.example.ehe_server.dto.*;
 import com.example.ehe_server.service.intf.user.UserRetrievalServiceInterface;
 import com.example.ehe_server.service.intf.user.UserSearchServiceInterface;
 import com.example.ehe_server.service.intf.user.UserUpdateServiceInterface;
+import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/api/admin/users")
 public class AdminUserController {
+
     private final MessageSource messageSource;
     private final UserRetrievalServiceInterface userRetrievalService;
     private final UserSearchServiceInterface userSearchService;
     private final UserUpdateServiceInterface userUpdateService;
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_DATE_TIME;
 
     public AdminUserController(UserRetrievalServiceInterface userRetrievalService,
                                UserSearchServiceInterface userSearchService,
@@ -34,102 +33,106 @@ public class AdminUserController {
         this.messageSource = messageSource;
     }
 
-    @GetMapping("/users")
+    /**
+     * GET /api/admin/users
+     * Retrieve all users (no filters)
+     */
+    @GetMapping
     public ResponseEntity<Map<String, Object>> getUsers() {
-        // Call automated trade rule retrieval service
-        List<UserRetrievalResponse> userRetrievalResponses = userRetrievalService.getUsers();
+        List<UserResponse> userRetrievalResponses = userRetrievalService.getUsers();
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.user.get", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.user.get",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("users", userRetrievalResponses);
 
-
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
-    @PostMapping("/users/search")
+    /**
+     * GET /api/admin/users/search?userId=1&userName=john&accountStatus=ACTIVE...
+     *
+     * Search users with filters via query parameters.
+     *
+     * NOTE: This endpoint contains PII (email). If your security policy requires
+     * keeping PII out of URLs/logs, you can keep this as POST instead.
+     * See alternative method below.
+     */
+    @PostMapping("/search")
     public ResponseEntity<Map<String, Object>> searchUsers(@RequestBody UserSearchRequest request) {
-        // Parse date strings to LocalDateTime
-        LocalDateTime registrationDateToTime = parseLocalDateTime(request.getRegistrationDateToTime());
-        LocalDateTime registrationDateFromTime = parseLocalDateTime(request.getRegistrationDateFromTime());
-
-        // Call transaction search service with extracted parameters
-        List<UserSearchResponse> userSearchResponses = userSearchService.searchUsers(
+        List<UserResponse> userSearchResponses = userSearchService.searchUsers(
                 request.getUserId(),
                 request.getUserName(),
                 request.getEmail(),
                 request.getAccountStatus(),
-                registrationDateToTime,
-                registrationDateFromTime
+                request.getRegistrationDateTo(),
+                request.getRegistrationDateFrom()
         );
 
-        // Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
                 "success.message.user.search",
                 null,
                 LocaleContextHolder.getLocale()
         );
 
-        // Build the final response body
         Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("users", userSearchResponses);
 
-        // Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
-    @PostMapping("/users/update")
-    public ResponseEntity<Map<String, Object>> updateUsers(@RequestBody UserUpdateRequest request) {
+    /*
+     * ALTERNATIVE: If you want to keep email out of URLs for security,
+     * keeping POST for search is acceptable. Uncomment this and remove
+     * the GET version above.
+     *
+     * POST /api/admin/users/search
+     *
+    @PostMapping("/search")
+    public ResponseEntity<Map<String, Object>> searchUsers(@RequestBody UserSearchRequest request) {
+        // Same implementation as GET version
+    }
+    */
 
-        // Call transaction search service with extracted parameters
-        UserUpdateResponse userUpdateResponse = userUpdateService.updateUserInfo(
-                request.getUserId(),
+    /**
+     * PUT /api/admin/users/{userId}
+     * Update an existing user (full update)
+     *
+     * Use PUT for full replacement, PATCH for partial updates.
+     * Since you're updating multiple fields, PUT is appropriate.
+     */
+    @PutMapping("/{userId}")
+    public ResponseEntity<Map<String, Object>> updateUser(
+            @PathVariable Integer userId,
+            @Valid @RequestBody UserUpdateRequest request) {
+
+        UserResponse userUpdateResponse = userUpdateService.updateUserInfo(
+                userId,  // From path, not body
                 request.getUserName(),
                 request.getEmail(),
                 request.getPassword(),
                 request.getAccountStatus()
         );
 
-        // Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
                 "success.message.user.update",
                 null,
                 LocaleContextHolder.getLocale()
         );
 
-        // Build the final response body
         Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("user", userUpdateResponse);
 
-        // Return the successful response
         return ResponseEntity.ok(responseBody);
-    }
-
-    /**
-     * Parse ISO format LocalDateTime string
-     */
-    private LocalDateTime parseLocalDateTime(String dateTimeString) {
-        if (dateTimeString == null || dateTimeString.trim().isEmpty()) {
-            return null;
-        }
-        try {
-            return LocalDateTime.parse(dateTimeString, DATE_FORMATTER);
-        } catch (Exception e) {
-            return null;
-        }
     }
 }

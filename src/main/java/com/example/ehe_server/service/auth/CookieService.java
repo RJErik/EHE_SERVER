@@ -17,6 +17,9 @@ public class CookieService implements CookieServiceInterface {
 
     @Override
     public void addJwtAccessCookie(String jwtToken, HttpServletResponse response) {
+        if (jwtToken == null || jwtToken.trim().isEmpty())  {
+            throw new IllegalArgumentException("Jwt access token addition to cookie failed: Jwt access token is null or empty in");
+        }
         Cookie cookie = new Cookie("jwt_access_token", jwtToken);
         cookie.setHttpOnly(true);
         cookie.setSecure(false); //turn to true after development.
@@ -29,6 +32,9 @@ public class CookieService implements CookieServiceInterface {
 
     @Override
     public void addJwtRefreshCookie(String jwtToken, HttpServletResponse response) {
+        if (jwtToken == null || jwtToken.trim().isEmpty())  {
+            throw new IllegalArgumentException("Jwt refresh token addition to cookie failed: jwtToken refresh token is null or empty");
+        }
         Cookie cookie = new Cookie("jwt_refresh_token", jwtToken);
         cookie.setHttpOnly(true);
         cookie.setSecure(false); //turn to true after development.
@@ -44,7 +50,7 @@ public class CookieService implements CookieServiceInterface {
         // Clear access token cookie
         Cookie accessCookie = new Cookie("jwt_access_token", "");
         accessCookie.setHttpOnly(true);
-        accessCookie.setSecure(true);
+        accessCookie.setSecure(false); //turn to true after development.
         accessCookie.setPath("/");
         accessCookie.setMaxAge(0);
         accessCookie.setAttribute("SameSite", "Strict");
@@ -54,12 +60,11 @@ public class CookieService implements CookieServiceInterface {
         // Clear refresh token cookie
         Cookie refreshCookie = new Cookie("jwt_refresh_token", "");
         refreshCookie.setHttpOnly(true);
-        refreshCookie.setSecure(true);
+        refreshCookie.setSecure(false);  //turn to true after development.
         refreshCookie.setPath("/");
         refreshCookie.setMaxAge(0);
         refreshCookie.setAttribute("SameSite", "Strict");
 
         response.addCookie(refreshCookie);
     }
-
 }

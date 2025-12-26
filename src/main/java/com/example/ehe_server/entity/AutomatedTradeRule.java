@@ -63,16 +63,9 @@ public class AutomatedTradeRule {
     @Column(name = "threshold_value", nullable = false, precision = 18, scale = 8)
     private BigDecimal thresholdValue;
 
-    @ManyToOne
-    @JoinColumn(name = "api_key_id", nullable = false)
-    private ApiKey apiKey;
-
     @Column(name = "date_created", nullable = false, updatable = false,
             columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private LocalDateTime dateCreated;
-
-    @Column(name = "is_active", nullable = false)
-    private boolean isActive;
 
     // Getters and setters
     public Integer getAutomatedTradeRuleId() {
@@ -147,27 +140,11 @@ public class AutomatedTradeRule {
         this.thresholdValue = thresholdValue;
     }
 
-    public ApiKey getApiKey() {
-        return apiKey;
-    }
-
-    public void setApiKey(ApiKey apiKey) {
-        this.apiKey = apiKey;
-    }
-
     public LocalDateTime getDateCreated() {
         return dateCreated;
     }
 
     public void setDateCreated(LocalDateTime dateCreated) {
         this.dateCreated = dateCreated;
-    }
-
-    public boolean isActive() {
-        return isActive;
-    }
-
-    public void setActive(boolean active) {
-        isActive = active;
     }
 }

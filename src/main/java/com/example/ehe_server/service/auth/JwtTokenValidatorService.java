@@ -28,6 +28,9 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
 
     @Override
     public boolean validateAccessToken(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            return false;
+        }
         try {
             Jwts.parserBuilder()
                     .setSigningKey(publicKey)
@@ -37,13 +40,14 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
         } catch (SignatureException | MalformedJwtException | ExpiredJwtException e) {
             // Invalid or expired token
             return false;
-        } catch (Exception e) {
-            return false;
         }
     }
 
     @Override
     public boolean validateRefreshToken(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            return false;
+        }
         try {
             Claims claims = Jwts.parserBuilder()
                     .setSigningKey(publicKey)
@@ -67,8 +71,6 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
             return false;
         } catch (SignatureException | MalformedJwtException | ExpiredJwtException e) {
             // Invalid or expired token
-            return false;
-        } catch (Exception e) {
             return false;
         }
     }

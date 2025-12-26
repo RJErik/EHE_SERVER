@@ -13,16 +13,16 @@ public class CandleDataResponse {
     private List<CandleData> candles;
     private LocalDateTime lastUpdateTime;
     private String subscriptionId; // Add this field
-    private String subscriptionType; // Also add this to support frontend type differentiation
 
     // Inner class for candle data
     public static class CandleData {
         private LocalDateTime timestamp;
         private BigDecimal openPrice;
+        private BigDecimal closePrice;
         private BigDecimal highPrice;
         private BigDecimal lowPrice;
-        private BigDecimal closePrice;
         private BigDecimal volume;
+        private Long sequence; // Added sequence field
 
         // Getters and setters
         public LocalDateTime getTimestamp() {
@@ -71,6 +71,14 @@ public class CandleDataResponse {
 
         public void setVolume(BigDecimal volume) {
             this.volume = volume;
+        }
+
+        public Long getSequence() {
+            return sequence;
+        }
+
+        public void setSequence(Long sequence) {
+            this.sequence = sequence;
         }
     }
 
@@ -138,13 +146,5 @@ public class CandleDataResponse {
 
     public void setSubscriptionId(String subscriptionId) {
         this.subscriptionId = subscriptionId;
-    }
-
-    public String getSubscriptionType() {
-        return subscriptionType;
-    }
-
-    public void setSubscriptionType(String subscriptionType) {
-        this.subscriptionType = subscriptionType;
     }
 }

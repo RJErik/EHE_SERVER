@@ -10,5 +10,4 @@ import java.util.List;
 @Repository
 public interface HoldingRepository extends JpaRepository<Holding, Integer> {
     List<Holding> findByPortfolio(Portfolio portfolio);
-    void deleteByPortfolio(Portfolio portfolio);
 }

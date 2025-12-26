@@ -3,6 +3,7 @@ package com.example.ehe_server.service.stock;
 import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.StocksByPlatformResponse;
 import com.example.ehe_server.entity.PlatformStock;
+import com.example.ehe_server.exception.custom.MissingPlatformNameException;
 import com.example.ehe_server.exception.custom.PlatformNotFoundException;
 import com.example.ehe_server.repository.PlatformStockRepository;
 import com.example.ehe_server.service.intf.stock.StockServiceInterface;
@@ -13,7 +14,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 public class StockService implements StockServiceInterface {
 
     private final PlatformStockRepository platformStockRepository;
@@ -26,22 +27,27 @@ public class StockService implements StockServiceInterface {
             messageKey = "log.message.stock.stock.get",
             params = {
                     "#platformName",
-                    "#result.size()"
+                    "#result.stocks.size()"
             }
     )
     @Override
     public StocksByPlatformResponse getStocksByPlatform(String platformName) {
-        // Check if platform exists
-        if (!platformStockRepository.existsByPlatformName(platformName)) {
+
+        // Input validation checks
+        if (platformName == null || platformName.trim().isEmpty()) {
+            throw new MissingPlatformNameException();
+        }
+
+        // Database integrity checks
+        if (!platformStockRepository.existsByPlatformPlatformName(platformName)) {
             throw new PlatformNotFoundException(platformName);
         }
 
-        // Get all stocks for the platform
-        List<PlatformStock> platformStocks = platformStockRepository.findByPlatformName(platformName);
+        // Data retrieval and response mapping
+        List<PlatformStock> platformStocks = platformStockRepository.findByPlatformPlatformNameOrderByStockStockNameAsc(platformName);
 
-        // Extract stock symbols
         List<String> stocks = platformStocks.stream()
-                .map(PlatformStock::getStockSymbol)
+                .map(ps -> ps.getStock().getStockName())
                 .collect(Collectors.toList());
 
         return new StocksByPlatformResponse(platformName, stocks);

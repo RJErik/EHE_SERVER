@@ -7,7 +7,7 @@ import com.example.ehe_server.exception.custom.PlatformStockNotFoundException;
 import com.example.ehe_server.exception.custom.PortfolioNotFoundException;
 import com.example.ehe_server.exception.custom.PriceDataNotFoundException;
 import com.example.ehe_server.repository.*;
-import com.example.ehe_server.service.binance.BinanceAccountService;
+import com.example.ehe_server.service.intf.binance.BinanceAccountServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.trade.TradingCapacityServiceInterface;
 import org.springframework.stereotype.Service;
@@ -26,7 +26,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
     private final PlatformStockRepository platformStockRepository;
     private final MarketCandleRepository marketCandleRepository;
     private final LoggingServiceInterface loggingService;
-    private final BinanceAccountService binanceAccountService;
+    private final BinanceAccountServiceInterface binanceAccountService;
 
     public TradingCapacityService(
             PortfolioRepository portfolioRepository,
@@ -34,7 +34,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
             PlatformStockRepository platformStockRepository,
             MarketCandleRepository marketCandleRepository,
             LoggingServiceInterface loggingService,
-            BinanceAccountService binanceAccountService) {
+            BinanceAccountServiceInterface binanceAccountService) {
         this.portfolioRepository = portfolioRepository;
         this.holdingRepository = holdingRepository;
         this.platformStockRepository = platformStockRepository;
@@ -51,7 +51,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
         // Check if portfolio exists and belongs to the user
         Optional<Portfolio> portfolioOptional = portfolioRepository.findByPortfolioIdAndUser_UserId(portfolioId, userId);
         if (portfolioOptional.isEmpty()) {
-            throw new PortfolioNotFoundException(portfolioId, userId);
+            throw new PortfolioNotFoundException(portfolioId);
         }
 
         Portfolio portfolio = portfolioOptional.get();
@@ -74,17 +74,17 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
         }
 
         // Get platform name
-        String platformName = apiKey.getPlatformName();
+        String platformName = apiKey.getPlatform().getPlatformName();
         System.out.println("Platform name: " + platformName);
 
         // Find platform stock (try with different symbol formats)
-        List<PlatformStock> stocks = platformStockRepository.findByPlatformNameAndStockSymbol(
+        List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockName(
                 platformName, stockSymbol);
 
         if (stocks.isEmpty()) {
             // Try with USDT suffix if it's not already there
             if (!stockSymbol.endsWith("USDT")) {
-                stocks = platformStockRepository.findByPlatformNameAndStockSymbol(
+                stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockName(
                         platformName, stockSymbol + "USDT");
                 if (!stocks.isEmpty()) {
                     stockSymbol = stockSymbol + "USDT";
@@ -96,7 +96,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
                 // Try without USDT suffix if it's there
                 if (stockSymbol.endsWith("USDT")) {
                     String baseSymbol = stockSymbol.substring(0, stockSymbol.length() - 4);
-                    stocks = platformStockRepository.findByPlatformNameAndStockSymbol(
+                    stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockName(
                             platformName, baseSymbol);
                     if (!stocks.isEmpty()) {
                         stockSymbol = baseSymbol;
@@ -111,14 +111,15 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
         }
 
         PlatformStock stock = stocks.get(0);
-        System.out.println("Found platform stock: " + stock.getStockSymbol() + " (ID: " + stock.getPlatformStockId() + ")");
+        System.out.println("Found platform stock: " + stock.getStock().getStockName() +
+                " (ID: " + stock.getPlatformStockId() + ")");
 
         // Find current holding of this stock
         BigDecimal currentQuantity = BigDecimal.ZERO;
         List<Holding> holdings = holdingRepository.findByPortfolio(portfolio);
 
         for (Holding holding : holdings) {
-            if (holding.getPlatformStock().getStockSymbol().equals(stockSymbol)) {
+            if (holding.getPlatformStock().getStock().getStockName().equals(stockSymbol)) {
                 currentQuantity = holding.getQuantity();
                 System.out.println("Current holding quantity: " + currentQuantity);
                 break;
@@ -134,7 +135,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
             currentPrice = latestCandle.getClosePrice();
             System.out.println("Current price: " + currentPrice);
         } else {
-            throw new PriceDataNotFoundException(stock.getStockSymbol());
+            throw new PriceDataNotFoundException(stock.getStock().getStockName());
         }
 
         // Get the portfolio's reserved cash
@@ -186,7 +187,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
             List<Map<String, Object>> balances = (List<Map<String, Object>>) accountInfo.get("balances");
 
             if (balances != null && !balances.isEmpty()) {
-                String platformName = apiKey.getPlatformName();
+                String platformName = apiKey.getPlatform().getPlatformName();
 
                 // Initialize reserved cash to zero, will be updated if USDT is found
                 BigDecimal reservedCash = BigDecimal.ZERO;
@@ -212,7 +213,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
                         }
 
                         // First try exact match for the asset
-                        List<PlatformStock> stocks = platformStockRepository.findByPlatformNameAndStockSymbol(
+                        List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockName(
                                 platformName, asset);
 
                         if (!stocks.isEmpty()) {
@@ -228,7 +229,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
                             holdingRepository.save(holding);
                         } else {
                             // If no direct match, try looking for trading pairs
-                            List<PlatformStock> tradingPairs = platformStockRepository.findByPlatformNameAndStockSymbol(
+                            List<PlatformStock> tradingPairs = platformStockRepository.findByPlatformPlatformNameAndStockStockName(
                                     platformName, asset + "USDT");
 
                             if (!tradingPairs.isEmpty()) {

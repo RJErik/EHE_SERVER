@@ -1,60 +1,38 @@
 package com.example.ehe_server.service.intf.stock;
 
 import com.example.ehe_server.dto.websocket.CandleDataResponse.CandleData;
-import com.example.ehe_server.dto.websocket.CandleDataResponse;
 import com.example.ehe_server.entity.MarketCandle.Timeframe;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 public interface MarketCandleServiceInterface {
 
-    CandleDataResponse getCandleData(
+    /**
+     * Get the latest candle for a given stock and timeframe
+     */
+    CandleData getLatestCandle(
             String platformName,
             String stockSymbol,
-            String timeframeStr,
-            LocalDateTime startDate,
-            LocalDateTime endDate);
-
-    List<CandleData> getUpdatedCandles(
-            String platformName,
-            String stockSymbol,
-            String timeframeStr,
-            LocalDateTime startDate,
-            LocalDateTime endDate,
-            LocalDateTime lastCheckTime);
+            String timeframeStr);
 
     /**
-     * Checks if the latest candle for a given timeframe has been modified since the last check
-     * @param platformName The platform name
-     * @param stockSymbol The stock symbol
-     * @param timeframeStr The timeframe in string format
-     * @param lastCandleTimestamp The timestamp of the last known candle
-     * @param lastCandleOpen The open price of the last known candle
-     * @param lastCandleHigh The high price of the last known candle
-     * @param lastCandleLow The low price of the last known candle
-     * @param lastCandleClose The close price of the last known candle
-     * @param lastCandleVolume The volume of the last known candle
-     * @return The updated candle if modified, or null if not modified
+     * Check if the candle at a specific timestamp has been modified
+     * Returns the updated candle if modified, null otherwise
      */
-    CandleData getModifiedLatestCandle(
+    CandleData getModifiedCandle(
             String platformName,
             String stockSymbol,
             String timeframeStr,
-            LocalDateTime lastCandleTimestamp,
-            BigDecimal lastCandleOpen,
-            BigDecimal lastCandleHigh,
-            BigDecimal lastCandleLow,
-            BigDecimal lastCandleClose,
-            BigDecimal lastCandleVolume,
-            LocalDateTime endDate);
+            LocalDateTime candleTimestamp,
+            BigDecimal lastOpen,
+            BigDecimal lastHigh,
+            BigDecimal lastLow,
+            BigDecimal lastClose,
+            BigDecimal lastVolume);
 
-    CandleData getCandleAtTimestamp(
-            String platformName,
-            String stockSymbol,
-            String timeframeStr,
-            LocalDateTime timestamp);
-
+    /**
+     * Parse the timeframe string into an enum
+     */
     Timeframe parseTimeframe(String timeframeStr);
 }

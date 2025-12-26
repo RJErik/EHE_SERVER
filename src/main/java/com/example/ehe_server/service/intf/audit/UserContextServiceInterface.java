@@ -14,18 +14,6 @@ public interface UserContextServiceInterface {
     void setUser(String userId, String role);
 
     /**
-     * Set the current request path
-     * @param path The request path to store
-     */
-    void setRequestPath(String path);
-
-    /**
-     * Get the current request path
-     * @return The current request path, or null if not set
-     */
-    String getRequestPath();
-
-    /**
      * Get the current authenticated user ID
      * @return User ID if authenticated, null otherwise
      */

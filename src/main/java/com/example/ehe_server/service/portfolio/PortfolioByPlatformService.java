@@ -3,18 +3,20 @@ package com.example.ehe_server.service.portfolio;
 import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.PortfolioByPlatformResponse;
 import com.example.ehe_server.entity.Portfolio;
-import com.example.ehe_server.entity.User;
+import com.example.ehe_server.exception.custom.MissingPlatformNameException;
+import com.example.ehe_server.exception.custom.MissingUserIdException;
+import com.example.ehe_server.exception.custom.UserNotFoundException;
 import com.example.ehe_server.repository.PortfolioRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.portfolio.PortfolioByPlatformServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 public class PortfolioByPlatformService implements PortfolioByPlatformServiceInterface {
 
     private final PortfolioRepository portfolioRepository;
@@ -30,26 +32,33 @@ public class PortfolioByPlatformService implements PortfolioByPlatformServiceInt
     @LogMessage(
             messageKey = "log.message.portfolio.platforms.get",
             params = {
-                    "#result.platform",
+                    "#platform",
                     "#result.size()",
             }
     )
     @Override
     public List<PortfolioByPlatformResponse> getPortfoliosByPlatform(Integer userId, String platform) {
-        // Get all portfolios for the user
-        User user;
-        List<Portfolio> allPortfolios;
-        if (userRepository.existsById(userId)) {
-            user = userRepository.findById(userId).get();
-            allPortfolios = portfolioRepository.findByUser(user);
-        } else {
-            return null;
+
+        // Input validation checks
+        if (userId == null) {
+            throw new MissingUserIdException();
         }
 
-        // Transform to response format (only id and name as requested)
-        // Filter portfolios by platform and map to DTOs
-        return allPortfolios.stream()
-                .filter(p -> p.getApiKey() != null && p.getApiKey().getPlatformName().equalsIgnoreCase(platform))
+        if (platform == null || platform.trim().isEmpty()) {
+            throw new MissingPlatformNameException();
+        }
+
+        // Database integrity checks
+        if (!userRepository.existsById(userId)) {
+            throw new UserNotFoundException(userId);
+        }
+
+        // Data retrieval
+        List<Portfolio> portfolios = portfolioRepository
+                .findByUser_UserIdAndApiKey_PlatformNameIgnoreCaseOrderByCreationDateDesc(userId, platform);
+
+        // Response mapping
+        return portfolios.stream()
                 .map(p -> new PortfolioByPlatformResponse(p.getPortfolioId(), p.getPortfolioName()))
                 .collect(Collectors.toList());
     }

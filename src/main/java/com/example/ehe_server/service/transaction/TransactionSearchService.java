@@ -1,10 +1,15 @@
 package com.example.ehe_server.service.transaction;
 
 import com.example.ehe_server.annotation.LogMessage;
-import com.example.ehe_server.dto.TransactionSearchResponse;
+import com.example.ehe_server.dto.PaginatedResponse;
+import com.example.ehe_server.dto.TransactionResponse;
 import com.example.ehe_server.entity.Transaction;
+import com.example.ehe_server.exception.custom.*;
 import com.example.ehe_server.repository.TransactionRepository;
 import com.example.ehe_server.service.intf.transaction.TransactionSearchServiceInterface;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,10 +20,11 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 public class TransactionSearchService implements TransactionSearchServiceInterface {
 
     private final TransactionRepository transactionRepository;
+
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public TransactionSearchService(TransactionRepository transactionRepository) {
@@ -40,13 +46,15 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
                     "#toPrice",
                     "#type",
                     "#status",
+                    "#size",
+                    "#page",
                     "#result.size()"
             }
     )
     @Override
-    public List<TransactionSearchResponse> searchTransactions(
+    public PaginatedResponse<TransactionResponse> searchTransactions(
             Integer userId,
-            Integer portfolioId,  // ADD THIS
+            Integer portfolioId,
             String platform,
             String symbol,
             LocalDateTime fromTime,
@@ -56,16 +64,34 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
             BigDecimal fromPrice,
             BigDecimal toPrice,
             String type,
-            String status) {
+            String status,
+            Integer size,
+            Integer page) {
 
-        // Convert string enum values to actual enums
+        // Input Validation
+        if (page == null) {
+            throw new MissingPageNumberException();
+        }
+
+        if (size == null) {
+            throw new MissingPageSizeException();
+        }
+
+        if (page < 0) {
+            throw new InvalidPageNumberException(page);
+        }
+
+        if (size < 1) {
+            throw new InvalidPageSizeException(size);
+        }
+
+        // Parsing logic
         Transaction.TransactionType transactionType = null;
         if (type != null && !type.trim().isEmpty()) {
             try {
                 transactionType = Transaction.TransactionType.valueOf(type);
             } catch (IllegalArgumentException e) {
-                //Todo throw error
-                return List.of();
+                throw new InvalidTransactionTypeException(type);
             }
         }
 
@@ -74,15 +100,16 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
             try {
                 transactionStatus = Transaction.Status.valueOf(status);
             } catch (IllegalArgumentException e) {
-                //Todo throw error
-                return List.of();
+                throw new InvalidTransactionStatusException(status);
             }
         }
 
-        // Perform search
-        List<Transaction> transactions = transactionRepository.searchTransactions(
+        // Data retrieval
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Transaction> transactionPage = transactionRepository.searchTransactions(
                 userId,
-                portfolioId,  // ADD THIS
+                portfolioId,
                 platform,
                 symbol,
                 transactionType,
@@ -92,17 +119,18 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
                 fromAmount,
                 toAmount,
                 fromPrice,
-                toPrice
+                toPrice,
+                pageable
         );
 
-        // Transform entities to DTOs
-        return transactions.stream()
-                .map(transaction -> new TransactionSearchResponse(
+        // Response mapping
+        List<TransactionResponse> content = transactionPage.getContent().stream()
+                .map(transaction -> new TransactionResponse(
                         transaction.getTransactionId(),
                         transaction.getPortfolio().getUser().getUserId(),
                         transaction.getPortfolio().getPortfolioId(),
-                        transaction.getPlatformStock().getPlatformName(),
-                        transaction.getPlatformStock().getStockSymbol(),
+                        transaction.getPlatformStock().getPlatform().getPlatformName(),
+                        transaction.getPlatformStock().getStock().getStockName(),
                         transaction.getTransactionType().toString(),
                         transaction.getQuantity(),
                         transaction.getPrice(),
@@ -111,5 +139,11 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
                         transaction.getTransactionDate().format(DATE_FORMATTER)
                 ))
                 .collect(Collectors.toList());
+
+        return new PaginatedResponse<>(
+                transactionPage.getNumber(),
+                transactionPage.getTotalPages(),
+                content
+        );
     }
 }

@@ -1,7 +1,7 @@
 package com.example.ehe_server.exception.custom;
 
-public class UnauthorizedWatchlistAccessException extends AuthorizationException {
+public class UnauthorizedWatchlistAccessException extends ResourceNotFoundException {
     public UnauthorizedWatchlistAccessException(Integer userId, Integer watchlistItemId) {
-        super("error.message.unauthorizedWatchlistAccess", "error.logDetail.unauthorizedWatchlistAccess", userId, watchlistItemId);
+        super("error.message.watchlistItemNotFound", "error.logDetail.unauthorizedWatchlistAccess", userId, watchlistItemId);
     }
 }

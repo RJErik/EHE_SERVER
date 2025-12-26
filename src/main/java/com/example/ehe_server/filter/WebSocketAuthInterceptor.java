@@ -2,6 +2,7 @@ package com.example.ehe_server.filter;
 
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.repository.UserRepository;
+import com.example.ehe_server.service.auth.JwtClaimService;
 import com.example.ehe_server.service.intf.auth.JwtClaimServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtTokenValidatorInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
@@ -87,7 +88,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
         // Try to get token from Authorization header (Bearer token format)
         List<String> authorization = accessor.getNativeHeader("Authorization");
         if (authorization != null && !authorization.isEmpty()) {
-            String authHeader = authorization.get(0);
+            String authHeader = authorization.getFirst();
             if (authHeader.startsWith("Bearer ")) {
                 return authHeader.substring(7); // Remove "Bearer " prefix
             }
@@ -112,8 +113,9 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
      */
     private void setWebSocketAuthentication(String token, StompHeaderAccessor accessor) {
         try {
-            Integer userId = jwtClaimService.getUserIdFromToken(token);
-            String role = jwtClaimService.getRoleFromToken(token);
+            JwtClaimService.TokenDetails tokenDetails = jwtClaimService.parseTokenDetails(token);
+            Integer userId = tokenDetails.getUserId();
+            String role = tokenDetails.getRole();
 
             if (!areClaimsValid(userId, role)) {
                 loggingService.logAction("[WebSocket/CONNECT] JWT claims invalid: userId=" + userId + ", role=" + role);

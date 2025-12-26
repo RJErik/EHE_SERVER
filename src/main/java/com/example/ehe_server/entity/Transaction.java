@@ -9,8 +9,8 @@ import java.time.LocalDateTime;
 @Table(name = "\"transaction\"") // Escaped because transaction is a reserved word
 public class Transaction {
 
-    public enum TransactionType { Buy, Sell }
-    public enum Status { Pending, Completed, Failed }
+    public enum TransactionType {BUY, SELL}
+    public enum Status {PENDING, COMPLETED, FAILED}
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

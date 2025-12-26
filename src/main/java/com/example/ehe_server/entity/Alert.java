@@ -40,9 +40,6 @@ public class Alert {
             columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private LocalDateTime dateCreated;
 
-    @Column(name = "is_active", nullable = false)
-    private boolean active;
-
     // Getters and setters
     public Integer getAlertId() {
         return alertId;
@@ -90,13 +87,5 @@ public class Alert {
 
     public void setDateCreated(LocalDateTime dateCreated) {
         this.dateCreated = dateCreated;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
     }
 }

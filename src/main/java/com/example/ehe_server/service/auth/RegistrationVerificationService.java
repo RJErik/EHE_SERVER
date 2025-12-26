@@ -3,38 +3,35 @@ package com.example.ehe_server.service.auth;
 import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.entity.User;
 import com.example.ehe_server.entity.VerificationToken;
-import com.example.ehe_server.exception.custom.ExpiredVerificationTokenException;
-import com.example.ehe_server.exception.custom.InactiveTokenException;
-import com.example.ehe_server.exception.custom.InvalidVerificationTokenException;
-import com.example.ehe_server.exception.custom.TokenTypeMismatchException;
+import com.example.ehe_server.exception.custom.*;
 import com.example.ehe_server.repository.AdminRepository;
-import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.RegistrationVerificationServiceInterface;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.util.List;
 
 @Service
 @Transactional
 public class RegistrationVerificationService implements RegistrationVerificationServiceInterface {
 
-    private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository;
     private final AdminRepository adminRepository;
     private final UserContextService userContextService;
+    private final PasswordEncoder passwordEncoder;
 
     public RegistrationVerificationService(
-            UserRepository userRepository,
             VerificationTokenRepository verificationTokenRepository,
             AdminRepository adminRepository,
-            UserContextService userContextService) { // Inject EmailService
-        this.userRepository = userRepository;
+            UserContextService userContextService,
+            PasswordEncoder passwordEncoder) {
         this.verificationTokenRepository = verificationTokenRepository;
         this.adminRepository = adminRepository;
         this.userContextService = userContextService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @LogMessage(
@@ -43,29 +40,40 @@ public class RegistrationVerificationService implements RegistrationVerification
     )
     @Override
     public void verifyRegistrationToken(String token) {
-        Optional<VerificationToken> tokenOpt = verificationTokenRepository.findByToken(token);
 
-        if (tokenOpt.isEmpty()) {
+        // Input validation checks
+        if (token == null || token.trim().isEmpty()) {
+            throw new MissingVerificationTokenException();
+        }
+
+        // Database integrity checks
+        VerificationToken verificationToken = findTokenByPlainValue(
+                token
+        );
+
+        if (verificationToken == null) {
             throw new InvalidVerificationTokenException(token);
         }
 
-        VerificationToken verificationToken = tokenOpt.get();
-        // Eagerly fetch user if needed, or assume lazy loading works within transaction
         User user = verificationToken.getUser();
-        String userIdStr = user != null ? String.valueOf(user.getUserId()) : "unknown"; // Handle potential null user?
 
-        // Set audit context if user found
-        if (user != null) {
-            // Update audit context
-            boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+        if (user == null) {
+            throw new UserNotFoundForTokenException(token);
+        }
 
-            // Set audit context
-            String role = "USER"; // All authenticated users have USER role
+        // Audit context setup
+        boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+        String role = isAdmin ? "ADMIN" : "USER";
+        userContextService.setUser(String.valueOf(user.getUserId()), role);
 
-            if (isAdmin) {
-                role = "ADMIN"; // Add ADMIN role if user is in Admin table
-            }
-            userContextService.setUser(userIdStr, role);
+        // Token logical verification
+        if (verificationToken.getTokenType() != VerificationToken.TokenType.REGISTRATION) {
+            throw new TokenTypeMismatchException(token, VerificationToken.TokenType.REGISTRATION, verificationToken.getTokenType());
+        }
+
+        // Check Status
+        if (verificationToken.getStatus() != VerificationToken.TokenStatus.ACTIVE) {
+            throw new InactiveTokenException(token, verificationToken.getStatus().toString());
         }
 
         if (verificationToken.isExpired()) {
@@ -73,21 +81,22 @@ public class RegistrationVerificationService implements RegistrationVerification
             throw new ExpiredVerificationTokenException(token).withResendButton();
         }
 
-        if (verificationToken.getStatus() != VerificationToken.TokenStatus.ACTIVE) {
-            throw new InactiveTokenException(token, verificationToken.getStatus().toString());
-        }
-
-
-        // Optional: Check token type if tokens are used for multiple purposes
-        if (verificationToken.getTokenType() != VerificationToken.TokenType.REGISTRATION) {
-            throw new TokenTypeMismatchException(token, VerificationToken.TokenType.REGISTRATION, verificationToken.getTokenType());
-        }
-
-        assert user != null;
+        // State updates
         user.setAccountStatus(User.AccountStatus.ACTIVE);
         verificationToken.setStatus(VerificationToken.TokenStatus.USED);
+    }
 
-        userRepository.save(user);
-        verificationTokenRepository.save(verificationToken); // Save updated token status
+    private VerificationToken findTokenByPlainValue(String plainToken) {
+        // Get all active tokens of the specified type
+        List<VerificationToken> activeTokens = verificationTokenRepository.findByTokenTypeAndStatus(
+                VerificationToken.TokenType.REGISTRATION,
+                VerificationToken.TokenStatus.ACTIVE
+        );
+
+        // Find the token that matches the plain value
+        return activeTokens.stream()
+                .filter(token -> passwordEncoder.matches(plainToken, token.getTokenHash()))
+                .findFirst()
+                .orElse(null);
     }
 }

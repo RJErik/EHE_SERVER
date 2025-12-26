@@ -45,7 +45,7 @@ public class LoggingService implements LoggingServiceInterface {
 
         // Set user if it's a human user
         if (userContextService.isHumanUser()) {
-            Optional<User> user = userRepository.findById(userContextService.getCurrentUserId().intValue());
+            Optional<User> user = userRepository.findById(userContextService.getCurrentUserId());
             if (user.isPresent()) {
                 log.setUser(user.get());
             }
@@ -69,7 +69,7 @@ public class LoggingService implements LoggingServiceInterface {
 
         // Set user if it's a human user
         if (userContextService.isHumanUser()) {
-            Optional<User> user = userRepository.findById(userContextService.getCurrentUserId().intValue());
+            Optional<User> user = userRepository.findById(userContextService.getCurrentUserId());
             if (user.isPresent()) {
                 errorLog.setUser(user.get());
             }

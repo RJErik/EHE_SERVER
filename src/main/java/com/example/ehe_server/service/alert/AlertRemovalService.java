@@ -2,12 +2,12 @@ package com.example.ehe_server.service.alert;
 
 import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.entity.Alert;
-import com.example.ehe_server.exception.custom.AlertNotFoundException;
-import com.example.ehe_server.exception.custom.UnauthorizedAlertAccessException;
+import com.example.ehe_server.exception.custom.*;
 import com.example.ehe_server.repository.AlertRepository;
+import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.alert.AlertRemovalServiceInterface;
-import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -16,9 +16,12 @@ import java.util.Optional;
 public class AlertRemovalService implements AlertRemovalServiceInterface {
 
     private final AlertRepository alertRepository;
+    private final UserRepository userRepository;
 
-    public AlertRemovalService(AlertRepository alertRepository) {
+    public AlertRemovalService(AlertRepository alertRepository,
+                               UserRepository userRepository) {
         this.alertRepository = alertRepository;
+        this.userRepository = userRepository;
     }
 
     @LogMessage(
@@ -27,7 +30,22 @@ public class AlertRemovalService implements AlertRemovalServiceInterface {
     )
     @Override
     public void removeAlert(Integer userId, Integer alertId) {
-        // Check if the alert exists
+
+        // Input validation checks
+        if (userId == null) {
+            throw new MissingUserIdException();
+        }
+
+        if (alertId == null) {
+            throw new MissingAlertIdException();
+        }
+
+        // User validation
+        if (!userRepository.existsById(userId)) {
+            throw new UserNotFoundException(userId);
+        }
+
+        // Alert existence check
         Optional<Alert> alertOptional = alertRepository.findById(alertId);
         if (alertOptional.isEmpty()) {
             throw new AlertNotFoundException(alertId);
@@ -35,12 +53,12 @@ public class AlertRemovalService implements AlertRemovalServiceInterface {
 
         Alert alert = alertOptional.get();
 
-        // Verify the alert belongs to the user
+        // Ownership verification
         if (!alert.getUser().getUserId().equals(userId)) {
             throw new UnauthorizedAlertAccessException(userId, alertId);
         }
 
-        // Remove the alert
+        // Execute removal
         alertRepository.delete(alert);
     }
 }

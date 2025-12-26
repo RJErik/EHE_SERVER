@@ -7,6 +7,7 @@ import com.example.ehe_server.service.intf.alert.AlertRetrievalServiceInterface;
 import com.example.ehe_server.service.intf.alert.AlertCreationServiceInterface;
 import com.example.ehe_server.service.intf.alert.AlertRemovalServiceInterface;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.context.MessageSource;
@@ -16,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/user")
+@RequestMapping("/api/user/alerts")
 public class AlertController {
 
     private final AlertRetrievalServiceInterface alertRetrievalService;
@@ -42,84 +43,79 @@ public class AlertController {
     }
 
     /**
-     * Endpoint to retrieve all alerts for the current user
+     * GET /api/user/alerts
+     * Retrieve all alerts for the current user
      *
      * @return List of alerts and success status
      */
-    @GetMapping("/alerts")
+    @GetMapping
     public ResponseEntity<Map<String, Object>> getAlerts() {
-        // Call alert retrieval service
-        List<AlertRetrievalResponse> alertRetrievalResponses = alertRetrievalService.getAlerts(userContextService.getCurrentUserId());
+        List<AlertResponse> alertRetrievalResponses =
+                alertRetrievalService.getAlerts(userContextService.getCurrentUserId());
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.alert.get", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.alert.get",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
-        responseBody.put("alerts", alertRetrievalResponses); // Nest the DTO under a "data" key
+        responseBody.put("alerts", alertRetrievalResponses);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
     /**
-     * Endpoint to add a new alert for the user
+     * POST /api/user/alerts
+     * Create a new alert for the user
      *
      * @param request Contains platform name, stock symbol, condition type, and threshold value
      * @return Success status and details of added alert
      */
-    @PostMapping("/alerts")
+    @PostMapping
     public ResponseEntity<Map<String, Object>> createAlert(@RequestBody AlertCreationRequest request) {
-        // Call alert creation service to add item
-        AlertCreationResponse alertCreationResponse = alertCreationService.createAlert(
+        AlertResponse alertCreationResponse = alertCreationService.createAlert(
                 userContextService.getCurrentUserId(),
                 request.getPlatform(),
                 request.getSymbol(),
                 request.getConditionType(),
                 request.getThresholdValue());
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.alert.add", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.alert.add",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
-        responseBody.put("alert", alertCreationResponse); // Nest the DTO under a "data" key
+        responseBody.put("alert", alertCreationResponse);
 
-        // 4. Return the successful response
-        return ResponseEntity.ok(responseBody);
+        // Return 201 Created for resource creation
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 
     /**
-     * Endpoint to remove an alert
+     * DELETE /api/user/alerts/{alertId}
+     * Remove an alert by ID
      *
-     * @param request Contains the alert ID to delete
+     * @param alertId The alert ID to delete (from path)
      * @return Success status and confirmation message
      */
-    @DeleteMapping("/alerts")
-    public ResponseEntity<Map<String, Object>> removeAlert(@RequestBody AlertRemovalRequest request) {
-        // Call alert removal service to remove item
-        alertRemovalService.removeAlert(userContextService.getCurrentUserId(), request.getId());
+    @DeleteMapping("/{alertId}")
+    public ResponseEntity<Map<String, Object>> removeAlert(@PathVariable Integer alertId) {
+        alertRemovalService.removeAlert(userContextService.getCurrentUserId(), alertId);
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.alert.remove", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.alert.remove",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
@@ -127,31 +123,30 @@ public class AlertController {
     }
 
     /**
-     * Endpoint to search alerts by platform, symbol, and/or condition type
+     * GET /api/user/alerts/search?platform=X&symbol=Y&conditionType=Z
+     * Search alerts by platform, symbol, and/or condition type
      *
-     * @param request Contains optional search criteria
+     * @param request Contains optional search criteria (bound from query params)
      * @return Filtered list of alerts and success status
      */
-    @PostMapping("/alerts/search")
-    public ResponseEntity<Map<String, Object>> searchAlerts(@RequestBody AlertSearchRequest request) {
-        // Call alert search service
-        List<AlertSearchResponse> alertSearchResponses = alertSearchService.searchAlerts(
+    @GetMapping("/search")
+    public ResponseEntity<Map<String, Object>> searchAlerts(@ModelAttribute AlertSearchRequest request) {
+        List<AlertResponse> alertSearchResponses = alertSearchService.searchAlerts(
                 userContextService.getCurrentUserId(),
                 request.getPlatform(),
                 request.getSymbol(),
                 request.getConditionType());
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.alert.search", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.alert.search",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
-        responseBody.put("alerts", alertSearchResponses); // Nest the DTO under a "data" key
+        responseBody.put("alerts", alertSearchResponses);
 
         return ResponseEntity.ok(responseBody);
     }

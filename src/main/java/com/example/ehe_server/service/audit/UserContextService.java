@@ -51,20 +51,6 @@ public class UserContextService implements UserContextServiceInterface {
     }
 
     /**
-     * Set the current request path
-     */
-    public void setRequestPath(String path) {
-        requestPath.set(path);
-    }
-
-    /**
-     * Get the current request path
-     */
-    public String getRequestPath() {
-        return requestPath.get();
-    }
-
-    /**
      * Get the current authenticated user ID
      *
      * @return User ID if authenticated, null otherwise
@@ -129,7 +115,7 @@ public class UserContextService implements UserContextServiceInterface {
      */
     public User getCurrentHumanUser() {
         if (isHumanUser()) {
-            Optional<User> user = userRepository.findById(getCurrentUserId().intValue());
+            Optional<User> user = userRepository.findById(getCurrentUserId());
             if (user.isPresent()) {
                 return user.get();
             } else {

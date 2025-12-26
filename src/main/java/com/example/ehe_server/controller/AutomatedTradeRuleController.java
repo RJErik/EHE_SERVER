@@ -6,8 +6,10 @@ import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeRuleSear
 import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeRuleRetrievalServiceInterface;
 import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeRuleCreationServiceInterface;
 import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeRuleRemovalServiceInterface;
+import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/user")
+@RequestMapping("/api/user/automated-trade-rules")
 public class AutomatedTradeRuleController {
 
     private final AutomatedTradeRuleRetrievalServiceInterface automatedTradeRuleRetrievalService;
@@ -31,7 +33,8 @@ public class AutomatedTradeRuleController {
             AutomatedTradeRuleCreationServiceInterface automatedTradeRuleCreationService,
             AutomatedTradeRuleRemovalServiceInterface automatedTradeRuleRemovalService,
             AutomatedTradeRuleSearchServiceInterface automatedTradeRuleSearchService,
-            UserContextService userContextService, MessageSource messageSource) {
+            UserContextService userContextService,
+            MessageSource messageSource) {
         this.automatedTradeRuleRetrievalService = automatedTradeRuleRetrievalService;
         this.automatedTradeRuleCreationService = automatedTradeRuleCreationService;
         this.automatedTradeRuleRemovalService = automatedTradeRuleRemovalService;
@@ -41,132 +44,117 @@ public class AutomatedTradeRuleController {
     }
 
     /**
-     * Endpoint to retrieve all active automated trade rules for the current user
-     *
-     * @return List of automated trade rules and success status
+     * GET /api/user/automated-trade-rules
+     * Retrieve all active automated trade rules for the current user
      */
-    @GetMapping("/automated-trade-rules")
+    @GetMapping
     public ResponseEntity<Map<String, Object>> getAutomatedTradeRules() {
-        // Call automated trade rule retrieval service
-        List<AutomatedTradeRuleRetrievalResponse> automatedTradeRuleRetrievalResponses = automatedTradeRuleRetrievalService.getAutomatedTradeRules(userContextService.getCurrentUserId());
+        List<AutomatedTradeRuleResponse> automatedTradeRuleRetrievalResponses =
+                automatedTradeRuleRetrievalService.getAutomatedTradeRules(userContextService.getCurrentUserId());
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.automatedTradeRule.get", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.automatedTradeRule.get",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("automatedTradeRules", automatedTradeRuleRetrievalResponses);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
-    //LOOK OUT NAME
-
     /**
-     * Endpoint to add a new automated trade rule for the user
-     *
-     * @param request Contains portfolio ID, platform name, stock symbol, condition type, action type, quantity type, quantity, and threshold value
-     * @return Success status and details of added automated trade rule
+     * POST /api/user/automated-trade-rules
+     * Create a new automated trade rule
      */
-    @PostMapping("/automated-trade-rules")
-    public ResponseEntity<Map<String, Object>> createAutomatedTradeRule(@RequestBody AutomatedTradeRuleCreationRequest request) {
-        // Call alert retrieval service
-        AutomatedTradeRuleCreationResponse automatedTradeRuleCreationResponse = automatedTradeRuleCreationService.createAutomatedTradeRule(
-                userContextService.getCurrentUserId(),
-                request.getPortfolioId(),
-                request.getPlatform(),
-                request.getSymbol(),
-                request.getConditionType(),
-                request.getActionType(),
-                request.getQuantityType(),
-                request.getQuantity(),
-                request.getThresholdValue());
+    @PostMapping
+    public ResponseEntity<Map<String, Object>> createAutomatedTradeRule(
+            @Valid @RequestBody AutomatedTradeRuleCreationRequest request) {
 
-        // 2. Fetch the success message from messages.properties
+        AutomatedTradeRuleResponse automatedTradeRuleCreationResponse =
+                automatedTradeRuleCreationService.createAutomatedTradeRule(
+                        userContextService.getCurrentUserId(),
+                        request.getPortfolioId(),
+                        request.getPlatform(),
+                        request.getSymbol(),
+                        request.getConditionType(),
+                        request.getActionType(),
+                        request.getQuantityType(),
+                        request.getQuantity(),
+                        request.getThresholdValue());
+
         String successMessage = messageSource.getMessage(
-                "success.message.automatedTradeRule.add", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.automatedTradeRule.add",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("automatedTradeRule", automatedTradeRuleCreationResponse);
 
-        // 4. Return the successful response
-        return ResponseEntity.ok(responseBody);
+        // 201 Created is more appropriate for resource creation
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 
     /**
-     * Endpoint to remove (deactivate) an automated trade rule
-     *
-     * @param request Contains the automated trade rule ID to deactivate
-     * @return Success status and confirmation message
+     * DELETE /api/user/automated-trade-rules/{ruleId}
+     * Remove (deactivate) an automated trade rule
      */
-    @DeleteMapping("/automated-trade-rules")
-    public ResponseEntity<Map<String, Object>> removeAutomatedTradeRule(@RequestBody AutomatedTradeRemovalRequest request) {
-        // Call alert retrieval service
-        automatedTradeRuleRemovalService.removeAutomatedTradeRule(userContextService.getCurrentUserId(), request.getId());
+    @DeleteMapping("/{ruleId}")
+    public ResponseEntity<Map<String, Object>> removeAutomatedTradeRule(@PathVariable Integer ruleId) {
+        automatedTradeRuleRemovalService.removeAutomatedTradeRule(
+                userContextService.getCurrentUserId(),
+                ruleId);
 
-        // 2. Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
-                "success.message.automatedTradeRule.remove", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.automatedTradeRule.remove",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
     /**
-     * Endpoint to search automated trade rules by various criteria
-     *
-     * @param request Contains optional search criteria (portfolio ID, platform, symbol, condition type, action type, quantity type, min/max threshold)
-     * @return Filtered list of automated trade rules and success status
+     * GET /api/user/automated-trade-rules/search?portfolioId=1&platform=BINANCE&symbol=BTC...
+     * Search automated trade rules by various criteria
      */
-    @PostMapping("/automated-trade-rules/search")
-    public ResponseEntity<Map<String, Object>> searchAutomatedTradeRules(@RequestBody AutomatedTradeRuleSearchRequest request) {
-        // Call automated trade rule retrieval service
-        List<AutomatedTradeRuleSearchResponse> automatedTradeRuleSearchResponses = automatedTradeRuleSearchService.searchAutomatedTradeRules(
-                userContextService.getCurrentUserId(),
-                request.getPortfolioId(),
-                request.getPlatform(),
-                request.getSymbol(),
-                request.getConditionType(),
-                request.getActionType(),
-                request.getQuantityType(),
-                request.getMinThresholdValue(),
-                request.getMaxThresholdValue());
+    @GetMapping("/search")
+    public ResponseEntity<Map<String, Object>> searchAutomatedTradeRules(
+            @ModelAttribute AutomatedTradeRuleSearchRequest request) {
 
-        // 2. Fetch the success message from messages.properties
+        List<AutomatedTradeRuleResponse> automatedTradeRuleSearchResponses =
+                automatedTradeRuleSearchService.searchAutomatedTradeRules(
+                        userContextService.getCurrentUserId(),
+                        request.getPortfolioId(),
+                        request.getPlatform(),
+                        request.getSymbol(),
+                        request.getConditionType(),
+                        request.getActionType(),
+                        request.getQuantityType(),
+                        request.getMinThresholdValue(),
+                        request.getMaxThresholdValue());
+
         String successMessage = messageSource.getMessage(
-                "success.message.automatedTradeRule.search", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.automatedTradeRule.search",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
-        // 3. Build the final response body
-        Map<String, Object> responseBody = new HashMap<>(); // Use LinkedHashMap to preserve order
+        Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("automatedTradeRules", automatedTradeRuleSearchResponses);
 
-        // 4. Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 }

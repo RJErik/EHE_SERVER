@@ -4,18 +4,16 @@ import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.AlertCreationResponse;
 import com.example.ehe_server.entity.Alert;
 import com.example.ehe_server.entity.PlatformStock;
-import com.example.ehe_server.exception.custom.InvalidAlertThresholdException;
-import com.example.ehe_server.exception.custom.InvalidConditionTypeException;
-import com.example.ehe_server.exception.custom.PlatformStockNotFoundException;
+import com.example.ehe_server.entity.User;
+import com.example.ehe_server.exception.custom.*;
 import com.example.ehe_server.repository.AlertRepository;
 import com.example.ehe_server.repository.PlatformStockRepository;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.alert.AlertCreationServiceInterface;
-import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -25,8 +23,9 @@ public class AlertCreationService implements AlertCreationServiceInterface {
 
     private final AlertRepository alertRepository;
     private final PlatformStockRepository platformStockRepository;
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final UserRepository userRepository;
+
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public AlertCreationService(
             AlertRepository alertRepository,
@@ -45,52 +44,71 @@ public class AlertCreationService implements AlertCreationServiceInterface {
                     "#result.symbol",
                     "#result.conditionType",
                     "#result.thresholdValue",
-                    "#result.dateCreated",
-                    "#result.active"
+                    "#result.dateCreated"
             }
     )
     @Override
     public AlertCreationResponse createAlert(Integer userId, String platform, String symbol, String conditionTypeStr, BigDecimal thresholdValue) {
-        // Validate threshold value
-        if (thresholdValue == null || thresholdValue.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidAlertThresholdException(thresholdValue);
+
+        // Input validation checks
+        if (userId == null) {
+            throw new MissingUserIdException();
         }
 
-        // Parse condition type
+        if (platform == null || platform.trim().isEmpty()) {
+            throw new MissingPlatformNameException();
+        }
+
+        if (symbol == null || symbol.trim().isEmpty()) {
+            throw new MissingStockSymbolException();
+        }
+
+        if (conditionTypeStr == null || conditionTypeStr.trim().isEmpty()) {
+            throw new MissingConditionTypeException();
+        }
+
+        if (thresholdValue == null) {
+            throw new MissingThresholdValueException();
+        }
+
+        // Threshold logic check
+        if (thresholdValue.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidThresholdValueException(thresholdValue);
+        }
+
+        // Parse enum before database access
         Alert.ConditionType conditionType;
         try {
             conditionType = Alert.ConditionType.valueOf(conditionTypeStr);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | NullPointerException e) {
             throw new InvalidConditionTypeException(conditionTypeStr);
         }
 
-        // Check if platform and symbol combination exists
-        List<PlatformStock> platformStocks = platformStockRepository.findByPlatformNameAndStockSymbol(platform, symbol);
+        // Database integrity checks
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        List<PlatformStock> platformStocks = platformStockRepository.findByPlatformPlatformNameAndStockStockName(platform, symbol);
         if (platformStocks.isEmpty()) {
             throw new PlatformStockNotFoundException(platform, symbol);
         }
 
-        PlatformStock platformStock = platformStocks.getFirst();
-
-        // Create new alert
+        // Construct and save the alert
         Alert newAlert = new Alert();
-        newAlert.setUser(userRepository.findById(userId).get());
-        newAlert.setPlatformStock(platformStock);
+        newAlert.setUser(user);
+        newAlert.setPlatformStock(platformStocks.getFirst());
         newAlert.setConditionType(conditionType);
         newAlert.setThresholdValue(thresholdValue);
-        newAlert.setDateCreated(LocalDateTime.now());
-        newAlert.setActive(true);
+
         Alert savedAlert = alertRepository.save(newAlert);
 
-        // Prepare success response
         return new AlertCreationResponse(
                 savedAlert.getAlertId(),
                 platform,
                 symbol,
                 savedAlert.getConditionType().toString(),
                 savedAlert.getThresholdValue(),
-                savedAlert.getDateCreated().format(DATE_FORMATTER),
-                savedAlert.isActive()
+                savedAlert.getDateCreated().format(DATE_FORMATTER)
         );
     }
 }

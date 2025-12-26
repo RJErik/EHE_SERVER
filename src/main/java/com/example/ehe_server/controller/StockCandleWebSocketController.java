@@ -2,9 +2,10 @@ package com.example.ehe_server.controller;
 
 import com.example.ehe_server.dto.websocket.*;
 import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
-import com.example.ehe_server.service.stock.StockWebSocketSubscriptionManager;
+import com.example.ehe_server.service.intf.stock.StockWebSocketSubscriptionManagerInterface;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.annotation.SendToUser;
@@ -17,12 +18,12 @@ import java.util.Map;
 @Controller
 public class StockCandleWebSocketController {
 
-    private final StockWebSocketSubscriptionManager stockWebSocketSubscriptionManager;
+    private final StockWebSocketSubscriptionManagerInterface stockWebSocketSubscriptionManager;
     private final WebSocketAuthServiceInterface webSocketAuthService;
     private final MessageSource messageSource;
 
     public StockCandleWebSocketController(
-            StockWebSocketSubscriptionManager stockWebSocketSubscriptionManager,
+            StockWebSocketSubscriptionManagerInterface stockWebSocketSubscriptionManager,
             WebSocketAuthServiceInterface webSocketAuthService,
             MessageSource messageSource) {
         this.stockWebSocketSubscriptionManager = stockWebSocketSubscriptionManager;
@@ -34,6 +35,7 @@ public class StockCandleWebSocketController {
     @SendToUser("/queue/candles")
     public Map<String, Object> subscribeToCandles(
             @Payload StockCandleSubscriptionRequest request,
+            @Header("simpSessionId") String sessionId,
             StompHeaderAccessor headerAccessor) {
 
         Map<String, Object> response = new HashMap<>();
@@ -43,14 +45,12 @@ public class StockCandleWebSocketController {
 
         // Create subscription
         StockCandleSubscriptionResponse stockCandleSubscriptionResponse = stockWebSocketSubscriptionManager.createSubscription(
-                webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor),
+                userId,
+                sessionId,
                 request.getPlatformName(),
                 request.getStockSymbol(),
                 request.getTimeframe(),
-                request.getStartDate(),
-                request.getEndDate(),
-                "/user/" + userId + "/queue/candles",
-                request.getSubscriptionType());
+                "/user/" + userId + "/queue/candles");
 
         String successMessage = messageSource.getMessage(
                 "success.message.stock.candle.create", // The key from your properties file
@@ -90,36 +90,6 @@ public class StockCandleWebSocketController {
         response.put("success", true);
         response.put("message", successMessage);
         response.put("subscriptionId", new StockCandleUnsubscriptionResponse(subscriptionId));
-
-        return response;
-    }
-
-    @MessageMapping("/candles/update-subscription")
-    @SendToUser("/queue/candles")
-    public Map<String, Object> updateSubscription(
-            @Payload SubscriptionUpdateSubscriptionRequest request) {
-
-        Map<String, Object> response = new HashMap<>();
-
-        // Update subscription with the new type
-        StockCandleUpdateSubscriptionResponse stockCandleUpdateSubscriptionResponse = stockWebSocketSubscriptionManager.updateSubscription(
-                request.getSubscriptionId(),
-                request.getNewStartDate(),
-                request.getNewEndDate(),
-                request.getResetData() != null && request.getResetData(),
-                request.getSubscriptionType());
-
-        String successMessage = messageSource.getMessage(
-                "success.message.stock.candle.update", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
-        );
-
-        //LOOK OVER FRONTEND
-
-        response.put("success", true);
-        response.put("message", successMessage);
-        response.put("subscription", stockCandleUpdateSubscriptionResponse);
 
         return response;
     }

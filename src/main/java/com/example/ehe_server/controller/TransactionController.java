@@ -8,20 +8,16 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/api/admin/transactions")
 public class TransactionController {
 
     private final TransactionRetrievalServiceInterface transactionRetrievalService;
     private final TransactionSearchServiceInterface transactionSearchService;
     private final MessageSource messageSource;
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_DATE_TIME;
 
     public TransactionController(
             TransactionRetrievalServiceInterface transactionRetrievalService,
@@ -33,88 +29,75 @@ public class TransactionController {
     }
 
     /**
-     * Endpoint to retrieve all transactions across all users (Admin only)
+     * GET /api/admin/transactions?size=20&page=0
      *
-     * @return List of all transactions and success status
+     * Retrieve all transactions with pagination via query parameters.
+     *
+     * Example: GET /api/admin/transactions?size=20&page=0
      */
-    @GetMapping("/transactions")
-    public ResponseEntity<Map<String, Object>> getAllTransactions() {
-        // Call transaction retrieval service
-        List<TransactionRetrievalResponse> transactionResponses = transactionRetrievalService.getAllTransactions();
+    @GetMapping
+    public ResponseEntity<Map<String, Object>> getAllTransactions(
+            @RequestParam(defaultValue = "20") Integer size,
+            @RequestParam(defaultValue = "0") Integer page) {
 
-        // Fetch the success message from messages.properties
+        PaginatedResponse<TransactionResponse> transactionResponses =
+                transactionRetrievalService.getAllTransactions(size, page);
+
         String successMessage = messageSource.getMessage(
                 "success.message.transaction.get",
                 null,
                 LocaleContextHolder.getLocale()
         );
 
-        // Build the final response body
         Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("transactions", transactionResponses);
 
-        // Return the successful response
         return ResponseEntity.ok(responseBody);
     }
 
     /**
-     * Endpoint to search transactions with multiple filter criteria (Admin only)
+     * GET /api/admin/transactions/search?userId=1&platform=BINANCE&symbol=BTC...
      *
-     * @param request Contains optional filters for userId, platform, symbol, dates, amounts, prices, type, and status
-     * @return Filtered list of transactions and success status
+     * Search transactions with filters via query parameters.
+     * Spring automatically binds query params to the DTO using @ModelAttribute.
+     *
+     * Example: GET /api/admin/transactions/search?platform=BINANCE&symbol=BTC&size=20&page=0
      */
-    @PostMapping("/transactions/search")
-    public ResponseEntity<Map<String, Object>> searchTransactions(@RequestBody TransactionSearchRequest request) {
-        // Parse date strings to LocalDateTime
-        LocalDateTime fromTime = parseLocalDateTime(request.getFromTime());
-        LocalDateTime toTime = parseLocalDateTime(request.getToTime());
+    @GetMapping("/search")
+    public ResponseEntity<Map<String, Object>> searchTransactions(
+            @ModelAttribute TransactionSearchRequest request) {
 
-        // Call transaction search service with extracted parameters
-        List<TransactionSearchResponse> transactionResponses = transactionSearchService.searchTransactions(
-                request.getUserId(),
-                request.getPortfolioId(),
-                request.getPlatform(),
-                request.getSymbol(),
-                fromTime,
-                toTime,
-                request.getFromAmount(),
-                request.getToAmount(),
-                request.getFromPrice(),
-                request.getToPrice(),
-                request.getType(),
-                request.getStatus()
-        );
+        PaginatedResponse<TransactionResponse> transactionResponses =
+                transactionSearchService.searchTransactions(
+                        request.getUserId(),
+                        request.getPortfolioId(),
+                        request.getPlatform(),
+                        request.getSymbol(),
+                        request.getFromTime(),
+                        request.getToTime(),
+                        request.getFromAmount(),
+                        request.getToAmount(),
+                        request.getFromPrice(),
+                        request.getToPrice(),
+                        request.getType(),
+                        request.getStatus(),
+                        request.getSize(),
+                        request.getPage()
+                );
 
-        // Fetch the success message from messages.properties
         String successMessage = messageSource.getMessage(
                 "success.message.transaction.search",
                 null,
                 LocaleContextHolder.getLocale()
         );
 
-        // Build the final response body
         Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("transactions", transactionResponses);
 
-        // Return the successful response
         return ResponseEntity.ok(responseBody);
-    }
-
-    /**
-     * Parse ISO format LocalDateTime string
-     */
-    private LocalDateTime parseLocalDateTime(String dateTimeString) {
-        if (dateTimeString == null || dateTimeString.trim().isEmpty()) {
-            return null;
-        }
-        try {
-            return LocalDateTime.parse(dateTimeString, DATE_FORMATTER);
-        } catch (Exception e) {
-            return null;
-        }
     }
 }

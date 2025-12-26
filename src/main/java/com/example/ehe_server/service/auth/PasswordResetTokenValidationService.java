@@ -8,26 +8,30 @@ import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.PasswordResetTokenValidationServiceInterface;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.util.List;
 
 @Service
-@Transactional(readOnly = true)
+@Transactional
 public class PasswordResetTokenValidationService implements PasswordResetTokenValidationServiceInterface {
 
     private final VerificationTokenRepository verificationTokenRepository;
     private final AdminRepository adminRepository;
     private final UserContextService userContextService;
+    private final PasswordEncoder passwordEncoder;
 
     public PasswordResetTokenValidationService(
             VerificationTokenRepository verificationTokenRepository,
             AdminRepository adminRepository,
-            UserContextService userContextService) {
+            UserContextService userContextService,
+            PasswordEncoder passwordEncoder) {
         this.verificationTokenRepository = verificationTokenRepository;
         this.adminRepository = adminRepository;
         this.userContextService = userContextService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @LogMessage(
@@ -36,50 +40,57 @@ public class PasswordResetTokenValidationService implements PasswordResetTokenVa
     )
     @Override
     public void validatePasswordResetToken(String token) {
+
+        // Input validation checks
         if (token == null || token.trim().isEmpty()) {
-            throw new MissingTokenException();
+            throw new MissingVerificationTokenException();
         }
 
-        Optional<VerificationToken> tokenOpt = verificationTokenRepository.findByToken(token);
+        // Database integrity checks
+        VerificationToken verificationToken = findTokenByPlainValue(
+                token
+        );
 
-        if (tokenOpt.isEmpty()) {
+        if (verificationToken == null) {
             throw new InvalidPasswordResetTokenException(token);
         }
 
-        VerificationToken verificationToken = tokenOpt.get();
         User user = verificationToken.getUser();
 
         if (user == null) {
             throw new UserNotFoundForTokenException(token);
         }
 
-        // Set audit context if user found
-        // Update audit context
-        String userIdStr = String.valueOf(user.getUserId());
+        // Audit context setup
         boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
+        String role = isAdmin ? "ADMIN" : "USER";
+        userContextService.setUser(String.valueOf(user.getUserId()), role);
 
-        // Set audit context
-        String role = "USER"; // All authenticated users have USER role
-
-        if (isAdmin) {
-            role = "ADMIN"; // Add ADMIN role if user is in Admin table
-        }
-        userContextService.setUser(userIdStr, role);
-
-        // Check token type
+        // Token logical verification
         if (verificationToken.getTokenType() != VerificationToken.TokenType.PASSWORD_RESET) {
             throw new TokenTypeMismatchException(token, VerificationToken.TokenType.PASSWORD_RESET, verificationToken.getTokenType());
         }
 
-        // Check expiration
+        if (verificationToken.getStatus() != VerificationToken.TokenStatus.ACTIVE) {
+            throw new InactiveTokenException(token, verificationToken.getStatus().toString());
+        }
+
         if (verificationToken.isExpired()) {
             verificationToken.setStatus(VerificationToken.TokenStatus.EXPIRED);
             throw new ExpiredVerificationTokenException(token).withResendButton();
         }
-
-        // Check token status
-        if (verificationToken.getStatus() != VerificationToken.TokenStatus.ACTIVE) {
-            throw new InactiveTokenException(token, verificationToken.getStatus().toString());
-        }
     }
+
+    private VerificationToken findTokenByPlainValue(String plainToken) {
+        List<VerificationToken> activeTokens = verificationTokenRepository.findByTokenTypeAndStatus(
+                VerificationToken.TokenType.PASSWORD_RESET,
+                VerificationToken.TokenStatus.ACTIVE
+        );
+
+        return activeTokens.stream()
+                .filter(token -> passwordEncoder.matches(plainToken, token.getTokenHash()))
+                .findFirst()
+                .orElse(null);
+    }
+
 }

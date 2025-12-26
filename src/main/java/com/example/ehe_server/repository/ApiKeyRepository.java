@@ -9,6 +9,5 @@ import java.util.Optional;
 
 @Repository
 public interface ApiKeyRepository extends JpaRepository<ApiKey, Integer> {
-    List<ApiKey> findByUser_UserId(Integer userId);
-    Optional<ApiKey> findByApiKeyIdAndUser_UserId(Integer apiKeyId, Integer userId);
+    List<ApiKey> findByUser_UserIdOrderByDateAddedDesc(Integer userId);
 }

@@ -9,7 +9,7 @@ import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtRefreshTokenServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtTokenGeneratorInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-import com.example.ehe_server.service.intf.stock.JwtTokenRenewalServiceInterface;
+import com.example.ehe_server.service.intf.session.JwtTokenRenewalServiceInterface;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -51,7 +51,7 @@ public class JwtTokenRenewalService implements JwtTokenRenewalServiceInterface {
         this.loggingService = loggingService;
     }
 
-    @LogMessage(messageKey = "log.message.user.jwtTokenRenewal")
+    @LogMessage(messageKey = "log.message.session.jwtTokenRenewal")
     @Override
     public void renewToken(Integer userId, HttpServletRequest request, HttpServletResponse response) {
         // Retrieve the currently authenticated user

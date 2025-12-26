@@ -2,6 +2,8 @@ package com.example.ehe_server.service.user;
 
 import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.entity.User;
+import com.example.ehe_server.exception.custom.MissingUserIdException;
+import com.example.ehe_server.exception.custom.UserNotFoundException;
 import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.user.UserDeactivationServiceInterface;
 import org.springframework.stereotype.Service;
@@ -20,15 +22,17 @@ public class UserDeactivationService implements UserDeactivationServiceInterface
     @LogMessage(messageKey = "log.message.user.userDeactivation")
     @Override
     public void deactivateUser(Integer userId) {
-        // Check if user exists and is active
-        User user;
-        if (userRepository.existsById(userId)) {
-            user = userRepository.findById(userId).get();
-        } else {
-            return;
+
+        // Input validation checks
+        if (userId == null) {
+            throw new MissingUserIdException();
         }
 
-        // Set the account status to suspended
+        // Database integrity checks
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        // Execution
         user.setAccountStatus(User.AccountStatus.SUSPENDED);
         userRepository.save(user);
     }

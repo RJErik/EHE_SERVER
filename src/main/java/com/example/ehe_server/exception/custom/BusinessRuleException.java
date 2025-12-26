@@ -6,7 +6,7 @@ package com.example.ehe_server.exception.custom;
 
 /**
  * Thrown when a request is valid but violates a business rule (e.g., email
- * already exists, token is expired, item already in watchlist).
+ * already exists, token is expired, item already in watchlistitem).
  */
 public class BusinessRuleException extends CustomBaseException {
     public BusinessRuleException(String messageKey, String logDetailKey, Object... logArgs) {

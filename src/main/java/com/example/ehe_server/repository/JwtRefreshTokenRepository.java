@@ -22,11 +22,6 @@ public interface JwtRefreshTokenRepository extends JpaRepository<JwtRefreshToken
     Optional<JwtRefreshToken> findFirstByJwtRefreshTokenExpiryDateAfterOrderByJwtRefreshTokenExpiryDateAsc(LocalDateTime date);
 
     /**
-     * Find a token by its hash
-     */
-    Optional<JwtRefreshToken> findByJwtRefreshTokenHash(String tokenHash);
-
-    /**
      * Find all tokens for a specific user
      */
     List<JwtRefreshToken> findByUser_UserId(Integer userId);

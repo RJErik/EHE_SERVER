@@ -9,6 +9,7 @@ import com.example.ehe_server.repository.*;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioDetailsServiceInterface;
 import com.example.ehe_server.service.intf.portfolio.PortfolioValueServiceInterface;
+import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,8 @@ public class PortfolioDetailsService implements PortfolioDetailsServiceInterface
     private final MarketCandleRepository marketCandleRepository;
     private final LoggingServiceInterface loggingService;
     private final PortfolioValueServiceInterface portfolioValueService;
+    private final EntityManager entityManager;  // ← Add this
+
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public PortfolioDetailsService(
@@ -33,12 +36,14 @@ public class PortfolioDetailsService implements PortfolioDetailsServiceInterface
             HoldingRepository holdingRepository,
             MarketCandleRepository marketCandleRepository,
             LoggingServiceInterface loggingService,
-            PortfolioValueServiceInterface portfolioValueService) {
+            PortfolioValueServiceInterface portfolioValueService,
+            EntityManager entityManager) {  // ← Add this
         this.portfolioRepository = portfolioRepository;
         this.holdingRepository = holdingRepository;
         this.marketCandleRepository = marketCandleRepository;
         this.loggingService = loggingService;
         this.portfolioValueService = portfolioValueService;
+        this.entityManager = entityManager;  // ← Add this
     }
 
     @Override
@@ -47,26 +52,31 @@ public class PortfolioDetailsService implements PortfolioDetailsServiceInterface
         // Check if portfolio exists and belongs to the user
         Optional<Portfolio> portfolioOptional = portfolioRepository.findByPortfolioIdAndUser_UserId(portfolioId, userId);
         if (portfolioOptional.isEmpty()) {
-            throw new PortfolioNotFoundException(portfolioId, userId);
+            throw new PortfolioNotFoundException(portfolioId);
         }
 
         Portfolio portfolio = portfolioOptional.get();
         ApiKey apiKey = portfolio.getApiKey();
-        String platformName = apiKey != null ? apiKey.getPlatformName() : "Unknown";
+        String platformName = apiKey != null ? apiKey.getPlatform().getPlatformName() : "Unknown";
 
         try {
-            // update holdings on exchange before computing details
-            portfolioValueService.updateHoldings(userId, portfolioId);
+            // Update holdings on exchange before computing details
+//            portfolioValueService.updateHoldings(userId, portfolioId);
+//
+//            // ✅ CLEAR THE PERSISTENCE CONTEXT
+//            entityManager.flush();   // Ensure all changes are written to DB
+//            entityManager.clear();   // Clear the cache
+
         } catch (Exception e) {
-            // choose policy: log and continue with existing holdings, or rethrow
             loggingService.logError("Failed to update holdings before details: " + e.getMessage(), e);
-            // optionally rethrow if you want the details request to fail on update problems
         }
 
+        // ✅ Reload portfolio from DB (fresh copy)
+        portfolio = portfolioRepository.findById(portfolioId)
+                .orElseThrow(() -> new PortfolioNotFoundException(portfolioId));
 
-        // Get holdings for this portfolio
+        // ✅ Get holdings AFTER clearing cache
         List<Holding> holdings = holdingRepository.findByPortfolio(portfolio);
-
 
         // Handle reserved cash
         BigDecimal reservedCash = portfolio.getReservedCash() != null ?
@@ -75,26 +85,19 @@ public class PortfolioDetailsService implements PortfolioDetailsServiceInterface
         // Determine cash currency based on platform
         String cashCurrency = "Binance".equalsIgnoreCase(platformName) ? "USDT" : "USD";
 
-
         // Process holdings
         List<StockDetails> stocksList = new ArrayList<>();
         BigDecimal totalPortfolioValue = reservedCash;
         CashDetails cashDetails = new CashDetails(cashCurrency, reservedCash.setScale(2, RoundingMode.HALF_UP));
 
-        cashDetails.setCurrency(cashCurrency);
-        cashDetails.setValue(reservedCash.setScale(2, RoundingMode.HALF_UP));
-
-
         for (Holding holding : holdings) {
             PlatformStock stock = holding.getPlatformStock();
-            String symbol = stock.getStockSymbol();
+            String symbol = stock.getStock().getStockName();
             BigDecimal quantity = holding.getQuantity();
 
             // Extract the base symbol (remove USDT suffix if present)
-            String baseSymbol = symbol;
-            if (symbol.endsWith("USDT")) {
-                baseSymbol = symbol.substring(0, symbol.length() - 4);
-            }
+            String baseSymbol = symbol.endsWith("USDT") ?
+                    symbol.substring(0, symbol.length() - 4) : symbol;
 
             // Get the latest price from the market candle repository
             MarketCandle latestCandle = marketCandleRepository.findTopByPlatformStockAndTimeframeOrderByTimestampDesc(
@@ -107,9 +110,7 @@ public class PortfolioDetailsService implements PortfolioDetailsServiceInterface
                 // Add to total portfolio value
                 totalPortfolioValue = totalPortfolioValue.add(totalValue);
 
-                StockDetails stockDetailsDto = new StockDetails(baseSymbol, totalValue);
-
-                stocksList.add(stockDetailsDto);
+                stocksList.add(new StockDetails(baseSymbol, totalValue));
             }
         }
 

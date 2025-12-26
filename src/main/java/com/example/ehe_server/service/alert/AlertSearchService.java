@@ -1,13 +1,15 @@
 package com.example.ehe_server.service.alert;
 
 import com.example.ehe_server.annotation.LogMessage;
-import com.example.ehe_server.dto.AlertSearchResponse;
+import com.example.ehe_server.dto.AlertResponse;
 import com.example.ehe_server.entity.Alert;
 import com.example.ehe_server.exception.custom.InvalidConditionTypeException;
+import com.example.ehe_server.exception.custom.MissingUserIdException;
+import com.example.ehe_server.exception.custom.UserNotFoundException;
 import com.example.ehe_server.repository.AlertRepository;
+import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.alert.AlertSearchServiceInterface;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
@@ -15,18 +17,18 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 public class AlertSearchService implements AlertSearchServiceInterface {
 
     private final AlertRepository alertRepository;
-    private final LoggingServiceInterface loggingService;
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+    private final UserRepository userRepository;
 
-    public AlertSearchService(
-            AlertRepository alertRepository,
-            LoggingServiceInterface loggingService) {
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    public AlertSearchService(AlertRepository alertRepository,
+                              UserRepository userRepository) {
         this.alertRepository = alertRepository;
-        this.loggingService = loggingService;
+        this.userRepository = userRepository;
     }
 
     @LogMessage(
@@ -38,8 +40,14 @@ public class AlertSearchService implements AlertSearchServiceInterface {
                     "#result.size()"}
     )
     @Override
-    public List<AlertSearchResponse> searchAlerts(Integer userId, String platform, String symbol, String conditionTypeStr) {
-        // Parse condition type if provided
+    public List<AlertResponse> searchAlerts(Integer userId, String platform, String symbol, String conditionTypeStr) {
+
+        // Input validation checks
+        if (userId == null) {
+            throw new MissingUserIdException();
+        }
+
+        // Parse condition logic
         Alert.ConditionType conditionType = null;
         if (conditionTypeStr != null && !conditionTypeStr.trim().isEmpty()) {
             try {
@@ -49,19 +57,12 @@ public class AlertSearchService implements AlertSearchServiceInterface {
             }
         }
 
-        // Log search parameters
-        StringBuilder searchParams = new StringBuilder("Searching alerts with filters: ");
-        if (platform != null && !platform.trim().isEmpty()) searchParams.append("platform=").append(platform).append(", ");
-        if (symbol != null && !symbol.trim().isEmpty()) searchParams.append("symbol=").append(symbol).append(", ");
-        if (conditionType != null) searchParams.append("conditionType=").append(conditionType).append(", ");
-
-        String logMessage = searchParams.toString();
-        if (logMessage.endsWith(", ")) {
-            logMessage = logMessage.substring(0, logMessage.length() - 2);
+        // Database integrity checks
+        if (!userRepository.existsById(userId)) {
+            throw new UserNotFoundException(userId);
         }
-        loggingService.logAction(logMessage);
 
-        // Execute single database query with all filters
+        // Data retrieval
         List<Alert> alerts = alertRepository.searchAlerts(
                 userId,
                 (platform != null && !platform.trim().isEmpty()) ? platform : null,
@@ -69,24 +70,18 @@ public class AlertSearchService implements AlertSearchServiceInterface {
                 conditionType
         );
 
-        // Transform to AlertSearchResponse
-        List<AlertSearchResponse> alertSearchResponses = alerts.stream()
+        // Response mapping
+        return alerts.stream()
                 .map(alert -> {
-                    AlertSearchResponse alertSearchResponse = new AlertSearchResponse();
+                    AlertResponse alertSearchResponse = new AlertResponse();
                     alertSearchResponse.setId(alert.getAlertId());
-                    alertSearchResponse.setPlatform(alert.getPlatformStock().getPlatformName());
-                    alertSearchResponse.setSymbol(alert.getPlatformStock().getStockSymbol());
+                    alertSearchResponse.setPlatform(alert.getPlatformStock().getPlatform().getPlatformName());
+                    alertSearchResponse.setSymbol(alert.getPlatformStock().getStock().getStockName());
                     alertSearchResponse.setConditionType(alert.getConditionType().name());
                     alertSearchResponse.setThresholdValue(alert.getThresholdValue());
                     alertSearchResponse.setDateCreated(alert.getDateCreated().format(DATE_FORMATTER));
-                    alertSearchResponse.setActive(alert.isActive());
                     return alertSearchResponse;
                 })
                 .collect(Collectors.toList());
-
-        // Log success
-        loggingService.logAction("Alert search successful, found " + alertSearchResponses.size() + " alerts");
-
-        return alertSearchResponses;
     }
 }

@@ -1,8 +1,11 @@
 package com.example.ehe_server.service.session;
 
+import com.example.ehe_server.annotation.LogMessage;
+import com.example.ehe_server.exception.custom.MissingUserIdException;
+import com.example.ehe_server.exception.custom.UserNotFoundException;
+import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtRefreshTokenServiceInterface;
-import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.session.UserLogoutServiceInterface;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,31 +18,29 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserLogoutService implements UserLogoutServiceInterface {
 
     private final CookieServiceInterface cookieService;
-    private final LoggingServiceInterface loggingService;
     private final JwtRefreshTokenServiceInterface jwtRefreshTokenService;
+    private final UserRepository userRepository;
 
     public UserLogoutService(
             CookieServiceInterface cookieService,
-            LoggingServiceInterface loggingService,
-            JwtRefreshTokenServiceInterface jwtRefreshTokenService) {
+            JwtRefreshTokenServiceInterface jwtRefreshTokenService,
+            UserRepository userRepository) {
         this.cookieService = cookieService;
-        this.loggingService = loggingService;
         this.jwtRefreshTokenService = jwtRefreshTokenService;
+        this.userRepository = userRepository;
     }
 
+    @LogMessage(messageKey = "log.message.session.logout")
     @Override
     public void logoutUser(Integer userId, HttpServletRequest request, HttpServletResponse response) {
-        // Get the current user context before logout
-        boolean userExists = false;
-        boolean userActive = false;
+        // Input validation checks
+        if (userId == null) {
+            throw new MissingUserIdException();
+        }
 
-        // Log the logout action with appropriate message
-        if (!userExists) {
-            loggingService.logAction("Logout attempted for non-existent user ID: " + userId);
-        } else if (!userActive) {
-            loggingService.logAction("Logout attempted for inactive user ID: " + userId);
-        } else {
-            loggingService.logAction("User logged out successfully");
+        // Database integrity checks
+        if (!userRepository.existsById(userId)) {
+            throw new UserNotFoundException(userId);
         }
 
         // Extract refresh token from cookie and remove it from database
