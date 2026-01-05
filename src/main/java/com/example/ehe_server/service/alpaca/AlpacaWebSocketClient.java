@@ -26,17 +26,13 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler {
     private final UserContextService userContextService;
     private final AlpacaProperties alpacaProperties;
 
-    // WebSocket connection
     private volatile WebSocketSession session;
     private volatile boolean authenticated = false;
 
-    // Track subscribed symbols
     private final Set<String> subscriptions = ConcurrentHashMap.newKeySet();
 
-    // Handlers for each symbol
     private final Map<String, Consumer<JsonNode>> handlers = new ConcurrentHashMap<>();
 
-    // Determine which feed to use based on symbol type
     private static final String STOCK_FEED_PATH = "/v2/iex"; // or /v2/sip for paid plans
     private static final String CRYPTO_FEED_PATH = "/v1beta3/crypto";
 
@@ -101,10 +97,10 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler {
 
             // Connect to appropriate feeds
             if (!stocks.isEmpty()) {
-                connectToFeed(stocks, STOCK_FEED_PATH);
+                connectToFeed(STOCK_FEED_PATH);
             }
             if (!cryptos.isEmpty()) {
-                connectToFeed(cryptos, CRYPTO_FEED_PATH);
+                connectToFeed(CRYPTO_FEED_PATH);
             }
         } else {
             loggingService.logAction("No symbols to subscribe to, connection idle");
@@ -115,7 +111,7 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler {
     /**
      * Connect to a specific Alpaca data feed
      */
-    private void connectToFeed(List<String> symbols, String feedPath) {
+    private void connectToFeed(String feedPath) {
         userContextService.setUser("SYSTEM", "SYSTEM");
 
         try {
@@ -271,9 +267,6 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler {
         Map<String, Object> subscribePayload = new HashMap<>();
         subscribePayload.put("action", "subscribe");
         subscribePayload.put("bars", symbols);
-        // Can also subscribe to trades and quotes if needed
-        // subscribePayload.put("trades", symbols);
-        // subscribePayload.put("quotes", symbols);
 
         String json = objectMapper.writeValueAsString(subscribePayload);
         loggingService.logAction("Sending subscription for " + symbols.size() + " symbols");
@@ -335,13 +328,6 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler {
      */
     public int getSubscriptionCount() {
         return subscriptions.size();
-    }
-
-    /**
-     * Get list of currently subscribed symbols
-     */
-    public Set<String> getSubscribedSymbols() {
-        return new HashSet<>(subscriptions);
     }
 
     /**

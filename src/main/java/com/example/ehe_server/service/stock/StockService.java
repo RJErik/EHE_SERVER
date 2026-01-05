@@ -3,7 +3,6 @@ package com.example.ehe_server.service.stock;
 import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.StocksByPlatformResponse;
 import com.example.ehe_server.entity.PlatformStock;
-import com.example.ehe_server.exception.custom.MissingPlatformNameException;
 import com.example.ehe_server.exception.custom.PlatformNotFoundException;
 import com.example.ehe_server.repository.PlatformStockRepository;
 import com.example.ehe_server.service.intf.stock.StockServiceInterface;
@@ -33,21 +32,16 @@ public class StockService implements StockServiceInterface {
     @Override
     public StocksByPlatformResponse getStocksByPlatform(String platformName) {
 
-        // Input validation checks
-        if (platformName == null || platformName.trim().isEmpty()) {
-            throw new MissingPlatformNameException();
-        }
-
         // Database integrity checks
         if (!platformStockRepository.existsByPlatformPlatformName(platformName)) {
             throw new PlatformNotFoundException(platformName);
         }
 
         // Data retrieval and response mapping
-        List<PlatformStock> platformStocks = platformStockRepository.findByPlatformPlatformNameOrderByStockStockNameAsc(platformName);
+        List<PlatformStock> platformStocks = platformStockRepository.findByPlatformPlatformNameOrderByStockStockSymbolAsc(platformName);
 
         List<String> stocks = platformStocks.stream()
-                .map(ps -> ps.getStock().getStockName())
+                .map(ps -> ps.getStock().getStockSymbol())
                 .collect(Collectors.toList());
 
         return new StocksByPlatformResponse(platformName, stocks);

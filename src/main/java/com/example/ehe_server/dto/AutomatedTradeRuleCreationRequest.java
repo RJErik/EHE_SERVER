@@ -1,19 +1,34 @@
 // AutomatedTradeRuleCreationRequest.java
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.annotation.validation.NotEmptyString;
+import com.example.ehe_server.annotation.validation.NotNullField;
+import com.example.ehe_server.annotation.validation.PositiveAmount;
+import com.example.ehe_server.entity.AutomatedTradeRule;
+import com.example.ehe_server.exception.custom.*;
+
 import java.math.BigDecimal;
 
 public class AutomatedTradeRuleCreationRequest {
+    @NotNullField(exception = MissingPortfolioIdException.class)
     private Integer portfolioId;
+    @NotEmptyString(exception = MissingPortfolioNameException.class)
     private String platform;
+    @NotEmptyString(exception = MissingStockSymbolException.class)
     private String symbol;
-    private String conditionType;
-    private String actionType;
-    private String quantityType;
+    @NotNullField(exception = MissingConditionTypeException.class)
+    private AutomatedTradeRule.ConditionType conditionType;
+    @NotNullField(exception = MissingActionTypeException.class)
+    private AutomatedTradeRule.ActionType actionType;
+    @NotNullField(exception = MissingQuantityTypeException.class)
+    private AutomatedTradeRule.QuantityType quantityType;
+    @NotNullField(exception = MissingQuantityException.class)
+    @PositiveAmount(exception = InvalidQuantityException.class)
     private BigDecimal quantity;
+    @NotNullField(exception = MissingThresholdValueException.class)
+    @PositiveAmount(exception = InvalidThresholdValueException.class)
     private BigDecimal thresholdValue;
 
-    // Getters and setters
     public Integer getPortfolioId() {
         return portfolioId;
     }
@@ -38,27 +53,27 @@ public class AutomatedTradeRuleCreationRequest {
         this.symbol = symbol;
     }
 
-    public String getConditionType() {
+    public AutomatedTradeRule.ConditionType getConditionType() {
         return conditionType;
     }
 
-    public void setConditionType(String conditionType) {
+    public void setConditionType(AutomatedTradeRule.ConditionType conditionType) {
         this.conditionType = conditionType;
     }
 
-    public String getActionType() {
+    public AutomatedTradeRule.ActionType getActionType() {
         return actionType;
     }
 
-    public void setActionType(String actionType) {
+    public void setActionType(AutomatedTradeRule.ActionType actionType) {
         this.actionType = actionType;
     }
 
-    public String getQuantityType() {
+    public AutomatedTradeRule.QuantityType getQuantityType() {
         return quantityType;
     }
 
-    public void setQuantityType(String quantityType) {
+    public void setQuantityType(AutomatedTradeRule.QuantityType quantityType) {
         this.quantityType = quantityType;
     }
 

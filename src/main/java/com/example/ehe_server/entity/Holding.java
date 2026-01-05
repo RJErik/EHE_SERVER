@@ -26,7 +26,6 @@ public class Holding {
     @Column(name = "quantity", nullable = false, precision = 18, scale = 8)
     private BigDecimal quantity;
 
-    // Getters and setters
     public Integer getHoldingId() {
         return holdingId;
     }

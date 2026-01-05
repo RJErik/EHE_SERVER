@@ -9,13 +9,12 @@ public class AlertNotificationResponse {
     private Integer alertId;
     private String platformName;
     private String stockSymbol;
-    private String conditionType; // "PRICE_ABOVE" or "PRICE_BELOW"
+    private String conditionType;
     private BigDecimal thresholdValue;
     private BigDecimal currentPrice;
     private LocalDateTime triggerTime;
     private String subscriptionId;
 
-    // Getters and setters
     public boolean isSuccess() {
         return success;
     }
@@ -31,8 +30,6 @@ public class AlertNotificationResponse {
     public void setMessage(String message) {
         this.message = message;
     }
-
-    // ... remaining getters and setters
 
     public Integer getAlertId() {
         return alertId;

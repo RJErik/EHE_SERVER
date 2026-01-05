@@ -1,19 +1,22 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.entity.User;
+import com.fasterxml.jackson.annotation.JsonFormat;
+
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 public class UserResponse {
     private Integer id;
     private String userName;
     private String email;
-    private String accountStatus;
-    private String registrationDate;
+    private User.AccountStatus accountStatus;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime registrationDate;
 
-    // No-argument constructor
     public UserResponse() {}
 
-    // All-argument constructor
-    public UserResponse(Integer id, String userName, String email, String accountStatus, String registrationDate) {
+    public UserResponse(Integer id, String userName, String email, User.AccountStatus accountStatus, LocalDateTime registrationDate) {
         this.id = id;
         this.userName = userName;
         this.email = email;
@@ -21,7 +24,6 @@ public class UserResponse {
         this.registrationDate = registrationDate;
     }
 
-    // Getters and Setters
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
 
@@ -31,11 +33,11 @@ public class UserResponse {
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
-    public String getAccountStatus() { return accountStatus; }
-    public void setAccountStatus(String accountStatus) { this.accountStatus = accountStatus; }
+    public User.AccountStatus getAccountStatus() { return accountStatus; }
+    public void setAccountStatus(User.AccountStatus accountStatus) { this.accountStatus = accountStatus; }
 
-    public String getRegistrationDate() { return registrationDate; }
-    public void setRegistrationDate(String registrationDate) { this.registrationDate = registrationDate; }
+    public LocalDateTime getRegistrationDate() { return registrationDate; }
+    public void setRegistrationDate(LocalDateTime registrationDate) { this.registrationDate = registrationDate; }
 
     @Override
     public boolean equals(Object o) {

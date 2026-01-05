@@ -1,7 +1,7 @@
 package com.example.ehe_server.service.alert;
 
 import com.example.ehe_server.annotation.LogMessage;
-import com.example.ehe_server.dto.AlertCreationResponse;
+import com.example.ehe_server.dto.AlertResponse;
 import com.example.ehe_server.entity.Alert;
 import com.example.ehe_server.entity.PlatformStock;
 import com.example.ehe_server.entity.User;
@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -24,8 +23,6 @@ public class AlertCreationService implements AlertCreationServiceInterface {
     private final AlertRepository alertRepository;
     private final PlatformStockRepository platformStockRepository;
     private final UserRepository userRepository;
-
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public AlertCreationService(
             AlertRepository alertRepository,
@@ -48,47 +45,13 @@ public class AlertCreationService implements AlertCreationServiceInterface {
             }
     )
     @Override
-    public AlertCreationResponse createAlert(Integer userId, String platform, String symbol, String conditionTypeStr, BigDecimal thresholdValue) {
-
-        // Input validation checks
-        if (userId == null) {
-            throw new MissingUserIdException();
-        }
-
-        if (platform == null || platform.trim().isEmpty()) {
-            throw new MissingPlatformNameException();
-        }
-
-        if (symbol == null || symbol.trim().isEmpty()) {
-            throw new MissingStockSymbolException();
-        }
-
-        if (conditionTypeStr == null || conditionTypeStr.trim().isEmpty()) {
-            throw new MissingConditionTypeException();
-        }
-
-        if (thresholdValue == null) {
-            throw new MissingThresholdValueException();
-        }
-
-        // Threshold logic check
-        if (thresholdValue.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidThresholdValueException(thresholdValue);
-        }
-
-        // Parse enum before database access
-        Alert.ConditionType conditionType;
-        try {
-            conditionType = Alert.ConditionType.valueOf(conditionTypeStr);
-        } catch (IllegalArgumentException | NullPointerException e) {
-            throw new InvalidConditionTypeException(conditionTypeStr);
-        }
+    public AlertResponse createAlert(Integer userId, String platform, String symbol, Alert.ConditionType conditionType, BigDecimal thresholdValue) {
 
         // Database integrity checks
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
-        List<PlatformStock> platformStocks = platformStockRepository.findByPlatformPlatformNameAndStockStockName(platform, symbol);
+        List<PlatformStock> platformStocks = platformStockRepository.findByPlatformPlatformNameAndStockStockSymbol(platform, symbol);
         if (platformStocks.isEmpty()) {
             throw new PlatformStockNotFoundException(platform, symbol);
         }
@@ -102,13 +65,13 @@ public class AlertCreationService implements AlertCreationServiceInterface {
 
         Alert savedAlert = alertRepository.save(newAlert);
 
-        return new AlertCreationResponse(
+        return new AlertResponse(
                 savedAlert.getAlertId(),
                 platform,
                 symbol,
-                savedAlert.getConditionType().toString(),
+                savedAlert.getConditionType(),
                 savedAlert.getThresholdValue(),
-                savedAlert.getDateCreated().format(DATE_FORMATTER)
+                savedAlert.getDateCreated()
         );
     }
 }

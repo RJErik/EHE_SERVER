@@ -20,7 +20,6 @@ public class AutomatedTradeNotificationResponse {
     private String transactionStatus;
     private Integer transactionId;
 
-    // Getters and setters
     public boolean isSuccess() {
         return success;
     }

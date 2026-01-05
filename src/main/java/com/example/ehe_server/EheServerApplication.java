@@ -13,8 +13,8 @@ import java.security.Security;
 @SpringBootApplication
 @EntityScan(basePackages = {"com.example.ehe_server.entity"})
 @EnableJpaRepositories(basePackages = {"com.example.ehe_server.repository"})
-@EnableScheduling // Added for WebSocket heartbeat and update checking
-@EnableAsync  // Add this line
+@EnableScheduling
+@EnableAsync
 public class EheServerApplication {
 
     public static void main(String[] args) {

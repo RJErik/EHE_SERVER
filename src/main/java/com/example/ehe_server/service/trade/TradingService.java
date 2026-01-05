@@ -1,12 +1,8 @@
 package com.example.ehe_server.service.trade;
 
 import com.example.ehe_server.dto.TradeExecutionResponse;
-import com.example.ehe_server.entity.ApiKey;
-import com.example.ehe_server.entity.Portfolio;
-import com.example.ehe_server.entity.PlatformStock;
-import com.example.ehe_server.entity.Transaction;
+import com.example.ehe_server.entity.*;
 import com.example.ehe_server.exception.custom.ApiKeyMissingException;
-import com.example.ehe_server.exception.custom.InvalidQuantityTypeException;
 import com.example.ehe_server.exception.custom.PlatformStockNotFoundException;
 import com.example.ehe_server.exception.custom.PortfolioNotFoundException;
 import com.example.ehe_server.repository.PortfolioRepository;
@@ -20,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
 
@@ -34,7 +29,6 @@ public class TradingService implements TradingServiceInterface {
     private final TransactionRepository transactionRepository;
     private final PlatformStockRepository platformStockRepository;
 
-    // Define precision constants for Binance API
     private static final int QUOTE_ORDER_QTY_PRECISION = 8;
     private static final int QUANTITY_PRECISION = 8;
 
@@ -53,11 +47,9 @@ public class TradingService implements TradingServiceInterface {
 
     @Override
     @Transactional
-    public TradeExecutionResponse executeTrade(Integer userId, Integer portfolioId, String stockSymbol, String action,
-                                               BigDecimal amount, String quantityType) {
-        System.out.println("Executing market order: " + action + " " + amount + " of " + stockSymbol +
-                " for portfolio: " + portfolioId + " using " + quantityType);
-
+    public TradeExecutionResponse executeTrade(Integer userId, Integer portfolioId, String stockSymbol,
+                                               Transaction.TransactionType action,
+                                               BigDecimal amount, AutomatedTradeRule.QuantityType quantityType) {
         // Check if portfolio exists and belongs to the user
         Optional<Portfolio> portfolioOptional = portfolioRepository.findByPortfolioIdAndUser_UserId(portfolioId, userId);
         if (portfolioOptional.isEmpty()) {
@@ -72,16 +64,9 @@ public class TradingService implements TradingServiceInterface {
         }
 
         // Get credentials for Binance API
-        String encryptedApiKey = apiKey.getApiKeyValue();
-        String encryptedSecretKey = apiKey.getSecretKey();
-
-        // In a real application, you would need to decrypt these values
-        String apiKeyValue = encryptedApiKey;
-        String secretKeyValue = encryptedSecretKey;
-
         String platformName = apiKey.getPlatform().getPlatformName();
 
-        // Get PlatformStock entity for transaction record (using original stockSymbol from parameter)
+        // Get PlatformStock entity for transaction record
         PlatformStock platformStock = platformStockRepository
                 .findByStockNameAndPlatformName(stockSymbol, platformName)
                 .orElseThrow(() -> new PlatformStockNotFoundException(stockSymbol, platformName));
@@ -97,12 +82,10 @@ public class TradingService implements TradingServiceInterface {
         BigDecimal quantity = null;
         BigDecimal quoteOrderQty = null;
 
-        if ("QUANTITY".equalsIgnoreCase(quantityType)) {
+        if (quantityType.equals(AutomatedTradeRule.QuantityType.QUANTITY)) {
             quantity = amount.setScale(QUANTITY_PRECISION, RoundingMode.DOWN);
-        } else if ("QUOTE_ORDER_QTY".equalsIgnoreCase(quantityType)) {
+        } else if (quantityType.equals(AutomatedTradeRule.QuantityType.QUOTE_ORDER_QTY)) {
             quoteOrderQty = amount.setScale(QUOTE_ORDER_QTY_PRECISION, RoundingMode.DOWN);
-        } else {
-            throw new InvalidQuantityTypeException(quantityType);
         }
 
         Transaction transaction;
@@ -110,7 +93,7 @@ public class TradingService implements TradingServiceInterface {
         try {
             // Execute the order
             Map<String, Object> orderResult = binanceAccountService.placeMarketOrder(
-                    apiKeyValue, secretKeyValue, binanceSymbol, action, "MARKET", quantity, quoteOrderQty);
+                    apiKey.getApiKeyValue(), apiKey.getSecretKey(), binanceSymbol, action.toString(), "MARKET", quantity, quoteOrderQty);
 
             // Extract trade details from order result
             BigDecimal executedQty = orderResult.get("executedQty") != null ?
@@ -127,12 +110,11 @@ public class TradingService implements TradingServiceInterface {
 
             String orderStatus = (String) orderResult.get("status");
 
-            // Create and save transaction record
+            // Create and save transaction
             transaction = new Transaction();
             transaction.setPortfolio(portfolio);
             transaction.setPlatformStock(platformStock);
-            transaction.setTransactionType("BUY".equalsIgnoreCase(action) ?
-                    Transaction.TransactionType.BUY : Transaction.TransactionType.SELL);
+            transaction.setTransactionType(action);
             transaction.setQuantity(executedQty);
             transaction.setPrice(averagePrice);
 
@@ -147,7 +129,6 @@ public class TradingService implements TradingServiceInterface {
 
             transaction = transactionRepository.save(transaction);
 
-            // Log the successful trade
             String tradeDetails = action + " " + executedQty + " of " + stockSymbol +
                     " at " + averagePrice + " (total: " + cumulativeQuoteQty + ")";
             loggingService.logAction("Market order executed: " + tradeDetails +
@@ -166,12 +147,10 @@ public class TradingService implements TradingServiceInterface {
             );
 
         } catch (Exception e) {
-            // Create a failed transaction record
             transaction = new Transaction();
             transaction.setPortfolio(portfolio);
             transaction.setPlatformStock(platformStock);
-            transaction.setTransactionType("BUY".equalsIgnoreCase(action) ?
-                    Transaction.TransactionType.BUY : Transaction.TransactionType.SELL);
+            transaction.setTransactionType(action);
             transaction.setQuantity(quantity != null ? quantity : BigDecimal.ZERO);
             transaction.setPrice(BigDecimal.ZERO);
             transaction.setStatus(Transaction.Status.FAILED);

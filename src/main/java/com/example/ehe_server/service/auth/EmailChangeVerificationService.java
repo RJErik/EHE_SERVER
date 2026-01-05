@@ -11,7 +11,7 @@ import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.EmailChangeVerificationServiceInterface;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.example.ehe_server.service.intf.token.TokenHashServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-@Transactional(noRollbackFor = ExpiredVerificationTokenException.class)
+@Transactional(noRollbackFor = {ExpiredVerificationTokenException.class, EmailAlreadyInUseException.class})
 public class EmailChangeVerificationService implements EmailChangeVerificationServiceInterface {
 
     private final VerificationTokenRepository verificationTokenRepository;
@@ -27,7 +27,7 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
     private final UserRepository userRepository;
     private final UserContextService userContextService;
     private final AdminRepository adminRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final TokenHashServiceInterface tokenHashService;
 
     public EmailChangeVerificationService(
             VerificationTokenRepository verificationTokenRepository,
@@ -35,13 +35,13 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
             UserRepository userRepository,
             UserContextService userContextService,
             AdminRepository adminRepository,
-            PasswordEncoder passwordEncoder) {
+            TokenHashServiceInterface tokenHashService) {
         this.verificationTokenRepository = verificationTokenRepository;
         this.emailChangeRequestRepository = emailChangeRequestRepository;
         this.userRepository = userRepository;
         this.userContextService = userContextService;
         this.adminRepository = adminRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.tokenHashService = tokenHashService;
     }
 
     @LogMessage(
@@ -51,19 +51,11 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
     @Override
     public void validateEmailChange(String token) {
 
-        // Input validation checks
-        if (token == null || token.trim().isEmpty()) {
-            throw new MissingVerificationTokenException(); // New Check
-        }
-
         // Token lookup
-        VerificationToken verificationToken = findTokenByPlainValue(
-                token
-        );
+        String hashedToken = tokenHashService.hashToken(token);
 
-        if (verificationToken == null) {
-            throw new InvalidVerificationTokenException(token);
-        }
+        VerificationToken verificationToken = verificationTokenRepository.findByTokenHash(hashedToken)
+                .orElseThrow(() -> new InvalidVerificationTokenException(token));
 
 
         // Audit Context Setup
@@ -101,6 +93,7 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
         // Check for email collision
         Optional<User> existingUserWithEmail = userRepository.findByEmail(newEmail);
         if (existingUserWithEmail.isPresent() && !existingUserWithEmail.get().getUserId().equals(user.getUserId())) {
+            verificationToken.setStatus(VerificationToken.TokenStatus.INVALIDATED);
             throw new EmailAlreadyInUseException(newEmail);
         }
 
@@ -117,17 +110,4 @@ public class EmailChangeVerificationService implements EmailChangeVerificationSe
         verificationToken.setStatus(VerificationToken.TokenStatus.USED);
         verificationTokenRepository.save(verificationToken);
     }
-
-    private VerificationToken findTokenByPlainValue(String plainToken) {
-        List<VerificationToken> activeTokens = verificationTokenRepository.findByTokenTypeAndStatus(
-                VerificationToken.TokenType.EMAIL_CHANGE,
-                VerificationToken.TokenStatus.ACTIVE
-        );
-
-        return activeTokens.stream()
-                .filter(token -> passwordEncoder.matches(plainToken, token.getTokenHash()))
-                .findFirst()
-                .orElse(null);
-    }
-
 }

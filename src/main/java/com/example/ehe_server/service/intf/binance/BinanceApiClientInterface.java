@@ -24,14 +24,4 @@ public interface BinanceApiClientInterface {
             Long endTime,
             Integer limit
     );
-
-    /**
-     * Check if the API client is currently rate limited
-     *
-     * @param requestKey The request identifier
-     * @return true if rate limited, false otherwise
-     */
-    default boolean isRateLimited(String requestKey) {
-        return false;
-    }
 }

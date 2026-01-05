@@ -12,9 +12,8 @@ public class CandleDataResponse {
     private String timeframe;
     private List<CandleData> candles;
     private LocalDateTime lastUpdateTime;
-    private String subscriptionId; // Add this field
+    private String subscriptionId;
 
-    // Inner class for candle data
     public static class CandleData {
         private LocalDateTime timestamp;
         private BigDecimal openPrice;
@@ -22,9 +21,8 @@ public class CandleDataResponse {
         private BigDecimal highPrice;
         private BigDecimal lowPrice;
         private BigDecimal volume;
-        private Long sequence; // Added sequence field
+        private Long sequence;
 
-        // Getters and setters
         public LocalDateTime getTimestamp() {
             return timestamp;
         }
@@ -82,7 +80,6 @@ public class CandleDataResponse {
         }
     }
 
-    // Getters and setters for main class
     public boolean isSuccess() {
         return success;
     }
@@ -91,7 +88,6 @@ public class CandleDataResponse {
         this.success = success;
     }
 
-    // Other getters and setters...
     public String getMessage() {
         return message;
     }

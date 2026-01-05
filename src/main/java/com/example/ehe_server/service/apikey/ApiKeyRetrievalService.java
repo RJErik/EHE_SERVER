@@ -2,10 +2,7 @@ package com.example.ehe_server.service.apikey;
 
 import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.ApiKeyResponse;
-import com.example.ehe_server.exception.custom.MissingUserIdException;
-import com.example.ehe_server.exception.custom.UserNotFoundException;
 import com.example.ehe_server.repository.ApiKeyRepository;
-import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.apikey.ApiKeyRetrievalServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,13 +15,10 @@ import java.util.stream.Collectors;
 public class ApiKeyRetrievalService implements ApiKeyRetrievalServiceInterface {
 
     private final ApiKeyRepository apiKeyRepository;
-    private final UserRepository userRepository;
 
     public ApiKeyRetrievalService(
-            ApiKeyRepository apiKeyRepository,
-            UserRepository userRepository) {
+            ApiKeyRepository apiKeyRepository) {
         this.apiKeyRepository = apiKeyRepository;
-        this.userRepository = userRepository;
     }
 
     @LogMessage(
@@ -33,16 +27,6 @@ public class ApiKeyRetrievalService implements ApiKeyRetrievalServiceInterface {
     )
     @Override
     public List<ApiKeyResponse> getApiKeys(Integer userId) {
-
-        // Input validation checks
-        if (userId == null) {
-            throw new MissingUserIdException();
-        }
-
-        // Database integrity checks
-        if (!userRepository.existsById(userId)) {
-            throw new UserNotFoundException(userId);
-        }
 
         // Data retrieval and response mapping
         return apiKeyRepository.findByUser_UserIdOrderByDateAddedDesc(userId)
@@ -76,11 +60,6 @@ public class ApiKeyRetrievalService implements ApiKeyRetrievalServiceInterface {
         String lastPart = apiKeyValue.substring(apiKeyValue.length() - visibleCharCount);
         int maskedLength = apiKeyValue.length() - (2 * visibleCharCount);
 
-        StringBuilder maskedMiddle = new StringBuilder();
-        for (int i = 0; i < maskedLength; i++) {
-            maskedMiddle.append("*");
-        }
-
-        return firstPart + maskedMiddle + lastPart;
+        return firstPart + "*".repeat(maskedLength) + lastPart;
     }
 }

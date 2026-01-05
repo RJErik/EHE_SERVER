@@ -42,23 +42,6 @@ public class ApiKeyCreationService implements ApiKeyCreationServiceInterface {
     @Override
     public ApiKeyResponse createApiKey(Integer userId, String platformName, String apiKeyValue, String secretKey) {
 
-        // Input validation checks
-        if (userId == null) {
-            throw new MissingUserIdException();
-        }
-
-        if (platformName == null || platformName.trim().isEmpty()) {
-            throw new MissingPlatformNameException();
-        }
-
-        if (apiKeyValue == null || apiKeyValue.trim().isEmpty()) {
-            throw new MissingApiKeyValueException();
-        }
-
-        if (secretKey == null || secretKey.trim().isEmpty()) {
-            throw new MissingSecretKeyException();
-        }
-
         // Database integrity checks
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
@@ -70,7 +53,7 @@ public class ApiKeyCreationService implements ApiKeyCreationServiceInterface {
         ApiKey apiKey = new ApiKey();
         apiKey.setUser(user);
         apiKey.setPlatform(platform);
-        apiKey.setApiKeyValue(apiKeyValue); // Not encrypting for now as specified
+        apiKey.setApiKeyValue(apiKeyValue);
         apiKey.setSecretKey(secretKey);
 
         apiKeyRepository.save(apiKey);
@@ -99,11 +82,7 @@ public class ApiKeyCreationService implements ApiKeyCreationServiceInterface {
         String firstPart = apiKeyValue.substring(0, visibleCharCount);
         String lastPart = apiKeyValue.substring(apiKeyValue.length() - visibleCharCount);
         int maskedLength = apiKeyValue.length() - (2 * visibleCharCount);
-        StringBuilder maskedMiddle = new StringBuilder();
-        for (int i = 0; i < maskedLength; i++) {
-            maskedMiddle.append("*");
-        }
 
-        return firstPart + maskedMiddle + lastPart;
+        return firstPart + "*".repeat(maskedLength) + lastPart;
     }
 }

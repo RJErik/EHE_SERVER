@@ -12,15 +12,15 @@ import java.util.List;
 
 @Repository
 public interface AutomatedTradeRuleRepository extends JpaRepository<AutomatedTradeRule, Integer> {
-    @EntityGraph(attributePaths = {"portfolio", "platformStock"})
+    @EntityGraph(attributePaths = {"portfolio", "platformStock", "platformStock.platform", "platformStock.stock"})
     List<AutomatedTradeRule> findByUser_UserIdOrderByDateCreatedDesc(Integer userId);
 
-    @EntityGraph(attributePaths = {"portfolio", "platformStock"})
+    @EntityGraph(attributePaths = {"portfolio", "platformStock", "platformStock.platform", "platformStock.stock"})
     @Query("SELECT atr FROM AutomatedTradeRule atr WHERE " +
             "atr.user.userId = :userId AND " +
             "(:portfolioId IS NULL OR atr.portfolio.portfolioId = :portfolioId) AND " +
-            "(:platform IS NULL OR atr.platformStock.platformName = :platform) AND " +
-            "(:symbol IS NULL OR atr.platformStock.stockSymbol = :symbol) AND " +
+            "(:platform IS NULL OR atr.platformStock.platform.platformName = :platform) AND " +
+            "(:symbol IS NULL OR atr.platformStock.stock.stockSymbol = :symbol) AND " +
             "(:conditionType IS NULL OR atr.conditionType = :conditionType) AND " +
             "(:actionType IS NULL OR atr.actionType = :actionType) AND " +
             "(:quantityType IS NULL OR atr.quantityType = :quantityType) AND " +

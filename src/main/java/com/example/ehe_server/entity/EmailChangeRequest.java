@@ -18,22 +18,18 @@ public class EmailChangeRequest {
 
     @NotBlank
     @Email
-    @Pattern(regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
-            message = "Email must be in valid format")
+    @Pattern(regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
     @Column(name = "new_email", nullable = false)
     private String newEmail;
 
-    // Default constructor
     public EmailChangeRequest() {
     }
 
-    // Constructor with parameters
     public EmailChangeRequest(VerificationToken verificationToken, String newEmail) {
         this.verificationToken = verificationToken;
         this.newEmail = newEmail;
     }
 
-    // Getters and setters
     public Integer getEmailChangeRequestId() {
         return emailChangeRequestId;
     }

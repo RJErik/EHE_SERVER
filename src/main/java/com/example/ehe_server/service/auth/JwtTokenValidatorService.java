@@ -3,27 +3,29 @@ package com.example.ehe_server.service.auth;
 import com.example.ehe_server.entity.JwtRefreshToken;
 import com.example.ehe_server.repository.JwtRefreshTokenRepository;
 import com.example.ehe_server.service.intf.auth.JwtTokenValidatorInterface;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
+import com.example.ehe_server.service.intf.token.TokenHashServiceInterface;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.security.SignatureException;
-import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.interfaces.RSAPublicKey;
-import java.util.List;
+import java.util.Optional;
 
 @Service
+@Transactional
 public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
 
     private final RSAPublicKey publicKey;
     private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
+    private final TokenHashServiceInterface tokenHashService;
 
     public JwtTokenValidatorService(RSAPublicKey publicKey,
-                                    JwtRefreshTokenRepository jwtRefreshTokenRepository) {
+                                    JwtRefreshTokenRepository jwtRefreshTokenRepository,
+                                    TokenHashServiceInterface tokenHashService) {
         this.publicKey = publicKey;
         this.jwtRefreshTokenRepository = jwtRefreshTokenRepository;
+        this.tokenHashService = tokenHashService;
     }
 
     @Override
@@ -37,8 +39,7 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
                     .build()
                     .parseClaimsJws(token);
             return true;
-        } catch (SignatureException | MalformedJwtException | ExpiredJwtException e) {
-            // Invalid or expired token
+        } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }
@@ -49,28 +50,18 @@ public class JwtTokenValidatorService implements JwtTokenValidatorInterface {
             return false;
         }
         try {
-            Claims claims = Jwts.parserBuilder()
+            Jwts.parserBuilder()
                     .setSigningKey(publicKey)
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
 
-            // Extract user_id from the token claims
-            Integer userId = claims.get("user_id", Integer.class);
+            String hashedToken = tokenHashService.hashToken(token);
 
-            // Get only this user's refresh tokens from the database
-            List<JwtRefreshToken> userRefreshTokens = jwtRefreshTokenRepository.findByUser_UserId(userId);
+            Optional<JwtRefreshToken> storedToken = jwtRefreshTokenRepository.findByJwtRefreshTokenHash(hashedToken);
 
-            // Check if the provided token matches any of this user's stored hashes
-            for (JwtRefreshToken storedToken : userRefreshTokens) {
-                if (BCrypt.checkpw(token, storedToken.getJwtRefreshTokenHash())) {
-                    return true;
-                }
-            }
-            // No matching hash found
-            return false;
-        } catch (SignatureException | MalformedJwtException | ExpiredJwtException e) {
-            // Invalid or expired token
+            return storedToken.isPresent();
+        } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }

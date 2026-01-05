@@ -1,15 +1,15 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.annotation.validation.NotEmptyString;
 import com.example.ehe_server.dto.*;
-import com.example.ehe_server.properties.FrontendProperties;
-import com.example.ehe_server.service.audit.UserContextService;
+import com.example.ehe_server.exception.custom.MissingVerificationTokenException;
 import com.example.ehe_server.service.intf.auth.*;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -17,9 +17,9 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
+@Validated
 public class AuthController {
 
-    private final LogInServiceInterface logInService;
     private final RegistrationServiceInterface registrationService;
     private final RegistrationVerificationServiceInterface registrationVerificationService;
     private final RegistrationVerificationResendServiceInterface registrationVerificationResendService;
@@ -28,11 +28,8 @@ public class AuthController {
     private final PasswordResetServiceInterface passwordResetService;
     private final EmailChangeVerificationServiceInterface emailChangeVerificationService;
     private final MessageSource messageSource;
-    private final UserContextService userContextService;
-    private final FrontendProperties frontendProperties;
 
     public AuthController(
-            LogInServiceInterface logInService,
             RegistrationServiceInterface registrationService,
             RegistrationVerificationServiceInterface registrationVerificationService,
             RegistrationVerificationResendServiceInterface registrationVerificationResendService,
@@ -40,10 +37,7 @@ public class AuthController {
             PasswordResetTokenValidationServiceInterface passwordResetTokenValidationService,
             PasswordResetServiceInterface passwordResetService,
             EmailChangeVerificationServiceInterface emailChangeVerificationService,
-            MessageSource messageSource,
-            UserContextService userContextService,
-            FrontendProperties frontendProperties) {
-        this.logInService = logInService;
+            MessageSource messageSource) {
         this.registrationService = registrationService;
         this.registrationVerificationService = registrationVerificationService;
         this.registrationVerificationResendService = registrationVerificationResendService;
@@ -52,47 +46,13 @@ public class AuthController {
         this.passwordResetService = passwordResetService;
         this.emailChangeVerificationService = emailChangeVerificationService;
         this.messageSource = messageSource;
-        this.userContextService = userContextService;
-        this.frontendProperties = frontendProperties;
     }
 
     /**
-     * POST /api/auth/login
-     * Authenticate user and create session
+     * POST /api/auth/users
+     * Register a new user account.
      */
-    @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(
-            @Valid @RequestBody LoginRequest request,
-            HttpServletResponse response) {
-
-        logInService.authenticateUser(request.getEmail(), request.getPassword(), response);
-
-        String successMessage = messageSource.getMessage(
-                "success.message.auth.login",
-                null,
-                LocaleContextHolder.getLocale()
-        );
-
-        Map<String, Object> responseBody = new HashMap<>();
-        responseBody.put("success", true);
-        responseBody.put("message", successMessage);
-
-        if (userContextService.getCurrentUserRole().contains("ROLE_ADMIN")) {
-            responseBody.put("redirectUrl", frontendProperties.getUrl() + frontendProperties.getAdmin());
-        } else {
-            String fullUrl = frontendProperties.getUrl() + frontendProperties.getUser().getSuffix();
-            responseBody.put("redirectUrl", fullUrl);
-        }
-
-        return ResponseEntity.ok(responseBody);
-    }
-
-    /**
-     * POST /api/auth/register
-     * Register a new user account
-     * Returns 201 Created since a new resource (user) is created
-     */
-    @PostMapping("/register")
+    @PostMapping("/users")
     public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegistrationRequest request) {
 
         registrationService.registerUser(
@@ -112,15 +72,14 @@ public class AuthController {
         responseBody.put("message", successMessage);
         responseBody.put("showResendButton", true);
 
-        // 201 Created - a new user resource was created
         return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 
     /**
-     * POST /api/auth/verification/resend
-     * Resend registration verification email
+     * POST /api/auth/verification-requests
+     * Request a new verification email to be sent.
      */
-    @PostMapping("/verification/resend")
+    @PostMapping("/verification-requests")
     public ResponseEntity<Map<String, Object>> resendVerification(
             @Valid @RequestBody ResendVerificationRequest request) {
 
@@ -136,15 +95,18 @@ public class AuthController {
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        return ResponseEntity.ok(responseBody);
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 
     /**
-     * GET /api/auth/verification?token=xxx
-     * Verify registration token (typically called from email link)
+     * GET /api/auth/registrations/{token}
+     * Verify and complete registration using the token.
      */
-    @GetMapping("/verification")
-    public ResponseEntity<Map<String, Object>> verifyRegistration(@RequestParam String token) {
+    @GetMapping("/registrations/{token}")
+    public ResponseEntity<Map<String, Object>> verifyRegistration(
+            @NotEmptyString(exception = MissingVerificationTokenException.class)
+            @PathVariable
+            String token) {
 
         registrationVerificationService.verifyRegistrationToken(token);
 
@@ -162,10 +124,10 @@ public class AuthController {
     }
 
     /**
-     * POST /api/auth/password/forgot
-     * Request password reset email
+     * POST /api/auth/password-reset-requests
+     * Request a password reset email.
      */
-    @PostMapping("/password/forgot")
+    @PostMapping("/password-reset-requests")
     public ResponseEntity<Map<String, Object>> requestPasswordReset(
             @Valid @RequestBody PasswordResetRequest request) {
 
@@ -181,15 +143,18 @@ public class AuthController {
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        return ResponseEntity.ok(responseBody);
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 
     /**
-     * GET /api/auth/password/validate?token=xxx
-     * Validate password reset token before showing reset form
+     * GET /api/auth/password-reset-tokens/{token}
+     * Retrieve and validate a password reset token.
      */
-    @GetMapping("/password/validate")
-    public ResponseEntity<Map<String, Object>> validatePasswordResetToken(@RequestParam String token) {
+    @GetMapping("/password-reset-tokens/{token}")
+    public ResponseEntity<Map<String, Object>> validatePasswordResetToken(
+            @NotEmptyString(exception = MissingVerificationTokenException.class)
+            @PathVariable
+            String token) {
 
         passwordResetTokenValidationService.validatePasswordResetToken(token);
 
@@ -207,10 +172,10 @@ public class AuthController {
     }
 
     /**
-     * POST /api/auth/password/reset
-     * Reset password with valid token
+     * POST /api/auth/password-resets
+     * Execute a password reset with a valid token.
      */
-    @PostMapping("/password/reset")
+    @PostMapping("/password-resets")
     public ResponseEntity<Map<String, Object>> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {
 
@@ -230,11 +195,14 @@ public class AuthController {
     }
 
     /**
-     * GET /api/auth/email/verify?token=xxx
-     * Verify email change token
+     * GET /api/auth/email-verifications/{token}
+     * Verify and complete an email change using the token.
      */
-    @GetMapping("/email/verify")
-    public ResponseEntity<Map<String, Object>> validateEmailChange(@RequestParam String token) {
+    @GetMapping("/email-verifications/{token}")
+    public ResponseEntity<Map<String, Object>> validateEmailChange(
+            @NotEmptyString(exception = MissingVerificationTokenException.class)
+            @PathVariable
+            String token) {
 
         emailChangeVerificationService.validateEmailChange(token);
 

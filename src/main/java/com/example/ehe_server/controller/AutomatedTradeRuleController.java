@@ -1,6 +1,8 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.annotation.validation.NotNullField;
 import com.example.ehe_server.dto.*;
+import com.example.ehe_server.exception.custom.MissingAutomatedTradeRuleIdException;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeRuleSearchServiceInterface;
 import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeRuleRetrievalServiceInterface;
@@ -11,6 +13,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -19,6 +22,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/user/automated-trade-rules")
+@Validated
 public class AutomatedTradeRuleController {
 
     private final AutomatedTradeRuleRetrievalServiceInterface automatedTradeRuleRetrievalService;
@@ -97,7 +101,6 @@ public class AutomatedTradeRuleController {
         responseBody.put("message", successMessage);
         responseBody.put("automatedTradeRule", automatedTradeRuleCreationResponse);
 
-        // 201 Created is more appropriate for resource creation
         return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 
@@ -106,7 +109,10 @@ public class AutomatedTradeRuleController {
      * Remove (deactivate) an automated trade rule
      */
     @DeleteMapping("/{ruleId}")
-    public ResponseEntity<Map<String, Object>> removeAutomatedTradeRule(@PathVariable Integer ruleId) {
+    public ResponseEntity<Map<String, Object>> removeAutomatedTradeRule(
+            @NotNullField(exception = MissingAutomatedTradeRuleIdException.class)
+            @PathVariable
+            Integer ruleId) {
         automatedTradeRuleRemovalService.removeAutomatedTradeRule(
                 userContextService.getCurrentUserId(),
                 ruleId);

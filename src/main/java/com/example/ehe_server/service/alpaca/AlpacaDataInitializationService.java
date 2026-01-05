@@ -26,7 +26,6 @@ public class AlpacaDataInitializationService {
     private final UserContextService userContextService;
     private final MarketHoursService marketHoursService;
 
-    // Track which symbols are live and synced
     private final Set<String> liveSymbols = ConcurrentHashMap.newKeySet();
     private final Map<String, Boolean> historicalSyncInProgress = new ConcurrentHashMap<>();
 
@@ -68,7 +67,7 @@ public class AlpacaDataInitializationService {
                 List<PlatformStock> cryptoSymbols = new ArrayList<>();
 
                 for (PlatformStock stock : stocks) {
-                    String stockName = stock.getStock().getStockName();
+                    String stockName = stock.getStock().getStockSymbol();
                     if (isCryptoSymbol(stockName)) {
                         cryptoSymbols.add(stock);
                     } else {
@@ -81,7 +80,7 @@ public class AlpacaDataInitializationService {
 
                 // Initialize crypto symbols immediately (24/7 market)
                 for (PlatformStock crypto : cryptoSymbols) {
-                    setupSymbol(crypto.getStock().getStockName());
+                    setupSymbol(crypto.getStock().getStockSymbol());
                 }
 
                 // Initialize stock symbols only if market is open, otherwise schedule for next open
@@ -89,7 +88,7 @@ public class AlpacaDataInitializationService {
                     if (marketHoursService.isMarketOpen()) {
                         loggingService.logAction("Market is open, initializing stock symbols");
                         for (PlatformStock stock : stockSymbols) {
-                            setupSymbol(stock.getStock().getStockName());
+                            setupSymbol(stock.getStock().getStockSymbol());
                         }
                     } else {
                         loggingService.logAction("Market is closed. Stock data will sync on next market open");
@@ -171,7 +170,7 @@ public class AlpacaDataInitializationService {
             List<PlatformStock> stocks = stockRepository.findByPlatformPlatformName(PLATFORM_NAME);
 
             for (PlatformStock stock : stocks) {
-                String symbol = stock.getStock().getStockName();
+                String symbol = stock.getStock().getStockSymbol();
 
                 // Skip if syncing or not live
                 if (historicalSyncInProgress.getOrDefault(symbol, false)) {
@@ -202,7 +201,7 @@ public class AlpacaDataInitializationService {
             List<PlatformStock> stocks = stockRepository.findByPlatformPlatformName(PLATFORM_NAME);
 
             for (PlatformStock stock : stocks) {
-                String symbol = stock.getStock().getStockName();
+                String symbol = stock.getStock().getStockSymbol();
 
                 // Only initialize stock symbols (not crypto)
                 if (!isCryptoSymbol(symbol) && !liveSymbols.contains(symbol)) {
@@ -266,7 +265,7 @@ public class AlpacaDataInitializationService {
     }
 
     private PlatformStock getStock(String symbol) {
-        List<PlatformStock> stocks = stockRepository.findByPlatformPlatformNameAndStockStockName(
+        List<PlatformStock> stocks = stockRepository.findByPlatformPlatformNameAndStockStockSymbol(
                 PLATFORM_NAME, symbol);
         return stocks.isEmpty() ? null : stocks.get(0);
     }

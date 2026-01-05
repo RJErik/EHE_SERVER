@@ -7,7 +7,6 @@ public class PortfolioSearchRequest {
     private BigDecimal minValue;
     private BigDecimal maxValue;
 
-    // Getters and setters
     public String getPlatform() {
         return platform;
     }

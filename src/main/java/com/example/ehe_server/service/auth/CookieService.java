@@ -1,13 +1,21 @@
 package com.example.ehe_server.service.auth;
 
+import com.example.ehe_server.exception.custom.MissingJwtAccessTokenException;
+import com.example.ehe_server.exception.custom.MissingJwtRefreshTokenException;
 import com.example.ehe_server.properties.JwtProperties;
 import com.example.ehe_server.service.intf.auth.CookieServiceInterface;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 public class CookieService implements CookieServiceInterface {
+
+    @Value("${spring.security.require-https}")
+    private boolean requireHttps;
 
     private final JwtProperties jwtConfig;
 
@@ -18,11 +26,11 @@ public class CookieService implements CookieServiceInterface {
     @Override
     public void addJwtAccessCookie(String jwtToken, HttpServletResponse response) {
         if (jwtToken == null || jwtToken.trim().isEmpty())  {
-            throw new IllegalArgumentException("Jwt access token addition to cookie failed: Jwt access token is null or empty in");
+            throw new MissingJwtAccessTokenException();
         }
         Cookie cookie = new Cookie("jwt_access_token", jwtToken);
         cookie.setHttpOnly(true);
-        cookie.setSecure(false); //turn to true after development.
+        cookie.setSecure(requireHttps);
         cookie.setPath("/");
         cookie.setMaxAge((int) (jwtConfig.getJwtAccessExpirationTime() / 1000));
         cookie.setAttribute("SameSite", "Strict");
@@ -33,11 +41,11 @@ public class CookieService implements CookieServiceInterface {
     @Override
     public void addJwtRefreshCookie(String jwtToken, HttpServletResponse response) {
         if (jwtToken == null || jwtToken.trim().isEmpty())  {
-            throw new IllegalArgumentException("Jwt refresh token addition to cookie failed: jwtToken refresh token is null or empty");
+            throw new MissingJwtRefreshTokenException();
         }
         Cookie cookie = new Cookie("jwt_refresh_token", jwtToken);
         cookie.setHttpOnly(true);
-        cookie.setSecure(false); //turn to true after development.
+        cookie.setSecure(requireHttps);
         cookie.setPath("/");
         cookie.setMaxAge((int) (jwtConfig.getJwtRefreshExpirationTime() / 1000));
         cookie.setAttribute("SameSite", "Strict");
@@ -50,7 +58,7 @@ public class CookieService implements CookieServiceInterface {
         // Clear access token cookie
         Cookie accessCookie = new Cookie("jwt_access_token", "");
         accessCookie.setHttpOnly(true);
-        accessCookie.setSecure(false); //turn to true after development.
+        accessCookie.setSecure(requireHttps);
         accessCookie.setPath("/");
         accessCookie.setMaxAge(0);
         accessCookie.setAttribute("SameSite", "Strict");
@@ -60,7 +68,7 @@ public class CookieService implements CookieServiceInterface {
         // Clear refresh token cookie
         Cookie refreshCookie = new Cookie("jwt_refresh_token", "");
         refreshCookie.setHttpOnly(true);
-        refreshCookie.setSecure(false);  //turn to true after development.
+        refreshCookie.setSecure(requireHttps);
         refreshCookie.setPath("/");
         refreshCookie.setMaxAge(0);
         refreshCookie.setAttribute("SameSite", "Strict");

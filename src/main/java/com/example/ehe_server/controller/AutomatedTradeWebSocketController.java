@@ -1,9 +1,11 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.annotation.validation.NotEmptyString;
 import com.example.ehe_server.dto.websocket.AutomatedTradeSubscriptionResponse;
 import com.example.ehe_server.dto.websocket.AutomatedTradeUnsubscriptionRequest;
+import com.example.ehe_server.exception.custom.MissingSessionIdException;
 import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
-import com.example.ehe_server.service.intf.automatictrade.AutomatedTradeWebSocketSubscriptionManagerInterface;
+import com.example.ehe_server.service.intf.automatictrade.websocket.AutomatedTradeWebSocketSubscriptionManagerInterface;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.messaging.handler.annotation.Header;
@@ -12,11 +14,13 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Controller;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Controller
+@Validated
 public class AutomatedTradeWebSocketController {
 
     private final AutomatedTradeWebSocketSubscriptionManagerInterface automatedTradeWebSocketSubscriptionManager;
@@ -34,7 +38,11 @@ public class AutomatedTradeWebSocketController {
 
     @MessageMapping("/automated-trades/subscribe")
     @SendToUser("/queue/automated-trades")
-    public Map<String, Object> subscribeToAutomatedTrades(@Header("simpSessionId") String sessionId, StompHeaderAccessor headerAccessor) {
+    public Map<String, Object> subscribeToAutomatedTrades(
+            @NotEmptyString(exception = MissingSessionIdException.class)
+            @Header("simpSessionId")
+            String sessionId,
+            StompHeaderAccessor headerAccessor) {
 
         Map<String, Object> response = new HashMap<>();
 

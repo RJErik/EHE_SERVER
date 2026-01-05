@@ -16,7 +16,6 @@ public class PaginatedResponse<T> {
         this.items = items;
     }
 
-    // Getters and setters
     public int getCurrentPage() { return currentPage; }
     public void setCurrentPage(int currentPage) { this.currentPage = currentPage; }
     public int getTotalPages() { return totalPages; }

@@ -1,5 +1,12 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.annotation.validation.MinValue;
+import com.example.ehe_server.annotation.validation.NotNullField;
+import com.example.ehe_server.entity.Transaction;
+import com.example.ehe_server.exception.custom.InvalidPageNumberException;
+import com.example.ehe_server.exception.custom.InvalidPageSizeException;
+import com.example.ehe_server.exception.custom.MissingPageNumberException;
+import com.example.ehe_server.exception.custom.MissingPageSizeException;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.math.BigDecimal;
@@ -12,7 +19,6 @@ public class TransactionSearchRequest {
     private String platform;
     private String symbol;
 
-    // Spring handles the conversion automatically with @DateTimeFormat
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime fromTime;
 
@@ -23,15 +29,20 @@ public class TransactionSearchRequest {
     private BigDecimal toAmount;
     private BigDecimal fromPrice;
     private BigDecimal toPrice;
-    private String type;
-    private String status;
+    private Transaction.TransactionType type;
+    private Transaction.Status status;
+    @NotNullField(exception = MissingPageSizeException.class)
+    @MinValue(exception = InvalidPageSizeException.class,
+            min = 1)
     private Integer size;
+    @NotNullField(exception = MissingPageNumberException.class)
+    @MinValue(exception = InvalidPageNumberException.class,
+            min = 0)
     private Integer page;
 
     public TransactionSearchRequest() {
     }
 
-    // Getters and Setters
     public Integer getUserId() {
         return userId;
     }
@@ -112,19 +123,19 @@ public class TransactionSearchRequest {
         this.toPrice = toPrice;
     }
 
-    public String getType() {
+    public Transaction.TransactionType getType() {
         return type;
     }
 
-    public void setType(String type) {
+    public void setType(Transaction.TransactionType type) {
         this.type = type;
     }
 
-    public String getStatus() {
+    public Transaction.Status getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(Transaction.Status status) {
         this.status = status;
     }
 

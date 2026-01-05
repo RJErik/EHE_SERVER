@@ -1,21 +1,26 @@
 package com.example.ehe_server.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "verification_token")
 public class VerificationToken {
 
+    public VerificationToken() {
+    }
+
     public enum TokenType {
         REGISTRATION, PASSWORD_RESET, EMAIL_CHANGE
     }
 
     public enum TokenStatus {
-        ACTIVE,     // Token is valid and ready to be used
-        USED,       // Token has been successfully used
-        EXPIRED,    // Token passed its expiry date without being used
-        INVALIDATED // Token was superseded by a newer token (e.g., resend)
+        ACTIVE,
+        USED,
+        EXPIRED,
+        INVALIDATED
     }
 
     @Id
@@ -36,28 +41,22 @@ public class VerificationToken {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private TokenStatus status = TokenStatus.ACTIVE; // Default status
+    private TokenStatus status = TokenStatus.ACTIVE;
 
+    @CreationTimestamp
     @Column(name = "issue_date", nullable = false, updatable = false)
     private LocalDateTime issueDate;
 
     @Column(name = "expiry_date", nullable = false)
     private LocalDateTime expiryDate;
 
-    // --- Constructors ---
-    public VerificationToken() {
-        this.issueDate = LocalDateTime.now(); // Default issue date
-    }
-
     public VerificationToken(User user, String tokenHash, TokenType tokenType, LocalDateTime expiryDate) {
-        this(); // Call default constructor
         this.user = user;
         this.tokenHash = tokenHash;
         this.tokenType = tokenType;
         this.expiryDate = expiryDate;
     }
 
-    // --- Getters and Setters ---
     public Integer getVerificationTokenId() {
         return verificationTokenId;
     }

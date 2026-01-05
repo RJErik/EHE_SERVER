@@ -1,6 +1,10 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.entity.AutomatedTradeRule;
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 public class AutomatedTradeRuleResponse {
@@ -9,18 +13,17 @@ public class AutomatedTradeRuleResponse {
     private String portfolioName;
     private String platform;
     private String symbol;
-    private String conditionType;
-    private String actionType;
-    private String quantityType;
+    private AutomatedTradeRule.ConditionType conditionType;
+    private AutomatedTradeRule.ActionType actionType;
+    private AutomatedTradeRule.QuantityType quantityType;
     private BigDecimal quantity;
     private BigDecimal thresholdValue;
-    private String dateCreated;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime dateCreated;
 
-    // No-argument constructor
     public AutomatedTradeRuleResponse() {}
 
-    // All-argument constructor
-    public AutomatedTradeRuleResponse(Integer id, Integer portfolioId, String portfolioName, String platform, String symbol, String conditionType, String actionType, String quantityType, BigDecimal quantity, BigDecimal thresholdValue, String dateCreated) {
+    public AutomatedTradeRuleResponse(Integer id, Integer portfolioId, String portfolioName, String platform, String symbol, AutomatedTradeRule.ConditionType conditionType, AutomatedTradeRule.ActionType actionType, AutomatedTradeRule.QuantityType quantityType, BigDecimal quantity, BigDecimal thresholdValue, LocalDateTime dateCreated) {
         this.id = id;
         this.portfolioId = portfolioId;
         this.portfolioName = portfolioName;
@@ -34,7 +37,6 @@ public class AutomatedTradeRuleResponse {
         this.dateCreated = dateCreated;
     }
 
-    // Getters and Setters
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
 
@@ -50,14 +52,14 @@ public class AutomatedTradeRuleResponse {
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
 
-    public String getConditionType() { return conditionType; }
-    public void setConditionType(String conditionType) { this.conditionType = conditionType; }
+    public AutomatedTradeRule.ConditionType getConditionType() { return conditionType; }
+    public void setConditionType(AutomatedTradeRule.ConditionType conditionType) { this.conditionType = conditionType; }
 
-    public String getActionType() { return actionType; }
-    public void setActionType(String actionType) { this.actionType = actionType; }
+    public AutomatedTradeRule.ActionType getActionType() { return actionType; }
+    public void setActionType(AutomatedTradeRule.ActionType actionType) { this.actionType = actionType; }
 
-    public String getQuantityType() { return quantityType; }
-    public void setQuantityType(String quantityType) { this.quantityType = quantityType; }
+    public AutomatedTradeRule.QuantityType getQuantityType() { return quantityType; }
+    public void setQuantityType(AutomatedTradeRule.QuantityType quantityType) { this.quantityType = quantityType; }
 
     public BigDecimal getQuantity() { return quantity; }
     public void setQuantity(BigDecimal quantity) { this.quantity = quantity; }
@@ -65,8 +67,8 @@ public class AutomatedTradeRuleResponse {
     public BigDecimal getThresholdValue() { return thresholdValue; }
     public void setThresholdValue(BigDecimal thresholdValue) { this.thresholdValue = thresholdValue; }
 
-    public String getDateCreated() { return dateCreated; }
-    public void setDateCreated(String dateCreated) { this.dateCreated = dateCreated; }
+    public LocalDateTime getDateCreated() { return dateCreated; }
+    public void setDateCreated(LocalDateTime dateCreated) { this.dateCreated = dateCreated; }
 
     @Override
     public boolean equals(Object o) {

@@ -19,7 +19,6 @@ public class HoldingDetails {
         this.valueInUsdt = valueInUsdt;
     }
 
-    // Getters, Setters, and standard boilerplate (equals, hashCode)
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
     public String getSymbol() { return symbol; }

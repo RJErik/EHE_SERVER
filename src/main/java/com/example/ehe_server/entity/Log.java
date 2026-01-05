@@ -1,6 +1,8 @@
 package com.example.ehe_server.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -19,8 +21,8 @@ public class Log {
     @Column(name = "log_description", nullable = false, columnDefinition = "TEXT")
     private String logDescription;
 
-    @Column(name = "log_date", nullable = false, updatable = false,
-            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    @CreationTimestamp
+    @Column(name = "log_date", nullable = false, updatable = false)
     private LocalDateTime logDate;
 
     @PrePersist
@@ -30,7 +32,6 @@ public class Log {
         }
     }
 
-    // Getters and setters
     public Integer getLogId() {
         return logId;
     }

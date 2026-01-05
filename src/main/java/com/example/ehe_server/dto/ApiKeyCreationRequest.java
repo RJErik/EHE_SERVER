@@ -1,13 +1,20 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.annotation.validation.NotEmptyString;
+import com.example.ehe_server.exception.custom.MissingApiKeyValueException;
+import com.example.ehe_server.exception.custom.MissingPlatformNameException;
+import com.example.ehe_server.exception.custom.MissingSecretKeyException;
+
 public class ApiKeyCreationRequest {
+    @NotEmptyString(exception = MissingPlatformNameException.class)
     private String platformName;
 
+    @NotEmptyString(exception = MissingApiKeyValueException.class)
     private String apiKeyValue;
 
+    @NotEmptyString(exception = MissingSecretKeyException.class)
     private String secretKey;
 
-    // Getters and setters
     public String getPlatformName() {
         return platformName;
     }

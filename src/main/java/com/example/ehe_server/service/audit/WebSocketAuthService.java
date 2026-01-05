@@ -5,11 +5,13 @@ import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service to handle WebSocket authentication operations
  */
 @Service
+@Transactional
 public class WebSocketAuthService implements WebSocketAuthServiceInterface {
 
     private final LoggingServiceInterface loggingService;
@@ -21,24 +23,21 @@ public class WebSocketAuthService implements WebSocketAuthServiceInterface {
     @Override
     public Integer getUserIdFromWebSocketAuth(StompHeaderAccessor headerAccessor) {
         if (headerAccessor == null) {
-            loggingService.logError("StompHeaderAccessor is null", null);
             return null;
         }
 
         Authentication auth = (Authentication) headerAccessor.getUser();
         if (auth == null) {
-            loggingService.logError("No authentication found in WebSocket header", null);
             return null;
         }
 
         Object principal = auth.getPrincipal();
 
-        // Handle different principal types
         if (principal instanceof String) {
             try {
                 return Integer.parseInt((String) principal);
             } catch (NumberFormatException e) {
-                loggingService.logError("Failed to parse user ID from string principal: " + principal, e);
+                loggingService.logAction("Failed to parse user ID from string principal: " + principal);
                 return null;
             }
         } else if (principal instanceof Long) {
@@ -49,10 +48,5 @@ public class WebSocketAuthService implements WebSocketAuthServiceInterface {
 
         loggingService.logError("Unexpected principal type: " + (principal != null ? principal.getClass().getSimpleName() : "null"), null);
         return null;
-    }
-
-    @Override
-    public boolean isWebSocketUserAuthenticated(StompHeaderAccessor headerAccessor) {
-        return getUserIdFromWebSocketAuth(headerAccessor) != null;
     }
 }

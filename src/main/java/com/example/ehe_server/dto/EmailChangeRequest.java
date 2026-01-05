@@ -1,10 +1,20 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.annotation.validation.NotEmptyString;
+import com.example.ehe_server.annotation.validation.RegexPattern;
+import com.example.ehe_server.exception.custom.InvalidEmailFormatException;
+import com.example.ehe_server.exception.custom.MissingEmailException;
+
 public class EmailChangeRequest {
 
+    @NotEmptyString(exception = MissingEmailException.class)
+    @RegexPattern(
+            pattern = "^(?=.{1,255}$)[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+            exception = InvalidEmailFormatException.class,
+            params = {"$value"}
+    )
     private String newEmail;
 
-    // Getters and setters
     public String getNewEmail() {
         return newEmail;
     }

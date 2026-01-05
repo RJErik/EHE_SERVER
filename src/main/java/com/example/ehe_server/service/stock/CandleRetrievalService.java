@@ -34,34 +34,15 @@ public class CandleRetrievalService implements CandleRetrievalServiceInterface {
             params = {"#platform", "#stockSymbol", "#timeframe", "#fromSequence", "#toSequence", "#result.totalCandles"}
     )
     @Override
-    public CandlesResponse getCandlesBySequence(String platform, String stockSymbol, String timeframe,
+    public CandlesResponse getCandlesBySequence(String platform, String stockSymbol, MarketCandle.Timeframe timeframe,
                                                 Long fromSequence, Long toSequence) {
-        if (platform == null || platform.trim().isEmpty()) {
-            throw new MissingPlatformNameException();
-        }
-
-        if (stockSymbol == null || stockSymbol.trim().isEmpty()) {
-            throw new MissingStockSymbolException();
-        }
-
-        if (timeframe == null || timeframe.trim().isEmpty()) {
-            throw new MissingTimeframeException();
-        }
-
-        if (fromSequence == null || toSequence == null) {
-            throw new MissingSequenceNumberException();
-        }
-
         // Find the platform stock
         PlatformStock platformStock = findPlatformStock(platform, stockSymbol);
-
-        // Parse and validate timeframe
-        MarketCandle.Timeframe tf = parseTimeframe(timeframe);
 
         // Retrieve candles by sequence range (Now returns Projection)
         List<ICandleWithSequence> candles = marketCandleRepository.findByStockAndTimeframeAndSequenceRange(
                 platformStock.getPlatformStockId(),
-                tf,
+                timeframe,
                 fromSequence,
                 toSequence
         );
@@ -75,7 +56,7 @@ public class CandleRetrievalService implements CandleRetrievalServiceInterface {
         return new CandlesResponse(
                 platform,
                 stockSymbol,
-                timeframe,
+                timeframe.toString(),
                 candleDTOs.size(),
                 candleDTOs
         );
@@ -86,35 +67,16 @@ public class CandleRetrievalService implements CandleRetrievalServiceInterface {
             params = {"#platform", "#stockSymbol", "#timeframe", "#fromDate", "#toDate", "#result.totalCandles"}
     )
     @Override
-    public CandlesResponse getCandlesByDate(String platform, String stockSymbol, String timeframe,
+    public CandlesResponse getCandlesByDate(String platform, String stockSymbol, MarketCandle.Timeframe timeframe,
                                             LocalDateTime fromDate, LocalDateTime toDate) {
-        if (platform == null || platform.trim().isEmpty()) {
-            throw new MissingPlatformNameException();
-        }
-
-        if (stockSymbol == null || stockSymbol.trim().isEmpty()) {
-            throw new MissingStockSymbolException();
-        }
-
-        if (timeframe == null || timeframe.trim().isEmpty()) {
-            throw new MissingTimeframeException();
-        }
-
-        if (fromDate == null || toDate == null) {
-            throw new MissingDateRangeException();
-        }
-
         // Find the platform stock
         PlatformStock platformStock = findPlatformStock(platform, stockSymbol);
-
-        // Parse and validate timeframe
-        MarketCandle.Timeframe tf = parseTimeframe(timeframe);
 
         // Retrieve candles by date range (Using new method to get sequence numbers)
         List<ICandleWithSequence> candles = marketCandleRepository
                 .findCandlesByDateRangeWithSequence(
                         platformStock.getPlatformStockId(),
-                        tf,
+                        timeframe,
                         fromDate,
                         toDate
                 );
@@ -128,7 +90,7 @@ public class CandleRetrievalService implements CandleRetrievalServiceInterface {
         return new CandlesResponse(
                 platform,
                 stockSymbol,
-                timeframe,
+                timeframe.toString(),
                 candleDTOs.size(),
                 candleDTOs
         );
@@ -136,7 +98,7 @@ public class CandleRetrievalService implements CandleRetrievalServiceInterface {
 
     private PlatformStock findPlatformStock(String platform, String stockSymbol) {
         List<PlatformStock> platformStocks = platformStockRepository
-                .findByPlatformPlatformNameAndStockStockName(platform, stockSymbol);
+                .findByPlatformPlatformNameAndStockStockSymbol(platform, stockSymbol);
 
         if (platformStocks.isEmpty()) {
             throw new PlatformStockNotFoundException(platform, stockSymbol);
@@ -145,21 +107,6 @@ public class CandleRetrievalService implements CandleRetrievalServiceInterface {
         return platformStocks.getFirst();
     }
 
-
-    private MarketCandle.Timeframe parseTimeframe(String timeframe) {
-        try {
-            return MarketCandle.Timeframe.fromValue(timeframe);
-        } catch (IllegalArgumentException e) {
-            throw new InvalidTimeframeException(timeframe);
-        }
-    }
-
-    /**
-     * Converts a Projection Interface to CandleDTO
-     *
-     * @param candle The ICandleWithSequence projection
-     * @return CandleDTO with sequence
-     */
     private CandleDTO convertToDTO(ICandleWithSequence candle) {
         return new CandleDTO(
                 candle.getMarketCandleId(),
@@ -169,7 +116,7 @@ public class CandleRetrievalService implements CandleRetrievalServiceInterface {
                 candle.getHighPrice(),
                 candle.getLowPrice(),
                 candle.getVolume(),
-                candle.getSequence() // Map the sequence number
+                candle.getSequence()
         );
     }
 }

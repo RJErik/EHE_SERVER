@@ -8,9 +8,12 @@ import io.jsonwebtoken.MalformedJwtException;
 import org.springframework.stereotype.Service;
 
 import io.jsonwebtoken.security.SignatureException;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.security.interfaces.RSAPublicKey;
 
 @Service
+@Transactional
 public class JwtClaimService implements JwtClaimServiceInterface {
 
     private final RSAPublicKey publicKey;
@@ -19,26 +22,14 @@ public class JwtClaimService implements JwtClaimServiceInterface {
         this.publicKey = publicKey;
     }
 
-    public static class TokenDetails {
-        private final Integer userId;
-        private final String role;
-
-        public TokenDetails(Integer userId, String role) {
-            this.userId = userId;
-            this.role = role;
-        }
-
-        public Integer getUserId() { return userId; }
-        public String getRole() { return role; }
+    public record TokenDetails(Integer userId, String role) {
     }
 
     public TokenDetails parseTokenDetails(String token) {
-        // Fail Fast
         if (token == null || token.trim().isEmpty()) {
             return null;
         }
 
-        // Expensive Crypto Math happens ONLY here
         Claims claims = extractClaims(token);
 
         if (claims != null) {

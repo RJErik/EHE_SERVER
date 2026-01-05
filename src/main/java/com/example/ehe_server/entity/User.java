@@ -2,10 +2,12 @@ package com.example.ehe_server.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "\"user\"") // Escape reserved keyword
+@Table(name = "\"user\"")
 public class User {
 
     public enum AccountStatus { ACTIVE, SUSPENDED, NONVERIFIED }
@@ -33,11 +35,10 @@ public class User {
     @Column(name = "account_status", nullable = false, length = 50)
     private AccountStatus accountStatus;
 
-    @Column(name = "registration_date", nullable = false, updatable = false,
-            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    @CreationTimestamp
+    @Column(name = "registration_date", nullable = false, updatable = false)
     private LocalDateTime registrationDate;
 
-    // Getters and setters
     public Integer getUserId() {
         return userId;
     }

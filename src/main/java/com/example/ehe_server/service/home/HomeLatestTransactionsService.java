@@ -6,11 +6,13 @@ import com.example.ehe_server.entity.Transaction;
 import com.example.ehe_server.repository.TransactionRepository;
 import com.example.ehe_server.service.intf.home.HomeLatestTransactionsServiceInterface;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.List;
 
 @Service
+@Transactional(readOnly = true)
 public class HomeLatestTransactionsService implements HomeLatestTransactionsServiceInterface {
     private final TransactionRepository transactionRepository;
     private final SecureRandom random = new SecureRandom();
@@ -78,7 +80,7 @@ public class HomeLatestTransactionsService implements HomeLatestTransactionsServ
                 .map(transaction -> new HomeLatestTransactionsResponse(
                         this.generatePseudonym(),
                         transaction.getPlatformStock().getPlatform().getPlatformName(),
-                        transaction.getPlatformStock().getStock().getStockName(),
+                        transaction.getPlatformStock().getStock().getStockSymbol(),
                         transaction.getQuantity(),
                         transaction.getTransactionType().toString()
                 ))

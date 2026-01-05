@@ -15,7 +15,6 @@ public class CashDetails {
         this.value = value;
     }
 
-    // Getters and Setters
     public String getCurrency() { return currency; }
     public void setCurrency(String currency) { this.currency = currency; }
     public BigDecimal getValue() { return value; }

@@ -17,7 +17,6 @@ public class BinanceApiClient implements BinanceApiClientInterface {
     private static final String API_BASE_URL = "https://api.binance.com";
     private final LoggingServiceInterface loggingService;
 
-    // Rate limit tracking
     private final Map<String, Long> requestWindowStartMap = new ConcurrentHashMap<>();
     private final Map<String, Integer> requestCountMap = new ConcurrentHashMap<>();
     private static final int WEIGHT_LIMIT_PER_MINUTE = 1200;
@@ -42,8 +41,6 @@ public class BinanceApiClient implements BinanceApiClientInterface {
 
         HttpHeaders headers = new HttpHeaders();
         HttpEntity<?> entity = new HttpEntity<>(headers);
-
-        //SYSTEM SET HERE
 
         loggingService.logAction("Requesting Binance klines: " + builder.toUriString());
         ResponseEntity<String> response = restTemplate.exchange(
@@ -112,7 +109,6 @@ public class BinanceApiClient implements BinanceApiClientInterface {
     private void updateRateLimitFromHeaders(HttpHeaders headers) {
         if (headers.containsKey("X-MBX-USED-WEIGHT-1M")) {
             String usedWeight = headers.getFirst("X-MBX-USED-WEIGHT-1M");
-            //SYSTEM SET HERE
             loggingService.logAction("Current Binance API weight: " + usedWeight + "/" + WEIGHT_LIMIT_PER_MINUTE);
         }
     }

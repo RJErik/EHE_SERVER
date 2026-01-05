@@ -1,13 +1,17 @@
 // src/main/java/com/example/ehe_server/dto/portfolio/PortfolioDetailsResponse.java
 package com.example.ehe_server.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
 public class PortfolioDetailsResponse {
     private String name;
-    private String creationDate;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime creationDate;
     private String platform;
     private CashDetails reservedCash;
     private List<StockDetails> stocks;
@@ -15,7 +19,7 @@ public class PortfolioDetailsResponse {
 
     public PortfolioDetailsResponse() {}
 
-    public PortfolioDetailsResponse(String name, String creationDate, String platform, CashDetails reservedCash, List<StockDetails> stocks, BigDecimal totalValue) {
+    public PortfolioDetailsResponse(String name, LocalDateTime creationDate, String platform, CashDetails reservedCash, List<StockDetails> stocks, BigDecimal totalValue) {
         this.name = name;
         this.creationDate = creationDate;
         this.platform = platform;
@@ -24,11 +28,10 @@ public class PortfolioDetailsResponse {
         this.totalValue = totalValue;
     }
 
-    // Getters and Setters
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
-    public String getCreationDate() { return creationDate; }
-    public void setCreationDate(String creationDate) { this.creationDate = creationDate; }
+    public LocalDateTime getCreationDate() { return creationDate; }
+    public void setCreationDate(LocalDateTime creationDate) { this.creationDate = creationDate; }
     public String getPlatform() { return platform; }
     public void setPlatform(String platform) { this.platform = platform; }
     public CashDetails getReservedCash() { return reservedCash; }

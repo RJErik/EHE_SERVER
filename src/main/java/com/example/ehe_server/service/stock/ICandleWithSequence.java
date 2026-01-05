@@ -11,5 +11,5 @@ public interface ICandleWithSequence {
     BigDecimal getHighPrice();
     BigDecimal getLowPrice();
     BigDecimal getVolume();
-    Long getSequence(); // The calculated row number
+    Long getSequence();
 }

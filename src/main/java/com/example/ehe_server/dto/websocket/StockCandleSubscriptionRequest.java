@@ -8,9 +8,8 @@ public class StockCandleSubscriptionRequest {
     private String timeframe;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
-    private String subscriptionType; // Also add this to support frontend type differentiation
+    private String subscriptionType;
 
-    // Getters and setters
     public String getPlatformName() {
         return platformName;
     }

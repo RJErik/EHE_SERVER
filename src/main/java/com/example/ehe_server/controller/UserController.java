@@ -14,12 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * REST controller for user account management.
- *
- * Resource: User Account / Profile
- * Base path: /api/user
- */
 @RestController
 @RequestMapping("/api/user")
 public class UserController {

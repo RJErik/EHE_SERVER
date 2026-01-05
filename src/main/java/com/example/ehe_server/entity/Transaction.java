@@ -2,11 +2,13 @@ package com.example.ehe_server.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "\"transaction\"") // Escaped because transaction is a reserved word
+@Table(name = "\"transaction\"")
 public class Transaction {
 
     public enum TransactionType {BUY, SELL}
@@ -39,15 +41,14 @@ public class Transaction {
     @Column(name = "price", nullable = false, precision = 18, scale = 8)
     private BigDecimal price;
 
-    @Column(name = "transaction_date", nullable = false, updatable = false,
-            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    @CreationTimestamp
+    @Column(name = "transaction_date", nullable = false, updatable = false)
     private LocalDateTime transactionDate;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     private Status status;
 
-    // Getters and setters
     public Integer getTransactionId() {
         return transactionId;
     }

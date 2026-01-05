@@ -2,8 +2,6 @@ package com.example.ehe_server.service.intf.stock;
 
 import com.example.ehe_server.dto.StocksByPlatformResponse;
 
-import java.util.Map;
-
 public interface StockServiceInterface {
     /**
      * Retrieves all stocks available for a specific platform

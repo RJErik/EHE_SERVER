@@ -25,7 +25,7 @@ import java.util.Collections;
 import java.util.Optional;
 
 @Component
-@Order(1)  // Run BEFORE Spring Security's authorization layer
+@Order(1)
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenValidatorInterface jwtTokenValidator;
@@ -69,9 +69,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // Try to authenticate the user (if token exists)
-        // Doesn't matter if it fails or succeeds—SecurityContext will be populated or empty
-        // Spring Security's authorizeHttpRequests will handle what to do
         authenticateIfTokenExists(request, path);
 
         filterChain.doFilter(request, response);
@@ -104,7 +101,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         } catch (Exception e) {
             loggingService.logError("[" + path + "] Error during JWT authentication: " + e.getMessage(), e);
-            // Don't throw—let SecurityConfig's authorizeHttpRequests handle rejection
         }
     }
 
@@ -114,8 +110,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private void setUserAuthentication(String token, String path) {
         try {
             JwtClaimService.TokenDetails tokenDetails = jwtClaimService.parseTokenDetails(token);
-            Integer userId = tokenDetails.getUserId();
-            String role = tokenDetails.getRole();
+            Integer userId = tokenDetails.userId();
+            String role = tokenDetails.role();
 
             if (!areClaimsValid(userId, role)) {
                 loggingService.logAction("[" + path + "] JWT claims invalid: userId=" + userId + ", role=" + role);
@@ -135,7 +131,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // ✅ Create Authentication with roles and set in context
+            // Create Authentication with roles and set in context
             Authentication auth = createAuthentication(user, role);
             SecurityContextHolder.getContext().setAuthentication(auth);
 
@@ -152,12 +148,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      */
     private Authentication createAuthentication(User user, String role) {
         // Convert role string to GrantedAuthority
-        // Spring expects "ROLE_ADMIN", "ROLE_USER", etc.
         String authorityName = role.startsWith("ROLE_") ? role : "ROLE_" + role;
 
         return new PreAuthenticatedAuthenticationToken(
-                String.valueOf(user.getUserId()),  // principal: who is this?
-                null,                              // credentials: not needed (token already validated)
+                String.valueOf(user.getUserId()),
+                null,
                 Collections.singletonList(new SimpleGrantedAuthority(authorityName))
         );
     }

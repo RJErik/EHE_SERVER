@@ -13,15 +13,14 @@ import java.util.Optional;
 @Repository
 public interface PortfolioRepository extends JpaRepository<Portfolio, Integer> {
     Optional<Portfolio> findByPortfolioIdAndUser_UserId(Integer portfolioId, Integer userId);
-    @EntityGraph(attributePaths = {"apiKey"})
-    List<Portfolio> findByUser_UserIdAndApiKey_PlatformNameIgnoreCaseOrderByCreationDateDesc(Integer userId, String platformName);
+    List<Portfolio> findByUser_UserIdAndApiKey_Platform_PlatformNameIgnoreCaseOrderByCreationDateDesc(Integer userId, String platformName);
     boolean existsByUser_UserIdAndPortfolioNameIgnoreCase(Integer userId, String portfolioName);
     List<Portfolio> findByUser_UserIdOrderByCreationDateDesc(Integer userId);
 
-    @EntityGraph(attributePaths = {"apiKey"})
+    @EntityGraph(attributePaths = {"apiKey", "apiKey.platform"})
     @Query("SELECT p FROM Portfolio p WHERE " +
             "p.user.userId = :userId AND " +
-            "(:platform IS NULL OR p.apiKey.platformName = :platform) " +
+            "(:platform IS NULL OR p.apiKey.platform.platformName = :platform) " +
             "ORDER BY p.creationDate DESC")
     List<Portfolio> searchPortfolios(
             @Param("userId") Integer userId,

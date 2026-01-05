@@ -1,5 +1,11 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.annotation.validation.NotEmptyString;
+import com.example.ehe_server.annotation.validation.NotNullField;
+import com.example.ehe_server.entity.MarketCandle;
+import com.example.ehe_server.exception.custom.MissingPlatformNameException;
+import com.example.ehe_server.exception.custom.MissingStockSymbolException;
+import com.example.ehe_server.exception.custom.MissingTimeframeException;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -8,11 +14,14 @@ import java.time.LocalDateTime;
 
 public class CandlesByDateRequest {
 
+    @NotEmptyString(exception = MissingPlatformNameException.class)
     private String platform;
 
+    @NotEmptyString(exception = MissingStockSymbolException.class)
     private String stockSymbol;
 
-    private String timeframe;
+//    @NotNullField(exception = MissingTimeframeException.class)
+    private MarketCandle.Timeframe timeframe;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime fromDate;
@@ -23,7 +32,7 @@ public class CandlesByDateRequest {
     public CandlesByDateRequest() {
     }
 
-    public CandlesByDateRequest(String platform, String stockSymbol, String timeframe,
+    public CandlesByDateRequest(String platform, String stockSymbol, MarketCandle.Timeframe timeframe,
                                 LocalDateTime fromDate, LocalDateTime toDate) {
         this.platform = platform;
         this.stockSymbol = stockSymbol;
@@ -32,7 +41,6 @@ public class CandlesByDateRequest {
         this.toDate = toDate;
     }
 
-    // Getters and setters
     public String getPlatform() {
         return platform;
     }
@@ -49,11 +57,11 @@ public class CandlesByDateRequest {
         this.stockSymbol = stockSymbol;
     }
 
-    public String getTimeframe() {
+    public MarketCandle.Timeframe getTimeframe() {
         return timeframe;
     }
 
-    public void setTimeframe(String timeframe) {
+    public void setTimeframe(MarketCandle.Timeframe timeframe) {
         this.timeframe = timeframe;
     }
 

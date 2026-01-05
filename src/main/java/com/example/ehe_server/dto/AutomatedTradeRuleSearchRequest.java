@@ -1,19 +1,20 @@
 // AutomatedTradeRuleSearchRequest.java
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.entity.AutomatedTradeRule;
+
 import java.math.BigDecimal;
 
 public class AutomatedTradeRuleSearchRequest {
     private Integer portfolioId;
     private String platform;
     private String symbol;
-    private String conditionType;
-    private String actionType;
-    private String quantityType;
+    private AutomatedTradeRule.ConditionType conditionType;
+    private AutomatedTradeRule.ActionType actionType;
+    private AutomatedTradeRule.QuantityType quantityType;
     private BigDecimal minThresholdValue;
     private BigDecimal maxThresholdValue;
 
-    // Getters and setters
     public Integer getPortfolioId() {
         return portfolioId;
     }
@@ -38,27 +39,27 @@ public class AutomatedTradeRuleSearchRequest {
         this.symbol = symbol;
     }
 
-    public String getConditionType() {
+    public AutomatedTradeRule.ConditionType getConditionType() {
         return conditionType;
     }
 
-    public void setConditionType(String conditionType) {
+    public void setConditionType(AutomatedTradeRule.ConditionType conditionType) {
         this.conditionType = conditionType;
     }
 
-    public String getActionType() {
+    public AutomatedTradeRule.ActionType getActionType() {
         return actionType;
     }
 
-    public void setActionType(String actionType) {
+    public void setActionType(AutomatedTradeRule.ActionType actionType) {
         this.actionType = actionType;
     }
 
-    public String getQuantityType() {
+    public AutomatedTradeRule.QuantityType getQuantityType() {
         return quantityType;
     }
 
-    public void setQuantityType(String quantityType) {
+    public void setQuantityType(AutomatedTradeRule.QuantityType quantityType) {
         this.quantityType = quantityType;
     }
 

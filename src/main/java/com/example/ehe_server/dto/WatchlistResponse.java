@@ -1,25 +1,26 @@
 package com.example.ehe_server.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 public class WatchlistResponse {
     private Integer id;
     private String platform;
     private String symbol;
-    private String dateAdded;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime dateAdded;
 
-    // No-argument constructor
     public WatchlistResponse() {}
 
-    // All-argument constructor
-    public WatchlistResponse(Integer id, String platform, String symbol, String dateAdded) {
+    public WatchlistResponse(Integer id, String platform, String symbol, LocalDateTime dateAdded) {
         this.id = id;
         this.platform = platform;
         this.symbol = symbol;
         this.dateAdded = dateAdded;
     }
 
-    // Getters and Setters
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
 
@@ -29,8 +30,8 @@ public class WatchlistResponse {
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
 
-    public String getDateAdded() { return dateAdded; }
-    public void setDateAdded(String dateAdded) { this.dateAdded = dateAdded; }
+    public LocalDateTime getDateAdded() { return dateAdded; }
+    public void setDateAdded(LocalDateTime dateAdded) { this.dateAdded = dateAdded; }
 
     @Override
     public boolean equals(Object o) {

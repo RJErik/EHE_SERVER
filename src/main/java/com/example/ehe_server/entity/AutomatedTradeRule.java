@@ -2,6 +2,8 @@ package com.example.ehe_server.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -63,11 +65,10 @@ public class AutomatedTradeRule {
     @Column(name = "threshold_value", nullable = false, precision = 18, scale = 8)
     private BigDecimal thresholdValue;
 
-    @Column(name = "date_created", nullable = false, updatable = false,
-            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    @CreationTimestamp
+    @Column(name = "date_created", nullable = false, updatable = false)
     private LocalDateTime dateCreated;
 
-    // Getters and setters
     public Integer getAutomatedTradeRuleId() {
         return automatedTradeRuleId;
     }

@@ -1,6 +1,8 @@
 package com.example.ehe_server.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -20,8 +22,8 @@ public class WatchlistItem {
     @JoinColumn(name = "platform_stock_id", nullable = false)
     private PlatformStock platformStock;
 
-    @Column(name = "date_added", nullable = false, updatable = false,
-            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    @CreationTimestamp
+    @Column(name = "date_added", nullable = false, updatable = false)
     private LocalDateTime dateAdded;
 
     // Getters and setters

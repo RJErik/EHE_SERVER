@@ -27,7 +27,6 @@ public class BinanceDataInitializationService implements BinanceDataInitializati
     private final LoggingServiceInterface loggingService;
     private final UserContextService userContextService;
 
-    // Track which symbols are live and synced
     private final Set<String> liveSymbols = ConcurrentHashMap.newKeySet();
     private final Map<String, Boolean> historicalSyncInProgress = new ConcurrentHashMap<>();
 
@@ -51,7 +50,7 @@ public class BinanceDataInitializationService implements BinanceDataInitializati
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    @Async
+    @Async("binanceTaskExecutor")
     public void initializeDataAsync() {
         try {
             userContextService.setUser("SYSTEM", "SYSTEM");
@@ -64,7 +63,7 @@ public class BinanceDataInitializationService implements BinanceDataInitializati
 
                 // Initialize each symbol
                 for (PlatformStock stock : stocks) {
-                    setupSymbol(stock.getStock().getStockName());
+                    setupSymbol(stock.getStock().getStockSymbol());
                 }
             } else {
                 loggingService.logAction("No Binance symbols found in database");
@@ -133,7 +132,7 @@ public class BinanceDataInitializationService implements BinanceDataInitializati
 
             List<PlatformStock> stocks = stockRepository.findByPlatformPlatformName(PLATFORM_NAME);
             for (PlatformStock stock : stocks) {
-                String symbol = stock.getStock().getStockName();
+                String symbol = stock.getStock().getStockSymbol();
 
                 // Skip if syncing or not live
                 if (historicalSyncInProgress.getOrDefault(symbol, false)) {
@@ -200,7 +199,7 @@ public class BinanceDataInitializationService implements BinanceDataInitializati
     }
 
     private PlatformStock getStock(String symbol) {
-        List<PlatformStock> stocks = stockRepository.findByPlatformPlatformNameAndStockStockName(
+        List<PlatformStock> stocks = stockRepository.findByPlatformPlatformNameAndStockStockSymbol(
                 PLATFORM_NAME, symbol);
         return stocks.isEmpty() ? null : stocks.getFirst();
     }

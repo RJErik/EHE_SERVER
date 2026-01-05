@@ -1,6 +1,8 @@
 package com.example.ehe_server.service.intf.stock;
 
 import com.example.ehe_server.dto.CandlesResponse;
+import com.example.ehe_server.entity.MarketCandle;
+
 import java.time.LocalDateTime;
 
 public interface CandleRetrievalServiceInterface {
@@ -15,7 +17,7 @@ public interface CandleRetrievalServiceInterface {
      * @param toSequence Ending sequence number (inclusive)
      * @return CandlesResponse containing the list of candles
      */
-    CandlesResponse getCandlesBySequence(String platform, String stockSymbol, String timeframe,
+    CandlesResponse getCandlesBySequence(String platform, String stockSymbol, MarketCandle.Timeframe timeframe,
                                          Long fromSequence, Long toSequence);
 
     /**
@@ -28,6 +30,6 @@ public interface CandleRetrievalServiceInterface {
      * @param toDate Ending date (inclusive)
      * @return CandlesResponse containing the list of candles
      */
-    CandlesResponse getCandlesByDate(String platform, String stockSymbol, String timeframe,
+    CandlesResponse getCandlesByDate(String platform, String stockSymbol, MarketCandle.Timeframe timeframe,
                                      LocalDateTime fromDate, LocalDateTime toDate);
 }

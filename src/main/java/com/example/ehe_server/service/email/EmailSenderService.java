@@ -10,8 +10,10 @@ import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 public class EmailSenderService implements EmailSenderServiceInterface {
 
     private final JavaMailSender javaMailSender;
@@ -82,7 +84,6 @@ public class EmailSenderService implements EmailSenderServiceInterface {
 
     /**
      * Internal helper to handle the actual network transmission and exception wrapping.
-     * This is synchronous to allow transactions to rollback on failure.
      */
     private void sendSimpleMessage(String to, String subject, String text) {
         try {
@@ -93,8 +94,6 @@ public class EmailSenderService implements EmailSenderServiceInterface {
             message.setText(text);
             javaMailSender.send(message);
         } catch (MailException e) {
-            // We catch the provider-specific exception and throw our domain exception.
-            // This allows the ControllerAdvice to handle it and the Transaction to rollback.
             throw new EmailSendFailureException(to, e.getMessage());
         }
     }

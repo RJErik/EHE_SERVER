@@ -1,6 +1,12 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.annotation.validation.MinValue;
+import com.example.ehe_server.annotation.validation.NotNullField;
 import com.example.ehe_server.dto.*;
+import com.example.ehe_server.exception.custom.InvalidPageNumberException;
+import com.example.ehe_server.exception.custom.InvalidPageSizeException;
+import com.example.ehe_server.exception.custom.MissingPageNumberException;
+import com.example.ehe_server.exception.custom.MissingPageSizeException;
 import com.example.ehe_server.service.intf.user.UserRetrievalServiceInterface;
 import com.example.ehe_server.service.intf.user.UserSearchServiceInterface;
 import com.example.ehe_server.service.intf.user.UserUpdateServiceInterface;
@@ -8,14 +14,15 @@ import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/users")
+@Validated
 public class AdminUserController {
 
     private final MessageSource messageSource;
@@ -34,12 +41,20 @@ public class AdminUserController {
     }
 
     /**
-     * GET /api/admin/users
-     * Retrieve all users (no filters)
+     * GET /api/admin/users?size=20&page=0
+     * Retrieve all users with pagination via query parameters.
      */
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getUsers() {
-        List<UserResponse> userRetrievalResponses = userRetrievalService.getUsers();
+    public ResponseEntity<Map<String, Object>> getUsers(
+            @NotNullField(exception = MissingPageSizeException.class)
+            @MinValue(exception = InvalidPageSizeException.class, min = 1)
+            @RequestParam() Integer size,
+            @NotNullField(exception = MissingPageNumberException.class)
+            @MinValue(exception = InvalidPageNumberException.class, min = 0)
+            @RequestParam() Integer page) {
+
+        PaginatedResponse<UserResponse> userRetrievalResponses =
+                userRetrievalService.getUsers(size, page);
 
         String successMessage = messageSource.getMessage(
                 "success.message.user.get",
@@ -56,24 +71,24 @@ public class AdminUserController {
     }
 
     /**
-     * GET /api/admin/users/search?userId=1&userName=john&accountStatus=ACTIVE...
-     *
-     * Search users with filters via query parameters.
-     *
-     * NOTE: This endpoint contains PII (email). If your security policy requires
-     * keeping PII out of URLs/logs, you can keep this as POST instead.
-     * See alternative method below.
+     * POST /api/admin/users/search
+     * Search users with filters via request body (POST to keep PII like email out of URLs).
      */
     @PostMapping("/search")
-    public ResponseEntity<Map<String, Object>> searchUsers(@RequestBody UserSearchRequest request) {
-        List<UserResponse> userSearchResponses = userSearchService.searchUsers(
-                request.getUserId(),
-                request.getUserName(),
-                request.getEmail(),
-                request.getAccountStatus(),
-                request.getRegistrationDateTo(),
-                request.getRegistrationDateFrom()
-        );
+    public ResponseEntity<Map<String, Object>> searchUsers(
+            @Valid @RequestBody UserSearchRequest request) {
+
+        PaginatedResponse<UserResponse> userSearchResponses =
+                userSearchService.searchUsers(
+                        request.getUserId(),
+                        request.getUserName(),
+                        request.getEmail(),
+                        request.getAccountStatus(),
+                        request.getRegistrationDateTo(),
+                        request.getRegistrationDateFrom(),
+                        request.getSize(),
+                        request.getPage()
+                );
 
         String successMessage = messageSource.getMessage(
                 "success.message.user.search",
@@ -89,25 +104,9 @@ public class AdminUserController {
         return ResponseEntity.ok(responseBody);
     }
 
-    /*
-     * ALTERNATIVE: If you want to keep email out of URLs for security,
-     * keeping POST for search is acceptable. Uncomment this and remove
-     * the GET version above.
-     *
-     * POST /api/admin/users/search
-     *
-    @PostMapping("/search")
-    public ResponseEntity<Map<String, Object>> searchUsers(@RequestBody UserSearchRequest request) {
-        // Same implementation as GET version
-    }
-    */
-
     /**
      * PUT /api/admin/users/{userId}
      * Update an existing user (full update)
-     *
-     * Use PUT for full replacement, PATCH for partial updates.
-     * Since you're updating multiple fields, PUT is appropriate.
      */
     @PutMapping("/{userId}")
     public ResponseEntity<Map<String, Object>> updateUser(
@@ -115,7 +114,7 @@ public class AdminUserController {
             @Valid @RequestBody UserUpdateRequest request) {
 
         UserResponse userUpdateResponse = userUpdateService.updateUserInfo(
-                userId,  // From path, not body
+                userId,
                 request.getUserName(),
                 request.getEmail(),
                 request.getPassword(),

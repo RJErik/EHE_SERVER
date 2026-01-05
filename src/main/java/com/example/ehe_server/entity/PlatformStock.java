@@ -21,7 +21,6 @@ public class PlatformStock {
     @JoinColumn(name = "stock_id", nullable = false)
     private Stock stock;
 
-    // Getters and setters
     public Integer getPlatformStockId() {
         return platformStockId;
     }

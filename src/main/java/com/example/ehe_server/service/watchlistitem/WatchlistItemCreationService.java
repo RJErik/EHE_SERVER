@@ -13,7 +13,6 @@ import com.example.ehe_server.service.intf.watchlist.WatchlistCreationServiceInt
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
 @Service
@@ -23,8 +22,6 @@ public class WatchlistItemCreationService implements WatchlistCreationServiceInt
     private final WatchlistItemRepository watchlistItemRepository;
     private final PlatformStockRepository platformStockRepository;
     private final UserRepository userRepository;
-
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public WatchlistItemCreationService(
             WatchlistItemRepository watchlistItemRepository,
@@ -47,24 +44,11 @@ public class WatchlistItemCreationService implements WatchlistCreationServiceInt
     @Override
     public WatchlistResponse createWatchlistItem(Integer userId, String platform, String symbol) {
 
-        // Input validation checks
-        if (userId == null) {
-            throw new MissingUserIdException();
-        }
-
-        if (platform == null || platform.trim().isEmpty()) {
-            throw new MissingPlatformNameException();
-        }
-
-        if (symbol == null || symbol.trim().isEmpty()) {
-            throw new MissingStockSymbolException();
-        }
-
         // Database integrity checks
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
-        Optional<PlatformStock> platformStocks = platformStockRepository.findByStockNameAndPlatformName(platform, symbol);
+        Optional<PlatformStock> platformStocks = platformStockRepository.findByStockNameAndPlatformName(symbol, platform);
         if (platformStocks.isEmpty()) {
             throw new PlatformStockNotFoundException(platform, symbol);
         }
@@ -89,7 +73,7 @@ public class WatchlistItemCreationService implements WatchlistCreationServiceInt
                 savedItem.getWatchlistItemId(),
                 platform,
                 symbol,
-                savedItem.getDateAdded().format(DATE_FORMATTER)
+                savedItem.getDateAdded()
         );
     }
 }

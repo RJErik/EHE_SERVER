@@ -10,12 +10,10 @@ import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.auth.JwtRefreshTokenServiceInterface;
 import com.example.ehe_server.service.intf.auth.PasswordResetServiceInterface;
 import com.example.ehe_server.service.intf.auth.PasswordResetTokenValidationServiceInterface;
+import com.example.ehe_server.service.intf.token.TokenHashServiceInterface;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.regex.Pattern;
 
 @Service
 @Transactional
@@ -27,23 +25,23 @@ public class PasswordResetService implements PasswordResetServiceInterface {
     private final JwtRefreshTokenServiceInterface jwtRefreshTokenService;
     private final PasswordEncoder passwordEncoder;
     private final UserContextServiceInterface userContextService;
+    private final TokenHashServiceInterface tokenHashService;
 
-    private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{8,72}$");
-
-    // Note: AdminRepository and UserContextService removed (handled by validator)
     public PasswordResetService(
             VerificationTokenRepository verificationTokenRepository,
             AdminRepository adminRepository,
             PasswordResetTokenValidationServiceInterface passwordResetTokenValidationService,
             JwtRefreshTokenServiceInterface jwtRefreshTokenService,
             PasswordEncoder passwordEncoder,
-            UserContextServiceInterface userContextService) {
+            UserContextServiceInterface userContextService,
+            TokenHashServiceInterface tokenHashService) {
         this.verificationTokenRepository = verificationTokenRepository;
         this.passwordResetTokenValidationService = passwordResetTokenValidationService;
         this.jwtRefreshTokenService = jwtRefreshTokenService;
         this.passwordEncoder = passwordEncoder;
         this.adminRepository = adminRepository;
         this.userContextService = userContextService;
+        this.tokenHashService = tokenHashService;
     }
 
     @LogMessage(
@@ -56,25 +54,11 @@ public class PasswordResetService implements PasswordResetServiceInterface {
         // External Validation (Throws exception if invalid, sets UserContext)
         passwordResetTokenValidationService.validatePasswordResetToken(token);
 
-        // Input Validation (Password specific)
-        if (newPassword == null || newPassword.trim().isEmpty()) {
-            throw new MissingPasswordException();
-        }
-
-        if (!PASSWORD_PATTERN.matcher(newPassword).matches()) {
-            throw new InvalidPasswordFormatException();
-        }
-
         // Data Retrieval
-        // We fetch blindly because the validator guaranteed existence.
-        // using orElseThrow is just a sanity check for the compiler/runtime safety.
-        VerificationToken verificationToken = findTokenByPlainValue(
-                token
-        );
+        String hashedToken = tokenHashService.hashToken(token);
 
-        if (verificationToken == null) {
-            throw new PasswordResetTokenNotFoundException(token);
-        }
+        VerificationToken verificationToken = verificationTokenRepository.findByTokenHash(hashedToken)
+                .orElseThrow(() -> new InvalidVerificationTokenException(token));
 
 
         User user = verificationToken.getUser();
@@ -84,7 +68,7 @@ public class PasswordResetService implements PasswordResetServiceInterface {
         String role = isAdmin ? "ADMIN" : "USER";
         userContextService.setUser(userIdStr, role);
 
-        // 4. State Updates
+        // Updates
         user.setPasswordHash(passwordEncoder.encode(newPassword));
 
         if (user.getAccountStatus() == User.AccountStatus.NONVERIFIED) {
@@ -93,20 +77,7 @@ public class PasswordResetService implements PasswordResetServiceInterface {
 
         verificationToken.setStatus(VerificationToken.TokenStatus.USED);
 
-        // Authentication  update
+        // Authentication update
         jwtRefreshTokenService.removeAllUserTokens(user.getUserId());
     }
-
-    private VerificationToken findTokenByPlainValue(String plainToken) {
-        List<VerificationToken> activeTokens = verificationTokenRepository.findByTokenTypeAndStatus(
-                VerificationToken.TokenType.PASSWORD_RESET,
-                VerificationToken.TokenStatus.ACTIVE
-        );
-
-        return activeTokens.stream()
-                .filter(token -> passwordEncoder.matches(plainToken, token.getTokenHash()))
-                .findFirst()
-                .orElse(null);
-    }
-
 }

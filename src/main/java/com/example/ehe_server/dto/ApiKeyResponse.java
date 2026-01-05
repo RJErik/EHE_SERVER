@@ -8,21 +8,17 @@ public class ApiKeyResponse {
     private String maskedApiKeyValue;
     private String maskedSecretKey;
 
-    // No-argument constructor
     public ApiKeyResponse() {}
 
-    // Constructor with apiKeyId only
     public ApiKeyResponse(Integer apiKeyId) {
         this.apiKeyId = apiKeyId;
     }
 
-    // Constructor with apiKeyId and platformName
     public ApiKeyResponse(Integer apiKeyId, String platformName) {
         this.apiKeyId = apiKeyId;
         this.platformName = platformName;
     }
 
-    // All-argument constructor
     public ApiKeyResponse(Integer apiKeyId, String platformName, String maskedApiKeyValue, String maskedSecretKey) {
         this.apiKeyId = apiKeyId;
         this.platformName = platformName;
@@ -30,7 +26,6 @@ public class ApiKeyResponse {
         this.maskedSecretKey = maskedSecretKey;
     }
 
-    // Getters and Setters
     public Integer getApiKeyId() { return apiKeyId; }
     public void setApiKeyId(Integer apiKeyId) { this.apiKeyId = apiKeyId; }
 

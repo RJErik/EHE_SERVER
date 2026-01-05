@@ -15,21 +15,21 @@ import java.util.List;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Integer> {
-    @EntityGraph(attributePaths = {"portfolio", "portfolio.user", "platformStock"})
+    @EntityGraph(attributePaths = {"portfolio", "portfolio.user", "platformStock", "platformStock.platform", "platformStock.stock"})
     List<Transaction> findByPortfolio_PortfolioId(Integer portfolioId);
 
-    @EntityGraph(attributePaths = {"platformStock"})
+    @EntityGraph(attributePaths = {"platformStock", "platformStock.platform", "platformStock.stock"})
     List<Transaction> findTop3ByStatusOrderByTransactionDateDesc(Transaction.Status status);
 
-    @EntityGraph(attributePaths = {"portfolio", "portfolio.user", "platformStock"})
+    @EntityGraph(attributePaths = {"portfolio", "portfolio.user", "platformStock", "platformStock.platform", "platformStock.stock"})
     Page<Transaction> findAllByOrderByTransactionDateDesc(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"portfolio", "portfolio.user", "platformStock"})
+    @EntityGraph(attributePaths = {"portfolio", "portfolio.user", "platformStock", "platformStock.platform", "platformStock.stock"})
     @Query("SELECT t FROM Transaction t WHERE " +
             "(:userId IS NULL OR t.portfolio.user.userId = :userId) AND " +
             "(:portfolioId IS NULL OR t.portfolio.portfolioId = :portfolioId) AND " +
-            "(:platform IS NULL OR t.platformStock.platformName = :platform) AND " +
-            "(:symbol IS NULL OR t.platformStock.stockSymbol = :symbol) AND " +
+            "(:platform IS NULL OR t.platformStock.platform.platformName = :platform) AND " +
+            "(:symbol IS NULL OR t.platformStock.stock.stockSymbol = :symbol) AND " +
             "(:type IS NULL OR t.transactionType = :type) AND " +
             "(:status IS NULL OR t.status = :status) AND " +
             "(:fromTime IS NULL OR t.transactionDate >= :fromTime) AND " +
@@ -41,7 +41,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
             "ORDER BY t.transactionDate DESC")
     Page<Transaction> searchTransactions(
             @Param("userId") Integer userId,
-            @Param("portfolioId") Integer portfolioId,  // ADD THIS
+            @Param("portfolioId") Integer portfolioId,
             @Param("platform") String platform,
             @Param("symbol") String symbol,
             @Param("type") Transaction.TransactionType type,

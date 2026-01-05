@@ -16,39 +16,41 @@ import java.util.Optional;
 @Repository
 public interface MarketCandleRepository extends JpaRepository<MarketCandle, Integer> {
 
-    @Query("SELECT m FROM MarketCandle m " +
-            "WHERE m.platformStock IN :stocks " +
-            "AND m.timeframe = :timeframe " +
-            "AND m.timestamp = (" +
-            "    SELECT MAX(m2.timestamp) " +
-            "    FROM MarketCandle m2 " +
-            "    WHERE m2.platformStock = m.platformStock " +
-            "    AND m2.timeframe = :timeframe" +
+    /**
+     * Fetches the single latest candle for each provided stock within the given timeframe.
+     */
+    @Query("SELECT mc FROM MarketCandle mc " +
+            "WHERE mc.platformStock IN :stocks " +
+            "AND mc.timeframe = :timeframe " +
+            "AND mc.timestamp = (" +
+            "    SELECT MAX(sub.timestamp) " +
+            "    FROM MarketCandle sub " +
+            "    WHERE sub.platformStock = mc.platformStock " +
+            "    AND sub.timeframe = :timeframe" +
             ")")
     List<MarketCandle> findLatestCandlesForStocks(
             @Param("stocks") List<PlatformStock> stocks,
             @Param("timeframe") MarketCandle.Timeframe timeframe
     );
 
-    // Replaced the simple JPA findBy... with a native query to calculate sequence
     @Query(value = """
         SELECT * FROM (
-            SELECT mc.market_candle_id as marketCandleId, 
-                   mc.timestamp, 
-                   mc.open_price as openPrice, 
-                   mc.close_price as closePrice, 
-                   mc.high_price as highPrice, 
-                   mc.low_price as lowPrice, 
+            SELECT mc.market_candle_id as marketCandleId,
+                   mc.timestamp,
+                   mc.open_price as openPrice,
+                   mc.close_price as closePrice,
+                   mc.high_price as highPrice,
+                   mc.low_price as lowPrice,
                    mc.volume,
                    ROW_NUMBER() OVER (
-                       ORDER BY mc.timestamp ASC
+                       ORDER BY mc.timestamp
                    ) as sequence
             FROM market_candle mc
             WHERE mc.platform_stock_id = :stockId
             AND mc.timeframe = :#{#timeframe.value}
         ) as sequenced_data
         WHERE sequenced_data.timestamp BETWEEN :startDate AND :endDate
-        ORDER BY sequenced_data.timestamp ASC
+        ORDER BY sequenced_data.timestamp
         """, nativeQuery = true)
     List<ICandleWithSequence> findCandlesByDateRangeWithSequence(
             @Param("stockId") Integer stockId,
@@ -66,31 +68,21 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
             MarketCandle.Timeframe timeframe,
             LocalDateTime timestamp);
 
-    List<MarketCandle> findAllByPlatformStockAndTimeframeAndTimestamp(
-            PlatformStock platformStock,
-            MarketCandle.Timeframe timeframe,
-            LocalDateTime timestamp);
-
-    MarketCandle findByPlatformStockAndTimeframeAndTimestamp(
-            PlatformStock platformStock,
-            Timeframe timeframe,
-            LocalDateTime timestamp);
-
     /**
      * Finds the single latest candle with its calculated sequence number.
      * Uses LIMIT 1 on the sequenced data.
      */
     @Query(value = """
         SELECT * FROM (
-            SELECT mc.market_candle_id as marketCandleId, 
-                   mc.timestamp, 
-                   mc.open_price as openPrice, 
-                   mc.close_price as closePrice, 
-                   mc.high_price as highPrice, 
-                   mc.low_price as lowPrice, 
+            SELECT mc.market_candle_id as marketCandleId,
+                   mc.timestamp,
+                   mc.open_price as openPrice,
+                   mc.close_price as closePrice,
+                   mc.high_price as highPrice,
+                   mc.low_price as lowPrice,
                    mc.volume,
                    ROW_NUMBER() OVER (
-                       ORDER BY mc.timestamp ASC
+                       ORDER BY mc.timestamp
                    ) as sequence
             FROM market_candle mc
             WHERE mc.platform_stock_id = :stockId
@@ -108,15 +100,15 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
      */
     @Query(value = """
         SELECT * FROM (
-            SELECT mc.market_candle_id as marketCandleId, 
-                   mc.timestamp, 
-                   mc.open_price as openPrice, 
-                   mc.close_price as closePrice, 
-                   mc.high_price as highPrice, 
-                   mc.low_price as lowPrice, 
+            SELECT mc.market_candle_id as marketCandleId,
+                   mc.timestamp,
+                   mc.open_price as openPrice,
+                   mc.close_price as closePrice,
+                   mc.high_price as highPrice,
+                   mc.low_price as lowPrice,
                    mc.volume,
                    ROW_NUMBER() OVER (
-                       ORDER BY mc.timestamp ASC
+                       ORDER BY mc.timestamp
                    ) as sequence
             FROM market_candle mc
             WHERE mc.platform_stock_id = :stockId
@@ -129,42 +121,46 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
             @Param("timeframe") Timeframe timeframe,
             @Param("timestamp") LocalDateTime timestamp);
 
-    @Query(value = "SELECT * FROM market_candle mc " +
-            "WHERE mc.timeframe = '1d' " +
-            "AND CAST(mc.timestamp AS date) = CURRENT_DATE " +
-            "AND mc.open_price > 0 " +
-            "ORDER BY ABS((mc.close_price - mc.open_price) / mc.open_price) DESC " +
-            "LIMIT 10",
-            nativeQuery = true)
+    @Query(value = """
+    SELECT mc.* FROM market_candle mc
+    INNER JOIN platform_stock ps ON mc.platform_stock_id = ps.platform_stock_id
+    INNER JOIN platform p ON ps.platform_id = p.platform_id
+    INNER JOIN stock s ON ps.stock_id = s.stock_id
+    WHERE mc.timeframe = '1d' AND CAST(mc.timestamp AS date) = CURRENT_DATE
+    AND mc.open_price > 0 ORDER BY ABS((mc.close_price - mc.open_price) / mc.open_price) DESC LIMIT 10
+    """, nativeQuery = true)
     List<MarketCandle> findTopTenDailyCandlesByPercentageChange();
 
-    @Query(value = "SELECT * FROM market_candle mc " +
-            "WHERE mc.timeframe = '1d' " +
-            "AND CAST(mc.timestamp AS date) = CURRENT_DATE " +
-            "AND mc.open_price > 0 " +
-            "ORDER BY (mc.close_price - mc.open_price) / mc.open_price ASC " +
-            "LIMIT 10",
-            nativeQuery = true)
+
+    @Query(value = """
+    SELECT mc.* FROM market_candle mc
+    INNER JOIN platform_stock ps ON mc.platform_stock_id = ps.platform_stock_id
+    INNER JOIN platform p ON ps.platform_id = p.platform_id
+    INNER JOIN stock s ON ps.stock_id = s.stock_id
+    WHERE mc.timeframe = '1d' AND CAST(mc.timestamp AS date) = CURRENT_DATE AND mc.open_price > 0
+    ORDER BY (mc.close_price - mc.open_price) / mc.open_price
+    LIMIT 10
+    """, nativeQuery = true)
     List<MarketCandle> findBottomTenDailyCandlesByPercentageChange();
 
     @Query(value = """
         SELECT * FROM (
-            SELECT mc.market_candle_id as marketCandleId, 
-                   mc.timestamp, 
-                   mc.open_price as openPrice, 
-                   mc.close_price as closePrice, 
-                   mc.high_price as highPrice, 
-                   mc.low_price as lowPrice, 
+            SELECT mc.market_candle_id as marketCandleId,
+                   mc.timestamp,
+                   mc.open_price as openPrice,
+                   mc.close_price as closePrice,
+                   mc.high_price as highPrice,
+                   mc.low_price as lowPrice,
                    mc.volume,
                    ROW_NUMBER() OVER (
-                       ORDER BY mc.timestamp ASC
+                       ORDER BY mc.timestamp
                    ) as sequence
             FROM market_candle mc
             WHERE mc.platform_stock_id = :stockId
             AND mc.timeframe = :#{#timeframe.value}
         ) as sequenced_data
         WHERE sequenced_data.sequence BETWEEN :fromSequence AND :toSequence
-        ORDER BY sequenced_data.timestamp ASC
+        ORDER BY sequenced_data.timestamp
         """, nativeQuery = true)
     List<ICandleWithSequence> findByStockAndTimeframeAndSequenceRange(
             @Param("stockId") Integer stockId,

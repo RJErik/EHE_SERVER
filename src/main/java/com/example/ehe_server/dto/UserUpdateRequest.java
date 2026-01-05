@@ -1,35 +1,45 @@
 package com.example.ehe_server.dto;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Size;
+import com.example.ehe_server.annotation.validation.RegexPattern;
+import com.example.ehe_server.entity.User;
+import com.example.ehe_server.exception.custom.InvalidEmailFormatException;
+import com.example.ehe_server.exception.custom.InvalidPasswordFormatException;
+import com.example.ehe_server.exception.custom.InvalidUsernameFormatException;
 
 import java.util.Objects;
 
-/**
- * Request body for updating a user.
- * Note: userId is now passed via path parameter, not in the body.
- */
 public class UserUpdateRequest {
 
+    @RegexPattern( pattern = "^[a-zA-Z0-9_]{3,100}$",
+            exception = InvalidUsernameFormatException.class,
+            params = {"$value"})
     private String userName;
 
+    @RegexPattern(
+            pattern = "^(?=.{1,255}$)[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+            exception = InvalidEmailFormatException.class,
+            params = {"$value"}
+    )
     private String email;
 
+    @RegexPattern(
+            pattern = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{8,72}$",
+            exception = InvalidPasswordFormatException.class
+    )
     private String password;
 
-    private String accountStatus;
+    private User.AccountStatus accountStatus;
 
     public UserUpdateRequest() {
     }
 
-    public UserUpdateRequest(String userName, String email, String password, String accountStatus) {
+    public UserUpdateRequest(String userName, String email, String password, User.AccountStatus accountStatus) {
         this.userName = userName;
         this.email = email;
         this.password = password;
         this.accountStatus = accountStatus;
     }
 
-    // Getters and Setters
     public String getUserName() {
         return userName;
     }
@@ -54,11 +64,11 @@ public class UserUpdateRequest {
         this.password = password;
     }
 
-    public String getAccountStatus() {
+    public User.AccountStatus getAccountStatus() {
         return accountStatus;
     }
 
-    public void setAccountStatus(String accountStatus) {
+    public void setAccountStatus(User.AccountStatus accountStatus) {
         this.accountStatus = accountStatus;
     }
 

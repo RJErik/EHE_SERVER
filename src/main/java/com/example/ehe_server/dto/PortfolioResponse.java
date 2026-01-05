@@ -1,20 +1,22 @@
 package com.example.ehe_server.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 public class PortfolioResponse {
     private Integer id;
     private String name;
     private String platform;
-    private String creationDate;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime creationDate;
     private BigDecimal value;
 
-    // No-argument constructor
     public PortfolioResponse() {}
 
-    // All-argument constructor
-    public PortfolioResponse(Integer id, String name, String platform, String creationDate, BigDecimal value) {
+    public PortfolioResponse(Integer id, String name, String platform, LocalDateTime creationDate, BigDecimal value) {
         this.id = id;
         this.name = name;
         this.platform = platform;
@@ -22,7 +24,6 @@ public class PortfolioResponse {
         this.value = value;
     }
 
-    // Getters and Setters
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
 
@@ -32,8 +33,8 @@ public class PortfolioResponse {
     public String getPlatform() { return platform; }
     public void setPlatform(String platform) { this.platform = platform; }
 
-    public String getCreationDate() { return creationDate; }
-    public void setCreationDate(String creationDate) { this.creationDate = creationDate; }
+    public LocalDateTime getCreationDate() { return creationDate; }
+    public void setCreationDate(LocalDateTime creationDate) { this.creationDate = creationDate; }
 
     public BigDecimal getValue() { return value; }
     public void setValue(BigDecimal value) { this.value = value; }

@@ -8,17 +8,14 @@ public class HomeStockResponse {
     private String symbol;
     private BigDecimal changePercentage;
 
-    // No-argument constructor
     public HomeStockResponse() {}
 
-    // All-argument constructor
     public HomeStockResponse(String platform, String symbol, BigDecimal changePercentage) {
         this.platform = platform;
         this.symbol = symbol;
         this.changePercentage = changePercentage;
     }
 
-    // Getters and Setters
     public String getPlatform() { return platform; }
     public void setPlatform(String platform) { this.platform = platform; }
 

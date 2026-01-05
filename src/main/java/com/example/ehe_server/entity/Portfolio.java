@@ -2,6 +2,8 @@ package com.example.ehe_server.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -30,11 +32,10 @@ public class Portfolio {
     @Column(name = "reserved_cash", precision = 18, scale = 8)
     private BigDecimal reservedCash;
 
-    @Column(name = "creation_date", nullable = false, updatable = false,
-            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    @CreationTimestamp
+    @Column(name = "creation_date", nullable = false, updatable = false)
     private LocalDateTime creationDate;
 
-    // Getters and setters
     public Integer getPortfolioId() {
         return portfolioId;
     }

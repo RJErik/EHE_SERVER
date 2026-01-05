@@ -22,7 +22,6 @@ public class PortfolioValueResponse {
         this.holdings = holdings;
     }
 
-    // Getters, Setters, and standard boilerplate (equals, hashCode)
     public Integer getPortfolioId() { return portfolioId; }
     public void setPortfolioId(Integer portfolioId) { this.portfolioId = portfolioId; }
     public String getPortfolioName() { return portfolioName; }

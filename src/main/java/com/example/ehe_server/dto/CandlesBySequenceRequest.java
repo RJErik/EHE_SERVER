@@ -1,21 +1,30 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.annotation.validation.NotEmptyString;
+import com.example.ehe_server.annotation.validation.NotNullField;
+import com.example.ehe_server.entity.MarketCandle;
+import com.example.ehe_server.exception.custom.*;
+
 public class CandlesBySequenceRequest {
 
+    @NotEmptyString(exception = MissingPlatformNameException.class)
     private String platform;
 
+    @NotEmptyString(exception = MissingStockSymbolException.class)
     private String stockSymbol;
 
-    private String timeframe;
+//    @NotNullField(exception = MissingTimeframeException.class)
+    private MarketCandle.Timeframe timeframe;
 
+    @NotNullField(exception = MissingStartSequenceNumberException.class)
     private Long fromSequence;
 
+    @NotNullField(exception = MissingEndSequenceNumberException.class)
     private Long toSequence;
 
-    // Constructors
     public CandlesBySequenceRequest() {}
 
-    public CandlesBySequenceRequest(String platform, String stockSymbol, String timeframe,
+    public CandlesBySequenceRequest(String platform, String stockSymbol, MarketCandle.Timeframe timeframe,
                                     Long fromSequence, Long toSequence) {
         this.platform = platform;
         this.stockSymbol = stockSymbol;
@@ -24,7 +33,6 @@ public class CandlesBySequenceRequest {
         this.toSequence = toSequence;
     }
 
-    // Getters and setters
     public String getPlatform() {
         return platform;
     }
@@ -41,11 +49,11 @@ public class CandlesBySequenceRequest {
         this.stockSymbol = stockSymbol;
     }
 
-    public String getTimeframe() {
+    public MarketCandle.Timeframe getTimeframe() {
         return timeframe;
     }
 
-    public void setTimeframe(String timeframe) {
+    public void setTimeframe(MarketCandle.Timeframe timeframe) {
         this.timeframe = timeframe;
     }
 

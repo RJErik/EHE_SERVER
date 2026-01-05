@@ -1,11 +1,19 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.annotation.validation.MinValue;
+import com.example.ehe_server.annotation.validation.NotNullField;
 import com.example.ehe_server.dto.*;
+import com.example.ehe_server.exception.custom.InvalidPageNumberException;
+import com.example.ehe_server.exception.custom.InvalidPageSizeException;
+import com.example.ehe_server.exception.custom.MissingPageNumberException;
+import com.example.ehe_server.exception.custom.MissingPageSizeException;
 import com.example.ehe_server.service.intf.transaction.TransactionRetrievalServiceInterface;
 import com.example.ehe_server.service.intf.transaction.TransactionSearchServiceInterface;
+import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -13,6 +21,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/transactions")
+@Validated
 public class TransactionController {
 
     private final TransactionRetrievalServiceInterface transactionRetrievalService;
@@ -30,15 +39,19 @@ public class TransactionController {
 
     /**
      * GET /api/admin/transactions?size=20&page=0
-     *
      * Retrieve all transactions with pagination via query parameters.
-     *
-     * Example: GET /api/admin/transactions?size=20&page=0
      */
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllTransactions(
-            @RequestParam(defaultValue = "20") Integer size,
-            @RequestParam(defaultValue = "0") Integer page) {
+            @NotNullField(exception = MissingPageSizeException.class)
+            @MinValue(exception = InvalidPageSizeException.class,
+                    min = 1)
+            @RequestParam()
+            Integer size,
+            @NotNullField(exception = MissingPageNumberException.class)
+            @MinValue(exception = InvalidPageNumberException.class,
+                    min = 0)
+            @RequestParam() Integer page) {
 
         PaginatedResponse<TransactionResponse> transactionResponses =
                 transactionRetrievalService.getAllTransactions(size, page);
@@ -59,15 +72,11 @@ public class TransactionController {
 
     /**
      * GET /api/admin/transactions/search?userId=1&platform=BINANCE&symbol=BTC...
-     *
      * Search transactions with filters via query parameters.
-     * Spring automatically binds query params to the DTO using @ModelAttribute.
-     *
-     * Example: GET /api/admin/transactions/search?platform=BINANCE&symbol=BTC&size=20&page=0
      */
     @GetMapping("/search")
     public ResponseEntity<Map<String, Object>> searchTransactions(
-            @ModelAttribute TransactionSearchRequest request) {
+            @Valid @ModelAttribute TransactionSearchRequest request) {
 
         PaginatedResponse<TransactionResponse> transactionResponses =
                 transactionSearchService.searchTransactions(

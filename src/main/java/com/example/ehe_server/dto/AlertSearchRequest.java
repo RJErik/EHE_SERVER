@@ -1,11 +1,12 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.entity.Alert;
+
 public class AlertSearchRequest {
     private String platform;
     private String symbol;
-    private String conditionType;
+    private Alert.ConditionType conditionType;
 
-    // Getters and setters
     public String getPlatform() {
         return platform;
     }
@@ -22,11 +23,11 @@ public class AlertSearchRequest {
         this.symbol = symbol;
     }
 
-    public String getConditionType() {
+    public Alert.ConditionType getConditionType() {
         return conditionType;
     }
 
-    public void setConditionType(String conditionType) {
+    public void setConditionType(Alert.ConditionType conditionType) {
         this.conditionType = conditionType;
     }
 }

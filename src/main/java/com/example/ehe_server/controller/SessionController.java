@@ -1,11 +1,15 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.dto.LoginRequest;
+import com.example.ehe_server.properties.FrontendProperties;
 import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
+import com.example.ehe_server.service.intf.session.LogInServiceInterface;
 import com.example.ehe_server.service.intf.session.UserLogoutServiceInterface;
 import com.example.ehe_server.service.intf.session.UserValidationServiceInterface;
 import com.example.ehe_server.service.intf.session.JwtTokenRenewalServiceInterface;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -23,28 +27,30 @@ public class SessionController {
     private final UserLogoutServiceInterface userLogoutService;
     private final UserContextServiceInterface userContextService;
     private final JwtTokenRenewalServiceInterface jwtTokenRenewalService;
+    private final LogInServiceInterface logInService;
     private final MessageSource messageSource;
+    private final FrontendProperties frontendProperties;
 
     public SessionController(
             UserValidationServiceInterface userValidationService,
             UserLogoutServiceInterface userLogoutService,
             UserContextServiceInterface userContextService,
             JwtTokenRenewalServiceInterface jwtTokenRenewalService,
-            MessageSource messageSource) {
+            LogInServiceInterface logInService,
+            MessageSource messageSource,
+            FrontendProperties frontendProperties) {
         this.userValidationService = userValidationService;
         this.userLogoutService = userLogoutService;
         this.userContextService = userContextService;
         this.jwtTokenRenewalService = jwtTokenRenewalService;
         this.messageSource = messageSource;
+        this.frontendProperties = frontendProperties;
+        this.logInService = logInService;
     }
 
     /**
      * GET /api/session
      * Verify/retrieve current session status.
-     *
-     * Changed from: GET /api/session/verify-user
-     * Reason: "verify-user" is a verb. GET on the resource itself implies
-     * "get current session state" which includes validation.
      */
     @GetMapping
     public ResponseEntity<Map<String, Object>> verifyUser() {
@@ -66,10 +72,6 @@ public class SessionController {
     /**
      * DELETE /api/session
      * End/destroy the current session (logout).
-     *
-     * Changed from: POST /api/session/logout
-     * Reason: Logout is "deleting" the session resource. DELETE is the
-     * appropriate HTTP method for resource removal.
      */
     @DeleteMapping
     public ResponseEntity<Map<String, Object>> logout(
@@ -88,17 +90,43 @@ public class SessionController {
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        // 200 OK with body, or could use 204 No Content without body
+        return ResponseEntity.ok(responseBody);
+    }
+
+    /**
+     * POST /api/session
+     * Authenticate user and create session.
+     */
+    @PostMapping()
+    public ResponseEntity<Map<String, Object>> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletResponse response) {
+
+        logInService.authenticateUser(request.getEmail(), request.getPassword(), response);
+
+        String successMessage = messageSource.getMessage(
+                "success.message.auth.login",
+                null,
+                LocaleContextHolder.getLocale()
+        );
+
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+
+        if (userContextService.getCurrentUserRole().contains("ROLE_ADMIN")) {
+            responseBody.put("redirectUrl", frontendProperties.getUrl() + frontendProperties.getAdmin());
+        } else {
+            String fullUrl = frontendProperties.getUrl() + frontendProperties.getUser().getSuffix();
+            responseBody.put("redirectUrl", fullUrl);
+        }
+
         return ResponseEntity.ok(responseBody);
     }
 
     /**
      * POST /api/session/token
      * Create/refresh a new JWT token.
-     *
-     * Changed from: POST /api/session/renew-token
-     * Reason: "renew-token" contains a verb. POST to /token represents
-     * "create a new token" which is what renewal does.
      */
     @PostMapping("/token")
     public ResponseEntity<Map<String, Object>> renewToken(
@@ -117,7 +145,6 @@ public class SessionController {
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
 
-        // 201 Created is appropriate for token creation
         return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 }

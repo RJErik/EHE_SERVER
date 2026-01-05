@@ -2,7 +2,6 @@ package com.example.ehe_server.service.intf.portfolio;
 
 import com.example.ehe_server.dto.PortfolioResponse;
 
-import java.util.Map;
 
 public interface PortfolioCreationServiceInterface {
     /**

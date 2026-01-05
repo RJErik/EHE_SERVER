@@ -21,7 +21,6 @@ public class AlpacaDataApiClient {
     private final AlpacaProperties alpacaProperties;
     private final LoggingServiceInterface loggingService;
 
-    // Rate limit tracking
     private final Map<String, Long> requestWindowStartMap = new ConcurrentHashMap<>();
     private final Map<String, Integer> requestCountMap = new ConcurrentHashMap<>();
     private static final int REQUEST_LIMIT_PER_MINUTE = 200;

@@ -1,6 +1,10 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.entity.Transaction;
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 public class TransactionResponse {
@@ -9,20 +13,19 @@ public class TransactionResponse {
     private Integer portfolioId;
     private String platform;
     private String symbol;
-    private String type;
+    private Transaction.TransactionType type;
     private BigDecimal quantity;
     private BigDecimal price;
     private BigDecimal totalValue;
-    private String status;
-    private String transactionDate;
+    private Transaction.Status status;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime transactionDate;
 
-    // No-argument constructor
     public TransactionResponse() {}
 
-    // All-argument constructor
     public TransactionResponse(Integer transactionId, Integer userId, Integer portfolioId,
-                               String platform, String symbol, String type, BigDecimal quantity,
-                               BigDecimal price, BigDecimal totalValue, String status, String transactionDate) {
+                               String platform, String symbol, Transaction.TransactionType type, BigDecimal quantity,
+                               BigDecimal price, BigDecimal totalValue, Transaction.Status status, LocalDateTime transactionDate) {
         this.transactionId = transactionId;
         this.userId = userId;
         this.portfolioId = portfolioId;
@@ -36,7 +39,6 @@ public class TransactionResponse {
         this.transactionDate = transactionDate;
     }
 
-    // Getters and Setters
     public Integer getTransactionId() { return transactionId; }
     public void setTransactionId(Integer transactionId) { this.transactionId = transactionId; }
 
@@ -52,8 +54,8 @@ public class TransactionResponse {
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
 
-    public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
+    public Transaction.TransactionType getType() { return type; }
+    public void setType(Transaction.TransactionType type) { this.type = type; }
 
     public BigDecimal getQuantity() { return quantity; }
     public void setQuantity(BigDecimal quantity) { this.quantity = quantity; }
@@ -64,11 +66,11 @@ public class TransactionResponse {
     public BigDecimal getTotalValue() { return totalValue; }
     public void setTotalValue(BigDecimal totalValue) { this.totalValue = totalValue; }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public Transaction.Status getStatus() { return status; }
+    public void setStatus(Transaction.Status status) { this.status = status; }
 
-    public String getTransactionDate() { return transactionDate; }
-    public void setTransactionDate(String transactionDate) { this.transactionDate = transactionDate; }
+    public LocalDateTime getTransactionDate() { return transactionDate; }
+    public void setTransactionDate(LocalDateTime transactionDate) { this.transactionDate = transactionDate; }
 
     @Override
     public boolean equals(Object o) {

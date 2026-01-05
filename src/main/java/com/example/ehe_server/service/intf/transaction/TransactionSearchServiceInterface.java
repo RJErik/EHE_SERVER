@@ -2,10 +2,10 @@ package com.example.ehe_server.service.intf.transaction;
 
 import com.example.ehe_server.dto.PaginatedResponse;
 import com.example.ehe_server.dto.TransactionResponse;
-import com.example.ehe_server.dto.TransactionSearchResponse;
+import com.example.ehe_server.entity.Transaction;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * Interface for transaction search operations (Admin)
@@ -38,8 +38,8 @@ public interface TransactionSearchServiceInterface {
             BigDecimal toAmount,
             BigDecimal fromPrice,
             BigDecimal toPrice,
-            String type,
-            String status,
+            Transaction.TransactionType type,
+            Transaction.Status status,
             Integer size,
             Integer page
     );

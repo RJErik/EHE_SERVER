@@ -9,11 +9,10 @@ public class AlpacaProperties {
 
     private String apikey;
     private String secret;
-    private String baseurl = "https://paper-api.alpaca.markets"; // default to paper trading
+    private String baseurl = "https://paper-api.alpaca.markets";
     private String dataurl = "https://data.alpaca.markets";
     private String websocketurl = "wss://stream.data.alpaca.markets";
 
-    // Getters and setters
     public String getApikey() {
         return apikey;
     }

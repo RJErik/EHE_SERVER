@@ -5,11 +5,10 @@ import java.util.List;
 
 public class CandleUpdateMessage {
     private String subscriptionId;
-    private String updateType; // "NEW", "UPDATE", "HEARTBEAT"
+    private String updateType;
     private List<CandleDataResponse.CandleData> updatedCandles;
     private LocalDateTime updateTimestamp;
 
-    // Getters and setters
     public String getSubscriptionId() {
         return subscriptionId;
     }

@@ -12,13 +12,12 @@ public class Stock {
     @Column(name = "stock_id")
     private Integer stockId;
 
-    @Column(name = "stock_name", length = 255)
-    private String stockName;
+    @Column(name = "stock_symbol", length = 255)
+    private String stockSymbol;
 
     @OneToMany(mappedBy = "stock", fetch = FetchType.LAZY)
     private List<PlatformStock> platformStocks;
 
-    // Getters and setters
     public Integer getStockId() {
         return stockId;
     }
@@ -27,12 +26,12 @@ public class Stock {
         this.stockId = stockId;
     }
 
-    public String getStockName() {
-        return stockName;
+    public String getStockSymbol() {
+        return stockSymbol;
     }
 
-    public void setStockName(String stockName) {
-        this.stockName = stockName;
+    public void setStockSymbol(String stockSymbol) {
+        this.stockSymbol = stockSymbol;
     }
 
     public List<PlatformStock> getPlatformStocks() {

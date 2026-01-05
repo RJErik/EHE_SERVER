@@ -1,6 +1,8 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.annotation.validation.NotNullField;
 import com.example.ehe_server.dto.*;
+import com.example.ehe_server.exception.custom.MissingAlertIdException;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.alert.AlertSearchServiceInterface;
 import com.example.ehe_server.service.intf.alert.AlertRetrievalServiceInterface;
@@ -9,6 +11,7 @@ import com.example.ehe_server.service.intf.alert.AlertRemovalServiceInterface;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.context.MessageSource;
 
@@ -18,6 +21,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/user/alerts")
+@Validated
 public class AlertController {
 
     private final AlertRetrievalServiceInterface alertRetrievalService;
@@ -45,8 +49,6 @@ public class AlertController {
     /**
      * GET /api/user/alerts
      * Retrieve all alerts for the current user
-     *
-     * @return List of alerts and success status
      */
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAlerts() {
@@ -70,9 +72,6 @@ public class AlertController {
     /**
      * POST /api/user/alerts
      * Create a new alert for the user
-     *
-     * @param request Contains platform name, stock symbol, condition type, and threshold value
-     * @return Success status and details of added alert
      */
     @PostMapping
     public ResponseEntity<Map<String, Object>> createAlert(@RequestBody AlertCreationRequest request) {
@@ -94,19 +93,18 @@ public class AlertController {
         responseBody.put("message", successMessage);
         responseBody.put("alert", alertCreationResponse);
 
-        // Return 201 Created for resource creation
         return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 
     /**
      * DELETE /api/user/alerts/{alertId}
      * Remove an alert by ID
-     *
-     * @param alertId The alert ID to delete (from path)
-     * @return Success status and confirmation message
      */
     @DeleteMapping("/{alertId}")
-    public ResponseEntity<Map<String, Object>> removeAlert(@PathVariable Integer alertId) {
+    public ResponseEntity<Map<String, Object>> removeAlert(
+            @NotNullField(exception = MissingAlertIdException.class)
+            @PathVariable
+            Integer alertId) {
         alertRemovalService.removeAlert(userContextService.getCurrentUserId(), alertId);
 
         String successMessage = messageSource.getMessage(
@@ -125,9 +123,6 @@ public class AlertController {
     /**
      * GET /api/user/alerts/search?platform=X&symbol=Y&conditionType=Z
      * Search alerts by platform, symbol, and/or condition type
-     *
-     * @param request Contains optional search criteria (bound from query params)
-     * @return Filtered list of alerts and success status
      */
     @GetMapping("/search")
     public ResponseEntity<Map<String, Object>> searchAlerts(@ModelAttribute AlertSearchRequest request) {

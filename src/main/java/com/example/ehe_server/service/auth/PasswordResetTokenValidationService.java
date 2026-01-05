@@ -8,30 +8,28 @@ import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.PasswordResetTokenValidationServiceInterface;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.example.ehe_server.service.intf.token.TokenHashServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
 @Service
-@Transactional
+@Transactional(noRollbackFor = {ExpiredVerificationTokenException.class})
 public class PasswordResetTokenValidationService implements PasswordResetTokenValidationServiceInterface {
 
     private final VerificationTokenRepository verificationTokenRepository;
     private final AdminRepository adminRepository;
     private final UserContextService userContextService;
-    private final PasswordEncoder passwordEncoder;
+    private final TokenHashServiceInterface tokenHashService;
 
     public PasswordResetTokenValidationService(
             VerificationTokenRepository verificationTokenRepository,
             AdminRepository adminRepository,
             UserContextService userContextService,
-            PasswordEncoder passwordEncoder) {
+            TokenHashServiceInterface tokenHashService) {
         this.verificationTokenRepository = verificationTokenRepository;
         this.adminRepository = adminRepository;
         this.userContextService = userContextService;
-        this.passwordEncoder = passwordEncoder;
+        this.tokenHashService = tokenHashService;
     }
 
     @LogMessage(
@@ -41,19 +39,11 @@ public class PasswordResetTokenValidationService implements PasswordResetTokenVa
     @Override
     public void validatePasswordResetToken(String token) {
 
-        // Input validation checks
-        if (token == null || token.trim().isEmpty()) {
-            throw new MissingVerificationTokenException();
-        }
-
         // Database integrity checks
-        VerificationToken verificationToken = findTokenByPlainValue(
-                token
-        );
+        String hashedToken = tokenHashService.hashToken(token);
 
-        if (verificationToken == null) {
-            throw new InvalidPasswordResetTokenException(token);
-        }
+        VerificationToken verificationToken = verificationTokenRepository.findByTokenHash(hashedToken)
+                .orElseThrow(() -> new InvalidVerificationTokenException(token));
 
         User user = verificationToken.getUser();
 
@@ -80,17 +70,4 @@ public class PasswordResetTokenValidationService implements PasswordResetTokenVa
             throw new ExpiredVerificationTokenException(token).withResendButton();
         }
     }
-
-    private VerificationToken findTokenByPlainValue(String plainToken) {
-        List<VerificationToken> activeTokens = verificationTokenRepository.findByTokenTypeAndStatus(
-                VerificationToken.TokenType.PASSWORD_RESET,
-                VerificationToken.TokenStatus.ACTIVE
-        );
-
-        return activeTokens.stream()
-                .filter(token -> passwordEncoder.matches(plainToken, token.getTokenHash()))
-                .findFirst()
-                .orElse(null);
-    }
-
 }

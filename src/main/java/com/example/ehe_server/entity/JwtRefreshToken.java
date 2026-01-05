@@ -27,7 +27,6 @@ public class JwtRefreshToken {
             columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP + INTERVAL '30 day'")
     private LocalDateTime jwtRefreshTokenMaxExpiryDate;
 
-    // Getters and setters
     public Integer getJwtRefreshTokenId() {
         return jwtRefreshTokenId;
     }

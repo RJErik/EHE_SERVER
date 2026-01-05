@@ -1,16 +1,20 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.annotation.validation.NotNullField;
 import com.example.ehe_server.dto.*;
+import com.example.ehe_server.exception.custom.MissingWatchlistItemIdException;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.watchlist.WatchlistCandleServiceInterface;
 import com.example.ehe_server.service.intf.watchlist.WatchlistSearchServiceInterface;
 import com.example.ehe_server.service.intf.watchlist.WatchlistRetrievalServiceInterface;
 import com.example.ehe_server.service.intf.watchlist.WatchlistCreationServiceInterface;
 import com.example.ehe_server.service.intf.watchlist.WatchlistRemovalServiceInterface;
+import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -19,6 +23,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/user/watchlist-items")
+@Validated
 public class WatchlistItemController {
 
     private final WatchlistRetrievalServiceInterface watchlistRetrievalService;
@@ -75,7 +80,7 @@ public class WatchlistItemController {
      */
     @PostMapping
     public ResponseEntity<Map<String, Object>> createWatchlistItem(
-            @RequestBody WatchlistCreationRequest request) {
+            @Valid @RequestBody WatchlistCreationRequest request) {
 
         WatchlistResponse watchlistCreationResponse = watchlistCreationService.createWatchlistItem(
                 userContextService.getCurrentUserId(),
@@ -93,7 +98,6 @@ public class WatchlistItemController {
         responseBody.put("message", successMessage);
         responseBody.put("watchlistItem", watchlistCreationResponse);
 
-        // 201 Created for resource creation
         return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 
@@ -102,7 +106,10 @@ public class WatchlistItemController {
      * Remove an item from the user's watchlist
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> removeWatchlistItem(@PathVariable Integer id) {
+    public ResponseEntity<Map<String, Object>> removeWatchlistItem(
+            @NotNullField(exception = MissingWatchlistItemIdException.class)
+            @PathVariable
+            Integer id) {
         watchlistRemovalService.removeWatchlistItem(userContextService.getCurrentUserId(), id);
 
         String successMessage = messageSource.getMessage(

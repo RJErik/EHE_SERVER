@@ -40,7 +40,6 @@ public class LoggingAspect {
 
     private void logMessage(ProceedingJoinPoint joinPoint, LogMessage logMessage, Object result) {
         try {
-            // Create evaluation context
             StandardEvaluationContext context = new StandardEvaluationContext();
 
             // Add method parameters to context
@@ -52,19 +51,16 @@ public class LoggingAspect {
                 context.setVariable(paramNames[i], paramValues[i]);
             }
 
-            // Add result to context if available
             if (result != null) {
                 context.setVariable("result", result);
             }
 
-            // Evaluate SpEL expressions to get actual parameters
             Object[] messageParams = new Object[logMessage.params().length];
             for (int i = 0; i < logMessage.params().length; i++) {
                 Expression expression = parser.parseExpression(logMessage.params()[i]);
                 messageParams[i] = expression.getValue(context);
             }
 
-            // Resolve and log message
             String message = messageSource.getMessage(
                     logMessage.messageKey(),
                     messageParams,

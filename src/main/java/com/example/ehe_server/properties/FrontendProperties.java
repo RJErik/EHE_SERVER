@@ -7,20 +7,15 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "app.frontend")
 public class FrontendProperties {
 
-    // 1. Rename to match "app.frontend.url"
     private String url;
 
-    // 2. Rename to match "app.frontend.user.*"
     private PathConfig user = new PathConfig();
 
-    // 3. Rename to match "app.frontend.admin.*"
     private PathConfig admin = new PathConfig();
 
     private String verifyRegistrationPath;
     private String resetPasswordPath;
     private String verifyEmailChangePath;
-
-    // --- Corrected Getters and Setters ---
 
     public String getUrl() {
         return url;
@@ -46,7 +41,6 @@ public class FrontendProperties {
         this.admin = admin;
     }
 
-    // Keep the other getters/setters the same...
     public String getVerifyRegistrationPath() { return verifyRegistrationPath; }
     public void setVerifyRegistrationPath(String verifyRegistrationPath) { this.verifyRegistrationPath = verifyRegistrationPath; }
     public String getResetPasswordPath() { return resetPasswordPath; }

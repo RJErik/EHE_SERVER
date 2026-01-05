@@ -4,7 +4,6 @@ import com.example.ehe_server.annotation.LogMessage;
 import com.example.ehe_server.dto.PaginatedResponse;
 import com.example.ehe_server.dto.TransactionResponse;
 import com.example.ehe_server.entity.Transaction;
-import com.example.ehe_server.exception.custom.*;
 import com.example.ehe_server.repository.TransactionRepository;
 import com.example.ehe_server.service.intf.transaction.TransactionSearchServiceInterface;
 import org.springframework.data.domain.Page;
@@ -15,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,8 +22,6 @@ import java.util.stream.Collectors;
 public class TransactionSearchService implements TransactionSearchServiceInterface {
 
     private final TransactionRepository transactionRepository;
-
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public TransactionSearchService(TransactionRepository transactionRepository) {
         this.transactionRepository = transactionRepository;
@@ -63,46 +59,10 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
             BigDecimal toAmount,
             BigDecimal fromPrice,
             BigDecimal toPrice,
-            String type,
-            String status,
+            Transaction.TransactionType type,
+            Transaction.Status status,
             Integer size,
             Integer page) {
-
-        // Input Validation
-        if (page == null) {
-            throw new MissingPageNumberException();
-        }
-
-        if (size == null) {
-            throw new MissingPageSizeException();
-        }
-
-        if (page < 0) {
-            throw new InvalidPageNumberException(page);
-        }
-
-        if (size < 1) {
-            throw new InvalidPageSizeException(size);
-        }
-
-        // Parsing logic
-        Transaction.TransactionType transactionType = null;
-        if (type != null && !type.trim().isEmpty()) {
-            try {
-                transactionType = Transaction.TransactionType.valueOf(type);
-            } catch (IllegalArgumentException e) {
-                throw new InvalidTransactionTypeException(type);
-            }
-        }
-
-        Transaction.Status transactionStatus = null;
-        if (status != null && !status.trim().isEmpty()) {
-            try {
-                transactionStatus = Transaction.Status.valueOf(status);
-            } catch (IllegalArgumentException e) {
-                throw new InvalidTransactionStatusException(status);
-            }
-        }
 
         // Data retrieval
         Pageable pageable = PageRequest.of(page, size);
@@ -112,8 +72,8 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
                 portfolioId,
                 platform,
                 symbol,
-                transactionType,
-                transactionStatus,
+                type,
+                status,
                 fromTime,
                 toTime,
                 fromAmount,
@@ -130,13 +90,13 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
                         transaction.getPortfolio().getUser().getUserId(),
                         transaction.getPortfolio().getPortfolioId(),
                         transaction.getPlatformStock().getPlatform().getPlatformName(),
-                        transaction.getPlatformStock().getStock().getStockName(),
-                        transaction.getTransactionType().toString(),
+                        transaction.getPlatformStock().getStock().getStockSymbol(),
+                        transaction.getTransactionType(),
                         transaction.getQuantity(),
                         transaction.getPrice(),
                         transaction.getQuantity().multiply(transaction.getPrice()),
-                        transaction.getStatus().toString(),
-                        transaction.getTransactionDate().format(DATE_FORMATTER)
+                        transaction.getStatus(),
+                        transaction.getTransactionDate()
                 ))
                 .collect(Collectors.toList());
 

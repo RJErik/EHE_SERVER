@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service
+@Transactional
 public class BinanceAccountService implements BinanceAccountServiceInterface {
 
     private final RestTemplate restTemplate;

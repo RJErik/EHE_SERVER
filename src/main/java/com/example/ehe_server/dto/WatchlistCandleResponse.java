@@ -1,14 +1,19 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.entity.MarketCandle;
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 public class WatchlistCandleResponse {
     private Integer watchlistItemId;
     private String platform;
     private String symbol;
-    private String timestamp;
-    private String timeframe;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime timestamp;
+    private MarketCandle.Timeframe timeframe;
     private BigDecimal open;
     private BigDecimal high;
     private BigDecimal low;
@@ -17,7 +22,7 @@ public class WatchlistCandleResponse {
 
     public WatchlistCandleResponse() {}
 
-    public WatchlistCandleResponse(Integer watchlistItemId, String platform, String symbol, String timestamp, String timeframe, BigDecimal open, BigDecimal high, BigDecimal low, BigDecimal close, BigDecimal volume) {
+    public WatchlistCandleResponse(Integer watchlistItemId, String platform, String symbol, LocalDateTime timestamp, MarketCandle.Timeframe timeframe, BigDecimal open, BigDecimal high, BigDecimal low, BigDecimal close, BigDecimal volume) {
         this.watchlistItemId = watchlistItemId;
         this.platform = platform;
         this.symbol = symbol;
@@ -36,10 +41,10 @@ public class WatchlistCandleResponse {
     public void setPlatform(String platform) { this.platform = platform; }
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
-    public String getTimestamp() { return timestamp; }
-    public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
-    public String getTimeframe() { return timeframe; }
-    public void setTimeframe(String timeframe) { this.timeframe = timeframe; }
+    public LocalDateTime getTimestamp() { return timestamp; }
+    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+    public MarketCandle.Timeframe getTimeframe() { return timeframe; }
+    public void setTimeframe(MarketCandle.Timeframe timeframe) { this.timeframe = timeframe; }
     public BigDecimal getOpen() { return open; }
     public void setOpen(BigDecimal open) { this.open = open; }
     public BigDecimal getHigh() { return high; }

@@ -7,7 +7,6 @@ import com.example.ehe_server.entity.Platform;
 import com.example.ehe_server.exception.custom.*;
 import com.example.ehe_server.repository.ApiKeyRepository;
 import com.example.ehe_server.repository.PlatformRepository;
-import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.service.intf.apikey.ApiKeyUpdateServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,15 +17,12 @@ public class ApiKeyUpdateService implements ApiKeyUpdateServiceInterface {
 
     private final ApiKeyRepository apiKeyRepository;
     private final PlatformRepository platformRepository;
-    private final UserRepository userRepository;
 
     public ApiKeyUpdateService(
             ApiKeyRepository apiKeyRepository,
-            PlatformRepository platformRepository,
-            UserRepository userRepository) {
+            PlatformRepository platformRepository) {
         this.apiKeyRepository = apiKeyRepository;
         this.platformRepository = platformRepository;
-        this.userRepository = userRepository;
     }
 
     @LogMessage(
@@ -40,23 +36,6 @@ public class ApiKeyUpdateService implements ApiKeyUpdateServiceInterface {
     @Override
     public ApiKeyResponse updateApiKey(Integer userId, Integer apiKeyId, String platformName, String apiKeyValue, String secretKey) {
 
-        // Input validation checks
-        if (userId == null) {
-            throw new MissingUserIdException();
-        }
-
-        if (platformName == null || platformName.trim().isEmpty()) {
-            throw new MissingPlatformNameException();
-        }
-
-        // Database integrity checks
-        if (!userRepository.existsById(userId)) {
-            throw new UserNotFoundException(userId);
-        }
-
-        Platform platform = platformRepository.findByPlatformName(platformName)
-                .orElseThrow(() -> new PlatformNotFoundException(platformName));
-
         // ApiKey lookup and authorization
         ApiKey apiKey = apiKeyRepository.findById(apiKeyId)
                 .orElseThrow(() -> new ApiKeyNotFoundException(apiKeyId));
@@ -65,16 +44,23 @@ public class ApiKeyUpdateService implements ApiKeyUpdateServiceInterface {
             throw new UnauthorizedApiKeyAccessException(userId, apiKeyId);
         }
 
-        // Execute updates
-        apiKey.setPlatform(platform);
+        // Execute updates - only if platformName is provided
+        if (platformName != null && !platformName.isEmpty() && !apiKey.getPlatform().getPlatformName().equals(platformName)) {
+            Platform platform = platformRepository.findByPlatformName(platformName)
+                    .orElseThrow(() -> new PlatformNotFoundException(platformName));
+            if (!apiKey.getPlatform().getPlatformId().equals(platform.getPlatformId())) {
+                apiKey.setPlatform(platform);
+            }
+        }
 
-        if (apiKeyValue != null && !apiKeyValue.isEmpty()) {
+        if (apiKeyValue != null && !apiKeyValue.isEmpty() && !apiKeyValue.equals(apiKey.getApiKeyValue())) {
             apiKey.setApiKeyValue(apiKeyValue);
         }
 
-        if (secretKey != null && !secretKey.isEmpty()) {
+        if (secretKey != null && !secretKey.isEmpty() && !secretKey.equals(apiKey.getSecretKey())) {
             apiKey.setSecretKey(secretKey);
         }
+
 
         apiKeyRepository.save(apiKey);
 
@@ -106,11 +92,7 @@ public class ApiKeyUpdateService implements ApiKeyUpdateServiceInterface {
         String firstPart = apiKeyValue.substring(0, visibleCharCount);
         String lastPart = apiKeyValue.substring(apiKeyValue.length() - visibleCharCount);
         int maskedLength = apiKeyValue.length() - (2 * visibleCharCount);
-        StringBuilder maskedMiddle = new StringBuilder();
-        for (int i = 0; i < maskedLength; i++) {
-            maskedMiddle.append("*");
-        }
 
-        return firstPart + maskedMiddle + lastPart;
+        return firstPart + "*".repeat(maskedLength) + lastPart;
     }
 }

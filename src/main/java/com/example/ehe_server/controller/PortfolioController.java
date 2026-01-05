@@ -1,6 +1,10 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.annotation.validation.NotEmptyString;
+import com.example.ehe_server.annotation.validation.NotNullField;
 import com.example.ehe_server.dto.*;
+import com.example.ehe_server.exception.custom.MissingPlatformNameException;
+import com.example.ehe_server.exception.custom.MissingPortfolioIdException;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.portfolio.*;
 import com.example.ehe_server.service.portfolio.PortfolioByPlatformService;
@@ -11,6 +15,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -19,6 +24,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/user/portfolios")
+@Validated
 public class PortfolioController {
 
     private final PortfolioRetrievalServiceInterface portfolioRetrievalService;
@@ -30,6 +36,7 @@ public class PortfolioController {
     private final PortfolioValueServiceInterface portfolioValueService;
     private final PortfolioDetailsServiceInterface portfolioDetailsService;
     private final PortfolioByPlatformServiceInterface portfolioByPlatformService;
+    private final HoldingsSyncServiceInterface holdingsSyncService;
 
     public PortfolioController(
             PortfolioRetrievalServiceInterface portfolioRetrievalService,
@@ -40,7 +47,8 @@ public class PortfolioController {
             MessageSource messageSource,
             PortfolioValueService portfolioValueService,
             PortfolioDetailsService portfolioDetailsService,
-            PortfolioByPlatformService portfolioByPlatformService) {
+            PortfolioByPlatformService portfolioByPlatformService,
+            HoldingsSyncServiceInterface holdingsSyncService) {
         this.portfolioRetrievalService = portfolioRetrievalService;
         this.portfolioCreationService = portfolioCreationService;
         this.portfolioRemovalService = portfolioRemovalService;
@@ -50,6 +58,7 @@ public class PortfolioController {
         this.portfolioValueService = portfolioValueService;
         this.portfolioDetailsService = portfolioDetailsService;
         this.portfolioByPlatformService = portfolioByPlatformService;
+        this.holdingsSyncService = holdingsSyncService;
     }
 
     /**
@@ -99,7 +108,6 @@ public class PortfolioController {
         responseBody.put("message", successMessage);
         responseBody.put("portfolio", portfolioCreationResponse);
 
-        // 201 Created for resource creation
         return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 
@@ -108,7 +116,10 @@ public class PortfolioController {
      * Delete a portfolio by ID
      */
     @DeleteMapping("/{portfolioId}")
-    public ResponseEntity<Map<String, Object>> removePortfolio(@PathVariable Integer portfolioId) {
+    public ResponseEntity<Map<String, Object>> removePortfolio(
+            @NotNullField(exception = MissingPortfolioIdException.class)
+            @PathVariable
+            Integer portfolioId) {
         portfolioRemovalService.removePortfolio(userContextService.getCurrentUserId(), portfolioId);
 
         String successMessage = messageSource.getMessage(
@@ -129,7 +140,7 @@ public class PortfolioController {
      * Search portfolios with filters
      */
     @GetMapping("/search")
-    public ResponseEntity<Map<String, Object>> searchPortfolio(@ModelAttribute PortfolioSearchRequest request) {
+    public ResponseEntity<Map<String, Object>> searchPortfolio(@Valid @ModelAttribute PortfolioSearchRequest request) {
         List<PortfolioResponse> portfolioSearchResponses = portfolioSearchService.searchPortfolios(
                 userContextService.getCurrentUserId(),
                 request.getPlatform(),
@@ -155,9 +166,12 @@ public class PortfolioController {
      * Update holdings for a specific portfolio (sync with exchange)
      */
     @PutMapping("/{portfolioId}/holdings")
-    public ResponseEntity<Map<String, Object>> updateHoldings(@PathVariable Integer portfolioId) {
+    public ResponseEntity<Map<String, Object>> updateHoldings(
+            @NotNullField(exception = MissingPortfolioIdException.class)
+            @PathVariable
+            Integer portfolioId) {
         HoldingsUpdateResponse holdingsUpdateResponse =
-                portfolioValueService.updateHoldings(userContextService.getCurrentUserId(), portfolioId);
+                holdingsSyncService.syncHoldings(userContextService.getCurrentUserId(), portfolioId);
 
         String successMessage = messageSource.getMessage(
                 "success.message.portfolio.holdings.updated",
@@ -178,7 +192,10 @@ public class PortfolioController {
      * Get the calculated value of a portfolio
      */
     @GetMapping("/{portfolioId}/value")
-    public ResponseEntity<Map<String, Object>> getPortfolioValue(@PathVariable Integer portfolioId) {
+    public ResponseEntity<Map<String, Object>> getPortfolioValue(
+            @NotNullField(exception = MissingPortfolioIdException.class)
+            @PathVariable
+            Integer portfolioId) {
         PortfolioValueResponse portfolioValueResponse =
                 portfolioValueService.calculatePortfolioValue(userContextService.getCurrentUserId(), portfolioId);
 
@@ -201,7 +218,10 @@ public class PortfolioController {
      * Get detailed information about a portfolio including holdings
      */
     @GetMapping("/{portfolioId}/details")
-    public ResponseEntity<Map<String, Object>> getPortfolioDetails(@PathVariable Integer portfolioId) {
+    public ResponseEntity<Map<String, Object>> getPortfolioDetails(
+            @NotNullField(exception = MissingPortfolioIdException.class)
+            @PathVariable
+            Integer portfolioId) {
         PortfolioDetailsResponse portfolioDetailsResponse =
                 portfolioDetailsService.getPortfolioDetails(userContextService.getCurrentUserId(), portfolioId);
 
@@ -225,6 +245,7 @@ public class PortfolioController {
      */
     @GetMapping("/by-platform")
     public ResponseEntity<Map<String, Object>> getPortfoliosByPlatform(
+            @NotEmptyString(exception = MissingPlatformNameException.class)
             @RequestParam String platform) {
 
         List<PortfolioByPlatformResponse> portfolioByPlatformResponses =

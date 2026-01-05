@@ -1,6 +1,8 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.annotation.validation.NotNullField;
 import com.example.ehe_server.dto.*;
+import com.example.ehe_server.exception.custom.MissingApiKeyIdException;
 import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.apikey.ApiKeyCreationServiceInterface;
 import com.example.ehe_server.service.intf.apikey.ApiKeyRemovalServiceInterface;
@@ -11,20 +13,16 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * REST controller for managing user API keys.
- *
- * Resource: API Key
- * Base path: /api/user/api-keys
- */
 @RestController
 @RequestMapping("/api/user/api-keys")
+@Validated
 public class ApiKeyController {
 
     private final UserContextServiceInterface userContextService;
@@ -105,7 +103,9 @@ public class ApiKeyController {
      */
     @PutMapping("/{apiKeyId}")
     public ResponseEntity<Map<String, Object>> updateApiKey(
-            @PathVariable Integer apiKeyId,
+            @NotNullField(exception = MissingApiKeyIdException.class)
+            @PathVariable
+            Integer apiKeyId,
             @Valid @RequestBody ApiKeyUpdateRequest request) {
         ApiKeyResponse apiKeyUpdateResponse = apiKeyUpdateService.updateApiKey(
                 userContextService.getCurrentUserId(),
@@ -133,7 +133,10 @@ public class ApiKeyController {
      * Remove an API key.
      */
     @DeleteMapping("/{apiKeyId}")
-    public ResponseEntity<Map<String, Object>> removeApiKey(@PathVariable Integer apiKeyId) {
+    public ResponseEntity<Map<String, Object>> removeApiKey(
+            @NotNullField(exception = MissingApiKeyIdException.class)
+            @PathVariable
+            Integer apiKeyId) {
         apiKeyRemovalService.removeApiKey(userContextService.getCurrentUserId(), apiKeyId);
 
         String successMessage = messageSource.getMessage(

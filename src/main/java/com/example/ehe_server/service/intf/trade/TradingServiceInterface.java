@@ -1,6 +1,8 @@
 package com.example.ehe_server.service.intf.trade;
 
 import com.example.ehe_server.dto.TradeExecutionResponse;
+import com.example.ehe_server.entity.AutomatedTradeRule;
+import com.example.ehe_server.entity.Transaction;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -16,6 +18,7 @@ public interface TradingServiceInterface {
      * @param quantityType "QUANTITY" (for selling) or "QUOTE_ORDER_QTY" (for buying)
      * @return Map containing success status and trade details or error message
      */
-    TradeExecutionResponse executeTrade(Integer userId, Integer portfolioId, String stockSymbol, String action,
-                                              BigDecimal amount, String quantityType);
+    TradeExecutionResponse executeTrade(Integer userId, Integer portfolioId, String stockSymbol,
+                                        Transaction.TransactionType action, BigDecimal amount,
+                                        AutomatedTradeRule.QuantityType quantityType);
 }

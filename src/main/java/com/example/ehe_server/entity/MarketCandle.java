@@ -1,5 +1,7 @@
 package com.example.ehe_server.entity;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.persistence.*;
 import jakarta.persistence.Converter;
 import jakarta.validation.constraints.*;
@@ -24,13 +26,15 @@ public class MarketCandle {
             this.value = value;
         }
 
+        @JsonValue
         public String getValue() {
             return value;
         }
 
+        @JsonCreator
         public static Timeframe fromValue(String value) {
             for (Timeframe tf : Timeframe.values()) {
-                if (tf.getValue().equals(value)) {
+                if (tf.getValue().equalsIgnoreCase(value)) {
                     return tf;
                 }
             }
@@ -92,7 +96,6 @@ public class MarketCandle {
     @Column(name = "volume", nullable = false, precision = 18, scale = 8)
     private BigDecimal volume;
 
-    // Getters and setters
     public Integer getMarketCandleId() {
         return marketCandleId;
     }

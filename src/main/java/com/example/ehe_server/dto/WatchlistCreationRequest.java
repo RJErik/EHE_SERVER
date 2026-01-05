@@ -1,10 +1,16 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.annotation.validation.NotEmptyString;
+import com.example.ehe_server.exception.custom.MissingPlatformNameException;
+import com.example.ehe_server.exception.custom.MissingStockSymbolException;
+
 public class WatchlistCreationRequest {
+
+    @NotEmptyString(exception = MissingPlatformNameException.class)
     private String platform;
+    @NotEmptyString(exception = MissingStockSymbolException.class)
     private String symbol;
 
-    // Getters and setters
     public String getPlatform() {
         return platform;
     }

@@ -114,8 +114,8 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     private void setWebSocketAuthentication(String token, StompHeaderAccessor accessor) {
         try {
             JwtClaimService.TokenDetails tokenDetails = jwtClaimService.parseTokenDetails(token);
-            Integer userId = tokenDetails.getUserId();
-            String role = tokenDetails.getRole();
+            Integer userId = tokenDetails.userId();
+            String role = tokenDetails.role();
 
             if (!areClaimsValid(userId, role)) {
                 loggingService.logAction("[WebSocket/CONNECT] JWT claims invalid: userId=" + userId + ", role=" + role);

@@ -1,21 +1,24 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.entity.Alert;
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 public class AlertResponse {
     private Integer id;
     private String platform;
     private String symbol;
-    private String conditionType;
+    private Alert.ConditionType conditionType;
     private BigDecimal thresholdValue;
-    private String dateCreated;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime dateCreated;
 
-    // No-argument constructor
     public AlertResponse() {}
 
-    // All-argument constructor
-    public AlertResponse(Integer id, String platform, String symbol, String conditionType, BigDecimal thresholdValue, String dateCreated) {
+    public AlertResponse(Integer id, String platform, String symbol, Alert.ConditionType conditionType, BigDecimal thresholdValue, LocalDateTime dateCreated) {
         this.id = id;
         this.platform = platform;
         this.symbol = symbol;
@@ -24,7 +27,6 @@ public class AlertResponse {
         this.dateCreated = dateCreated;
     }
 
-    // Getters and Setters
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
 
@@ -34,14 +36,14 @@ public class AlertResponse {
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
 
-    public String getConditionType() { return conditionType; }
-    public void setConditionType(String conditionType) { this.conditionType = conditionType; }
+    public Alert.ConditionType getConditionType() { return conditionType; }
+    public void setConditionType(Alert.ConditionType conditionType) { this.conditionType = conditionType; }
 
     public BigDecimal getThresholdValue() { return thresholdValue; }
     public void setThresholdValue(BigDecimal thresholdValue) { this.thresholdValue = thresholdValue; }
 
-    public String getDateCreated() { return dateCreated; }
-    public void setDateCreated(String dateCreated) { this.dateCreated = dateCreated; }
+    public LocalDateTime getDateCreated() { return dateCreated; }
+    public void setDateCreated(LocalDateTime dateCreated) { this.dateCreated = dateCreated; }
 
     @Override
     public boolean equals(Object o) {

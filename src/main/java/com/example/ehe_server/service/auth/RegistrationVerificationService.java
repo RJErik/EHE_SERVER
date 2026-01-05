@@ -8,30 +8,28 @@ import com.example.ehe_server.repository.AdminRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.RegistrationVerificationServiceInterface;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.example.ehe_server.service.intf.token.TokenHashServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
 @Service
-@Transactional
+@Transactional(noRollbackFor = {ExpiredVerificationTokenException.class})
 public class RegistrationVerificationService implements RegistrationVerificationServiceInterface {
 
     private final VerificationTokenRepository verificationTokenRepository;
     private final AdminRepository adminRepository;
     private final UserContextService userContextService;
-    private final PasswordEncoder passwordEncoder;
+    private final TokenHashServiceInterface tokenHashService;
 
     public RegistrationVerificationService(
             VerificationTokenRepository verificationTokenRepository,
             AdminRepository adminRepository,
             UserContextService userContextService,
-            PasswordEncoder passwordEncoder) {
+            TokenHashServiceInterface tokenHashService) {
         this.verificationTokenRepository = verificationTokenRepository;
         this.adminRepository = adminRepository;
         this.userContextService = userContextService;
-        this.passwordEncoder = passwordEncoder;
+        this.tokenHashService = tokenHashService;
     }
 
     @LogMessage(
@@ -41,19 +39,12 @@ public class RegistrationVerificationService implements RegistrationVerification
     @Override
     public void verifyRegistrationToken(String token) {
 
-        // Input validation checks
-        if (token == null || token.trim().isEmpty()) {
-            throw new MissingVerificationTokenException();
-        }
-
         // Database integrity checks
-        VerificationToken verificationToken = findTokenByPlainValue(
-                token
-        );
+        String hashedToken = tokenHashService.hashToken(token);
 
-        if (verificationToken == null) {
-            throw new InvalidVerificationTokenException(token);
-        }
+        // Direct DB Lookup
+        VerificationToken verificationToken = verificationTokenRepository.findByTokenHash(hashedToken)
+                .orElseThrow(() -> new InvalidVerificationTokenException(token));
 
         User user = verificationToken.getUser();
 
@@ -84,19 +75,5 @@ public class RegistrationVerificationService implements RegistrationVerification
         // State updates
         user.setAccountStatus(User.AccountStatus.ACTIVE);
         verificationToken.setStatus(VerificationToken.TokenStatus.USED);
-    }
-
-    private VerificationToken findTokenByPlainValue(String plainToken) {
-        // Get all active tokens of the specified type
-        List<VerificationToken> activeTokens = verificationTokenRepository.findByTokenTypeAndStatus(
-                VerificationToken.TokenType.REGISTRATION,
-                VerificationToken.TokenStatus.ACTIVE
-        );
-
-        // Find the token that matches the plain value
-        return activeTokens.stream()
-                .filter(token -> passwordEncoder.matches(plainToken, token.getTokenHash()))
-                .findFirst()
-                .orElse(null);
     }
 }

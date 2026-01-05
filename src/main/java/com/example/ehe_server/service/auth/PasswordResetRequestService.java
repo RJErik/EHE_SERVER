@@ -12,14 +12,13 @@ import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.auth.PasswordResetRequestServiceInterface;
 import com.example.ehe_server.service.intf.email.EmailSenderServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.example.ehe_server.service.intf.token.TokenHashServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 @Service
 @Transactional
@@ -28,9 +27,6 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
     private static final int RATE_LIMIT_MAX_REQUESTS = 5;
     private static final int RATE_LIMIT_MINUTES = 5;
 
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    private static final int EMAIL_MAX_LENGTH = 255;
-
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailSenderServiceInterface emailSenderService;
@@ -38,7 +34,8 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
     private final AdminRepository adminRepository;
     private final UserContextService userContextService;
     private final VerificationTokenProperties verificationTokenProperties;
-    private final PasswordEncoder passwordEncoder;
+    private final TokenHashServiceInterface tokenHashService;
+
 
     public PasswordResetRequestService(
             UserRepository userRepository,
@@ -48,7 +45,7 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
             AdminRepository adminRepository,
             UserContextService userContextService,
             VerificationTokenProperties verificationTokenProperties,
-            PasswordEncoder passwordEncoder) {
+            TokenHashServiceInterface tokenHashService) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.emailSenderService = emailSenderService;
@@ -56,7 +53,7 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
         this.adminRepository = adminRepository;
         this.userContextService = userContextService;
         this.verificationTokenProperties = verificationTokenProperties;
-        this.passwordEncoder = passwordEncoder;
+        this.tokenHashService = tokenHashService;
     }
 
     @LogMessage(
@@ -65,15 +62,6 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
     )
     @Override
     public void requestPasswordResetForUnauthenticatedUser(String email) {
-
-        // Input validation checks
-        if (email == null || email.trim().isEmpty()) {
-            throw new MissingEmailException();
-        }
-
-        if (email.length() > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.matcher(email).matches()) {
-            throw new InvalidEmailFormatException(email);
-        }
 
         // Database integrity checks
         var userOpt = userRepository.findByEmail(email);
@@ -104,18 +92,10 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
     @Override
     public void requestPasswordResetForAuthenticatedUser(Integer userId) {
 
-        // Input validation checks
-        if (userId == null) {
-            throw new MissingUserIdException();
-        }
+        // Retrieve the user and call the private method
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
 
-        // Database integrity checks
-        var userOpt = userRepository.findById(userId);
-        if (userOpt.isEmpty()) {
-            throw new UserNotFoundException(userId);
-        }
-
-        User user = userOpt.get();
         processPasswordResetRequest(user, user.getEmail());
     }
 
@@ -138,7 +118,7 @@ public class PasswordResetRequestService implements PasswordResetRequestServiceI
 
         // Token generation
         String plainToken = UUID.randomUUID().toString();  // Plain token to send via email
-        String hashedToken = passwordEncoder.encode(plainToken);
+        String hashedToken = tokenHashService.hashToken(plainToken);
         LocalDateTime expiryDate = LocalDateTime.now().plusHours(verificationTokenProperties.getTokenExpiryHours());
 
         VerificationToken newToken = new VerificationToken(

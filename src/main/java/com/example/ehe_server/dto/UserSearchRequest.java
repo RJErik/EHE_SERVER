@@ -1,5 +1,12 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.annotation.validation.MinValue;
+import com.example.ehe_server.annotation.validation.NotNullField;
+import com.example.ehe_server.entity.User;
+import com.example.ehe_server.exception.custom.InvalidPageNumberException;
+import com.example.ehe_server.exception.custom.InvalidPageSizeException;
+import com.example.ehe_server.exception.custom.MissingPageNumberException;
+import com.example.ehe_server.exception.custom.MissingPageSizeException;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDateTime;
@@ -10,30 +17,38 @@ public class UserSearchRequest {
     private Integer userId;
     private String userName;
     private String email;
-    private String accountStatus;
+    private User.AccountStatus accountStatus;
 
-    // Use LocalDateTime directly - Spring handles the conversion
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime registrationDateTo;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime registrationDateFrom;
 
+    @NotNullField(exception = MissingPageSizeException.class)
+    @MinValue(exception = InvalidPageSizeException.class, min = 1)
+    private Integer size;
+
+    @NotNullField(exception = MissingPageNumberException.class)
+    @MinValue(exception = InvalidPageNumberException.class, min = 0)
+    private Integer page;
+
     public UserSearchRequest() {
     }
 
     public UserSearchRequest(Integer userId, String userName, String email,
-                             String accountStatus, LocalDateTime registrationDateTo,
-                             LocalDateTime registrationDateFrom) {
+                             User.AccountStatus accountStatus, LocalDateTime registrationDateTo,
+                             LocalDateTime registrationDateFrom, Integer size, Integer page) {
         this.userId = userId;
         this.userName = userName;
         this.email = email;
         this.accountStatus = accountStatus;
         this.registrationDateTo = registrationDateTo;
         this.registrationDateFrom = registrationDateFrom;
+        this.size = size;
+        this.page = page;
     }
 
-    // Getters and Setters
     public Integer getUserId() {
         return userId;
     }
@@ -58,11 +73,11 @@ public class UserSearchRequest {
         this.email = email;
     }
 
-    public String getAccountStatus() {
+    public User.AccountStatus getAccountStatus() {
         return accountStatus;
     }
 
-    public void setAccountStatus(String accountStatus) {
+    public void setAccountStatus(User.AccountStatus accountStatus) {
         this.accountStatus = accountStatus;
     }
 
@@ -82,6 +97,22 @@ public class UserSearchRequest {
         this.registrationDateFrom = registrationDateFrom;
     }
 
+    public Integer getSize() {
+        return size;
+    }
+
+    public void setSize(Integer size) {
+        this.size = size;
+    }
+
+    public Integer getPage() {
+        return page;
+    }
+
+    public void setPage(Integer page) {
+        this.page = page;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
@@ -91,13 +122,15 @@ public class UserSearchRequest {
                 Objects.equals(email, that.email) &&
                 Objects.equals(accountStatus, that.accountStatus) &&
                 Objects.equals(registrationDateTo, that.registrationDateTo) &&
-                Objects.equals(registrationDateFrom, that.registrationDateFrom);
+                Objects.equals(registrationDateFrom, that.registrationDateFrom) &&
+                Objects.equals(size, that.size) &&
+                Objects.equals(page, that.page);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(userId, userName, email, accountStatus,
-                registrationDateTo, registrationDateFrom);
+                registrationDateTo, registrationDateFrom, size, page);
     }
 
     @Override
@@ -109,6 +142,8 @@ public class UserSearchRequest {
                 ", accountStatus='" + accountStatus + '\'' +
                 ", registrationDateTo=" + registrationDateTo +
                 ", registrationDateFrom=" + registrationDateFrom +
+                ", size=" + size +
+                ", page=" + page +
                 '}';
     }
 }

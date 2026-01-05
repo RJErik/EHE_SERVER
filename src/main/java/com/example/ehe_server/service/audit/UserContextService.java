@@ -20,8 +20,6 @@ import java.util.Optional;
 @Component
 public class UserContextService implements UserContextServiceInterface {
 
-    // Thread-local storage for request-specific information
-    private static final ThreadLocal<String> requestPath = new ThreadLocal<>();
     private final UserRepository userRepository;
 
     public UserContextService(@Lazy UserRepository userRepository) {
@@ -116,11 +114,7 @@ public class UserContextService implements UserContextServiceInterface {
     public User getCurrentHumanUser() {
         if (isHumanUser()) {
             Optional<User> user = userRepository.findById(getCurrentUserId());
-            if (user.isPresent()) {
-                return user.get();
-            } else {
-                return null;
-            }
+            return user.orElse(null);
         } else {
             return null;
         }

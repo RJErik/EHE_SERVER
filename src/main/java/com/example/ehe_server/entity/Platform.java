@@ -21,7 +21,6 @@ public class Platform {
     @OneToMany(mappedBy = "platform", fetch = FetchType.LAZY)
     private List<ApiKey> apiKeys;
 
-    // Getters and setters
     public Integer getPlatformId() {
         return platformId;
     }

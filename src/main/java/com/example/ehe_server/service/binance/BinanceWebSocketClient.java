@@ -28,10 +28,7 @@ public class BinanceWebSocketClient extends TextWebSocketHandler implements Bina
     // Single connection for all subscriptions
     private volatile WebSocketSession session;
 
-    // Track all subscribed symbols
     private final Set<String> subscriptions = ConcurrentHashMap.newKeySet();
-
-    // Handlers for each symbol
     private final Map<String, Consumer<JsonNode>> handlers = new ConcurrentHashMap<>();
 
     private final AtomicInteger lastId = new AtomicInteger(1);
@@ -92,6 +89,7 @@ public class BinanceWebSocketClient extends TextWebSocketHandler implements Bina
     /**
      * Add symbols to the existing subscription
      */
+    @Override
     public synchronized void addSymbols(List<String> symbols) {
         List<String> updatedList = new ArrayList<>(subscriptions);
         symbols.stream()
@@ -105,6 +103,7 @@ public class BinanceWebSocketClient extends TextWebSocketHandler implements Bina
     /**
      * Remove symbols from the subscription
      */
+    @Override
     public synchronized void removeSymbols(List<String> symbols) {
         Set<String> toRemove = symbols.stream()
                 .map(String::toLowerCase)
@@ -161,7 +160,7 @@ public class BinanceWebSocketClient extends TextWebSocketHandler implements Bina
      * Creates a subscription message with multiple streams
      * Format: [symbol1@kline_1m, symbol2@kline_1m, ...]
      */
-    private TextMessage createSubscriptionMessage(List<String> symbols) throws IOException {
+    private TextMessage createSubscriptionMessage(List<String> symbols) {
         String params = symbols.stream()
                 .map(symbol -> "\"" + symbol + "@kline_" + INTERVAL + "\"")
                 .collect(Collectors.joining(","));

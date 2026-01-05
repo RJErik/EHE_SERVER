@@ -1,6 +1,8 @@
 package com.example.ehe_server.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -22,12 +24,10 @@ public class ErrorLog {
     @Column(name = "stack_trace", nullable = false, columnDefinition = "TEXT")
     private String stackTrace;
 
-    @Column(name = "error_date", nullable = false,
-            updatable = false, insertable = false,
-            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    @CreationTimestamp
+    @Column(name = "error_date", nullable = false, updatable = false, insertable = false)
     private LocalDateTime errorDate;
 
-    // Getters and setters
     public Integer getErrorLogId() {
         return errorLogId;
     }

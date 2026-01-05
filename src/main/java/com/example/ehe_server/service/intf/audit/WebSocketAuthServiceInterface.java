@@ -14,12 +14,4 @@ public interface WebSocketAuthServiceInterface {
      * @return User ID as Integer, null if not authenticated or invalid
      */
     Integer getUserIdFromWebSocketAuth(StompHeaderAccessor headerAccessor);
-
-    /**
-     * Check if the WebSocket user is authenticated
-     *
-     * @param headerAccessor The STOMP header accessor containing authentication info
-     * @return true if authenticated, false otherwise
-     */
-    boolean isWebSocketUserAuthenticated(StompHeaderAccessor headerAccessor);
 }

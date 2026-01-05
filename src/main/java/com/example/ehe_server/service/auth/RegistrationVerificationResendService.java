@@ -11,7 +11,7 @@ import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.auth.RegistrationVerificationResendServiceInterface;
 import com.example.ehe_server.service.intf.email.EmailSenderServiceInterface;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.example.ehe_server.service.intf.token.TokenHashServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +19,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 @Service
 @Transactional
@@ -34,10 +33,7 @@ public class RegistrationVerificationResendService implements RegistrationVerifi
     private final UserRepository userRepository;
     private final AdminRepository adminRepository;
     private final UserContextServiceInterface userContextService;
-    private final PasswordEncoder passwordEncoder;
-
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    private static final int EMAIL_MAX_LENGTH = 255;
+    private final TokenHashServiceInterface tokenHashService;
 
     public RegistrationVerificationResendService(
             VerificationTokenRepository verificationTokenRepository,
@@ -46,14 +42,14 @@ public class RegistrationVerificationResendService implements RegistrationVerifi
             VerificationTokenProperties verificationTokenProperties,
             AdminRepository adminRepository,
             UserContextServiceInterface userContextService,
-            PasswordEncoder passwordEncoder) {
+            TokenHashServiceInterface tokenHashService) {
         this.verificationTokenRepository = verificationTokenRepository;
         this.userRepository = userRepository;
         this.emailSenderService = emailSenderService;
         this.verificationTokenProperties = verificationTokenProperties;
         this.adminRepository = adminRepository;
         this.userContextService = userContextService;
-        this.passwordEncoder = passwordEncoder;
+        this.tokenHashService = tokenHashService;
     }
 
     @LogMessage(messageKey = "log.message.auth.resendRegistrationVerification")
@@ -61,14 +57,6 @@ public class RegistrationVerificationResendService implements RegistrationVerifi
     public void resendVerificationEmail(String email) {
 
         // Input validation checks
-        if (email == null || email.trim().isEmpty()) {
-            throw new MissingEmailException();
-        }
-
-        if (email.length() > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.matcher(email).matches()) {
-            throw new InvalidEmailFormatException(email);
-        }
-
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
             throw new UserEmailNotFoundException(email);
@@ -107,7 +95,7 @@ public class RegistrationVerificationResendService implements RegistrationVerifi
 
         // Generate and Save New Token
         String plainToken = UUID.randomUUID().toString();
-        String hashedToken = passwordEncoder.encode(plainToken);
+        String hashedToken = tokenHashService.hashToken(plainToken);
         LocalDateTime expiryDate = LocalDateTime.now().plusHours(verificationTokenProperties.getTokenExpiryHours());
 
         VerificationToken newToken = new VerificationToken(

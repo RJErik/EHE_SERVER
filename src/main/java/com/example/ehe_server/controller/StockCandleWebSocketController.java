@@ -2,7 +2,7 @@ package com.example.ehe_server.controller;
 
 import com.example.ehe_server.dto.websocket.*;
 import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
-import com.example.ehe_server.service.intf.stock.StockWebSocketSubscriptionManagerInterface;
+import com.example.ehe_server.service.intf.stock.websocket.StockWebSocketSubscriptionManagerInterface;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.messaging.handler.annotation.Header;

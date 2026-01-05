@@ -11,15 +11,15 @@ import java.util.List;
 
 @Repository
 public interface AlertRepository extends JpaRepository<Alert, Integer> {
-    @EntityGraph(attributePaths = {"platformStock"})
+    @EntityGraph(attributePaths = {"platformStock", "platformStock.platform", "platformStock.stock"})
     List<Alert> findByUser_UserIdOrderByDateCreatedDesc(Integer userId);
     List<Alert> findByUser_UserId(Integer userId);
 
-    @EntityGraph(attributePaths = {"platformStock"})
+    @EntityGraph(attributePaths = {"platformStock", "platformStock.platform", "platformStock.stock"})
     @Query("SELECT a FROM Alert a WHERE " +
             "a.user.userId = :userId AND " +
-            "(:platform IS NULL OR a.platformStock.platformName = :platform) AND " +
-            "(:symbol IS NULL OR a.platformStock.stockSymbol = :symbol) AND " +
+            "(:platform IS NULL OR a.platformStock.platform.platformName = :platform) AND " +
+            "(:symbol IS NULL OR a.platformStock.stock.stockSymbol = :symbol) AND " +
             "(:conditionType IS NULL OR a.conditionType = :conditionType) " +
             "ORDER BY a.dateCreated DESC")
     List<Alert> searchAlerts(

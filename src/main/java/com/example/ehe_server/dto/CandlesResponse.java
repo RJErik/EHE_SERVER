@@ -10,7 +10,6 @@ public class CandlesResponse {
     private Integer totalCandles;
     private List<CandleDTO> candles;
 
-    // Constructors
     public CandlesResponse() {}
 
     public CandlesResponse(String platform, String stockSymbol, String timeframe,
@@ -22,7 +21,6 @@ public class CandlesResponse {
         this.candles = candles;
     }
 
-    // Getters and setters
     public String getPlatform() {
         return platform;
     }

@@ -3,18 +3,17 @@ package com.example.ehe_server.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "\"admin\"") // Quotes are used because "admin" might be a reserved keyword
+@Table(name = "\"admin\"")
 public class Admin {
 
     @Id
     private Integer adminId;
 
-    @OneToOne
-    @MapsId // Shares primary key with User entity
-    @JoinColumn(name = "admin_id") // Foreign key column in this table
+    @OneToOne(fetch = FetchType.LAZY)
+    @MapsId
+    @JoinColumn(name = "admin_id")
     private User user;
 
-    // Getters and setters
     public Integer getAdminId() {
         return adminId;
     }

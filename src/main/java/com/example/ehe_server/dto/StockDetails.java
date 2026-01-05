@@ -15,7 +15,6 @@ public class StockDetails {
         this.value = value;
     }
 
-    // Getters and Setters
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
     public BigDecimal getValue() { return value; }

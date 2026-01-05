@@ -1,15 +1,27 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.annotation.validation.NotEmptyString;
+import com.example.ehe_server.annotation.validation.NotNullField;
+import com.example.ehe_server.annotation.validation.PositiveAmount;
+import com.example.ehe_server.entity.AutomatedTradeRule;
+import com.example.ehe_server.entity.Transaction;
+import com.example.ehe_server.exception.custom.*;
+
 import java.math.BigDecimal;
 
 public class TradeRequest {
+    @NotNullField(exception = MissingPortfolioIdException.class)
     private Integer portfolioId;
+    @NotEmptyString(exception = MissingStockSymbolException.class)
     private String stockSymbol;
-    private String action; // "BUY" or "SELL"
-    private BigDecimal amount;
-    private String quantityType; // "QUANTITY" or "QUOTE_ORDER_QTY"
+    @NotNullField(exception = MissingActionTypeException.class)
+    private Transaction.TransactionType action; // "BUY" or "SELL"
+    @NotNullField(exception = MissingQuantityException.class)
+    @PositiveAmount(exception = InvalidQuantityException.class)
+    private BigDecimal quantity;
+    @NotNullField(exception = MissingQuantityTypeException.class)
+    private AutomatedTradeRule.QuantityType quantityType; // "QUANTITY" or "QUOTE_ORDER_QTY"
 
-    // Getters and setters
     public Integer getPortfolioId() {
         return portfolioId;
     }
@@ -26,27 +38,27 @@ public class TradeRequest {
         this.stockSymbol = stockSymbol;
     }
 
-    public String getAction() {
+    public Transaction.TransactionType getAction() {
         return action;
     }
 
-    public void setAction(String action) {
+    public void setAction(Transaction.TransactionType action) {
         this.action = action;
     }
 
-    public BigDecimal getAmount() {
-        return amount;
+    public BigDecimal getQuantity() {
+        return quantity;
     }
 
-    public void setAmount(BigDecimal amount) {
-        this.amount = amount;
+    public void setQuantity(BigDecimal quantity) {
+        this.quantity = quantity;
     }
 
-    public String getQuantityType() {
+    public AutomatedTradeRule.QuantityType getQuantityType() {
         return quantityType;
     }
 
-    public void setQuantityType(String quantityType) {
+    public void setQuantityType(AutomatedTradeRule.QuantityType quantityType) {
         this.quantityType = quantityType;
     }
 }

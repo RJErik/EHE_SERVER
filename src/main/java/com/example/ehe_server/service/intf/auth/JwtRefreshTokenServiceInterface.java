@@ -28,13 +28,6 @@ public interface JwtRefreshTokenServiceInterface {
     void saveRefreshToken(User user, String tokenHash, long expirationTime, LocalDateTime specificMaxExpiry);
 
     /**
-     * Remove a refresh token by its database ID.
-     *
-     * @param tokenId The ID of the token to remove
-     */
-    void removeRefreshTokenById(Integer tokenId);
-
-    /**
      * Remove a refresh token by the raw token string.
      * Used during rotation or logout.
      *

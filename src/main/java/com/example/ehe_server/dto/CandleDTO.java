@@ -14,7 +14,6 @@ public class CandleDTO {
     private BigDecimal volume;
     private Long sequence; // New field
 
-    // Constructors
     public CandleDTO() {}
 
     public CandleDTO(Integer candleId, LocalDateTime timestamp, BigDecimal openPrice,
@@ -30,7 +29,6 @@ public class CandleDTO {
         this.sequence = sequence;
     }
 
-    // Getters and setters
     public Integer getCandleId() {
         return candleId;
     }

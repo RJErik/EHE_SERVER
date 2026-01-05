@@ -1,14 +1,24 @@
 package com.example.ehe_server.dto;
 
+import com.example.ehe_server.annotation.validation.NotEmptyString;
+import com.example.ehe_server.annotation.validation.NotNullField;
+import com.example.ehe_server.annotation.validation.PositiveAmount;
+import com.example.ehe_server.entity.Alert;
+import com.example.ehe_server.exception.custom.*;
+
 import java.math.BigDecimal;
 
 public class AlertCreationRequest {
+    @NotEmptyString(exception = MissingPlatformNameException.class)
     private String platform;
+    @NotEmptyString(exception = MissingStockSymbolException.class)
     private String symbol;
-    private String conditionType;
+    @NotNullField(exception = MissingConditionTypeException.class)
+    private Alert.ConditionType conditionType;
+    @NotNullField(exception = MissingThresholdValueException.class)
+    @PositiveAmount(exception = InvalidThresholdValueException.class)
     private BigDecimal thresholdValue;
 
-    // Getters and setters
     public String getPlatform() {
         return platform;
     }
@@ -25,11 +35,11 @@ public class AlertCreationRequest {
         this.symbol = symbol;
     }
 
-    public String getConditionType() {
+    public Alert.ConditionType getConditionType() {
         return conditionType;
     }
 
-    public void setConditionType(String conditionType) {
+    public void setConditionType(Alert.ConditionType conditionType) {
         this.conditionType = conditionType;
     }
 

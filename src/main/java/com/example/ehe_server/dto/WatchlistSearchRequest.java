@@ -4,7 +4,6 @@ public class WatchlistSearchRequest {
     private String platform;
     private String symbol;
 
-    // Getters and setters
     public String getPlatform() {
         return platform;
     }

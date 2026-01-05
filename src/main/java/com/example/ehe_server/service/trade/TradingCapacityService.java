@@ -46,7 +46,6 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
     @Override
     @Transactional
     public TradingCapacityResponse getTradingCapacity(Integer userId, Integer portfolioId, String stockSymbol) {
-        System.out.println("Calculating trading capacity for portfolioId: " + portfolioId + ", stock: " + stockSymbol);
 
         // Check if portfolio exists and belongs to the user
         Optional<Portfolio> portfolioOptional = portfolioRepository.findByPortfolioIdAndUser_UserId(portfolioId, userId);
@@ -63,44 +62,34 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
 
         // Update holdings from exchange API
         try {
-            System.out.println("Updating holdings from exchange API");
             updateHoldingsFromExchange(portfolio, apiKey);
-            System.out.println("Holdings updated successfully");
         } catch (Exception e) {
             // Log the error but continue with existing data
-            System.out.println("Warning: Failed to update holdings from exchange: " + e.getMessage());
             loggingService.logError("Warning: Failed to update holdings from exchange: " + e.getMessage(), e);
-            // We'll continue with the data we already have
         }
 
-        // Get platform name
+        // Get platform and stock
         String platformName = apiKey.getPlatform().getPlatformName();
-        System.out.println("Platform name: " + platformName);
 
-        // Find platform stock (try with different symbol formats)
-        List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockName(
+        List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockSymbol(
                 platformName, stockSymbol);
 
         if (stocks.isEmpty()) {
-            // Try with USDT suffix if it's not already there
             if (!stockSymbol.endsWith("USDT")) {
-                stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockName(
+                stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockSymbol(
                         platformName, stockSymbol + "USDT");
                 if (!stocks.isEmpty()) {
                     stockSymbol = stockSymbol + "USDT";
-                    System.out.println("Found stock with USDT suffix: " + stockSymbol);
                 }
             }
 
             if (stocks.isEmpty()) {
-                // Try without USDT suffix if it's there
                 if (stockSymbol.endsWith("USDT")) {
                     String baseSymbol = stockSymbol.substring(0, stockSymbol.length() - 4);
-                    stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockName(
+                    stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockSymbol(
                             platformName, baseSymbol);
                     if (!stocks.isEmpty()) {
                         stockSymbol = baseSymbol;
-                        System.out.println("Found stock without USDT suffix: " + stockSymbol);
                     }
                 }
             }
@@ -110,18 +99,15 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
             }
         }
 
-        PlatformStock stock = stocks.get(0);
-        System.out.println("Found platform stock: " + stock.getStock().getStockName() +
-                " (ID: " + stock.getPlatformStockId() + ")");
+        PlatformStock stock = stocks.getFirst();
 
         // Find current holding of this stock
         BigDecimal currentQuantity = BigDecimal.ZERO;
         List<Holding> holdings = holdingRepository.findByPortfolio(portfolio);
 
         for (Holding holding : holdings) {
-            if (holding.getPlatformStock().getStock().getStockName().equals(stockSymbol)) {
+            if (holding.getPlatformStock().getStock().getStockSymbol().equals(stockSymbol)) {
                 currentQuantity = holding.getQuantity();
-                System.out.println("Current holding quantity: " + currentQuantity);
                 break;
             }
         }
@@ -133,15 +119,13 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
 
         if (latestCandle != null) {
             currentPrice = latestCandle.getClosePrice();
-            System.out.println("Current price: " + currentPrice);
         } else {
-            throw new PriceDataNotFoundException(stock.getStock().getStockName());
+            throw new PriceDataNotFoundException(stock.getStock().getStockSymbol());
         }
 
         // Get the portfolio's reserved cash
         BigDecimal reservedCash = portfolio.getReservedCash() != null ?
                 portfolio.getReservedCash() : BigDecimal.ZERO;
-        System.out.println("Reserved cash: " + reservedCash);
 
         // Calculate maximum buy capacity based on available cash
         BigDecimal maxBuyQuantity = BigDecimal.ZERO;
@@ -150,11 +134,9 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
             System.out.println("Max buy quantity: " + maxBuyQuantity);
         }
 
-        // The maximum sell quantity is simply the current quantity held
         BigDecimal maxSellQuantity = currentQuantity;
         System.out.println("Max sell quantity: " + maxSellQuantity);
 
-        // Log success
         loggingService.logAction("Calculated trading capacity for " + stockSymbol + " in portfolio " + portfolio.getPortfolioName());
 
         return new TradingCapacityResponse(
@@ -168,19 +150,16 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
     }
 
     private void updateHoldingsFromExchange(Portfolio portfolio, ApiKey apiKey) {
-        // Get credentials for Binance API
         String encryptedApiKey = apiKey.getApiKeyValue();
         String encryptedSecretKey = apiKey.getSecretKey();
 
-        // In a real application, you would need to decrypt these values
-        // For this example, we'll assume they're not encrypted
-        String apiKeyValue = encryptedApiKey; // In reality: decryptionService.decrypt(encryptedApiKey);
-        String secretKeyValue = encryptedSecretKey; // In reality: decryptionService.decrypt(encryptedSecretKey);
+        // For now they are not encrypted
+        String apiKeyValue = encryptedApiKey; // decryptionService.decrypt(encryptedApiKey);
+        String secretKeyValue = encryptedSecretKey; // decryptionService.decrypt(encryptedSecretKey);
 
         // Get account information from Binance
         Map<String, Object> accountInfo = binanceAccountService.getAccountInfo(apiKeyValue, secretKeyValue);
 
-        // Check if we have a valid response with balances
         boolean apiCallSuccessful = accountInfo != null && accountInfo.containsKey("balances");
 
         if (apiCallSuccessful) {
@@ -189,35 +168,29 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
             if (balances != null && !balances.isEmpty()) {
                 String platformName = apiKey.getPlatform().getPlatformName();
 
-                // Initialize reserved cash to zero, will be updated if USDT is found
                 BigDecimal reservedCash = BigDecimal.ZERO;
 
-                // First, delete all existing holdings for this portfolio
                 List<Holding> existingHoldings = holdingRepository.findByPortfolio(portfolio);
                 holdingRepository.deleteAll(existingHoldings);
+                holdingRepository.flush();
 
-                // Process each balance from Binance
                 for (Map<String, Object> balance : balances) {
                     String asset = (String) balance.get("asset");
                     String free = (String) balance.get("free");
 
-                    // Convert String to BigDecimal
                     BigDecimal quantity = new BigDecimal(free);
 
-                    // Only consider assets with non-zero balance
                     if (quantity.compareTo(BigDecimal.ZERO) > 0) {
-                        // Special handling for USDT - update reservedCash instead of creating a holding
                         if ("USDT".equals(asset)) {
                             reservedCash = quantity;
-                            continue; // Skip creating a holding for USDT
+                            continue;
                         }
 
-                        // First try exact match for the asset
-                        List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockName(
+                        List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockSymbol(
                                 platformName, asset);
 
                         if (!stocks.isEmpty()) {
-                            PlatformStock stock = stocks.get(0);
+                            PlatformStock stock = stocks.getFirst();
 
                             // Create a new holding
                             Holding holding = new Holding();
@@ -225,15 +198,13 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
                             holding.setPlatformStock(stock);
                             holding.setQuantity(quantity);
 
-                            // Save the holding
                             holdingRepository.save(holding);
                         } else {
-                            // If no direct match, try looking for trading pairs
-                            List<PlatformStock> tradingPairs = platformStockRepository.findByPlatformPlatformNameAndStockStockName(
+                            List<PlatformStock> tradingPairs = platformStockRepository.findByPlatformPlatformNameAndStockStockSymbol(
                                     platformName, asset + "USDT");
 
                             if (!tradingPairs.isEmpty()) {
-                                PlatformStock stock = tradingPairs.get(0);
+                                PlatformStock stock = tradingPairs.getFirst();
 
                                 // Create a new holding
                                 Holding holding = new Holding();
@@ -241,7 +212,6 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
                                 holding.setPlatformStock(stock);
                                 holding.setQuantity(quantity);
 
-                                // Save the holding
                                 holdingRepository.save(holding);
                             }
                         }

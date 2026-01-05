@@ -1,6 +1,11 @@
 package com.example.ehe_server.controller;
 
+import com.example.ehe_server.annotation.validation.NotEmptyString;
+import com.example.ehe_server.annotation.validation.NotNullField;
 import com.example.ehe_server.dto.*;
+import com.example.ehe_server.exception.custom.MissingPlatformNameException;
+import com.example.ehe_server.exception.custom.MissingPortfolioIdException;
+import com.example.ehe_server.exception.custom.MissingStockSymbolException;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.stock.CandleRetrievalServiceInterface;
 import com.example.ehe_server.service.intf.stock.PlatformServiceInterface;
@@ -12,6 +17,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -20,6 +26,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/user")
+@Validated
 public class StockController {
 
     private final PlatformServiceInterface platformService;
@@ -72,11 +79,12 @@ public class StockController {
     /**
      * GET /api/user/platforms/{platform}/stocks
      * Retrieve all stocks for a specific platform
-     *
-     * Platform is now a path parameter (resource identifier)
      */
     @GetMapping("/platforms/{platform}/stocks")
-    public ResponseEntity<Map<String, Object>> getStocksByPlatform(@PathVariable String platform) {
+    public ResponseEntity<Map<String, Object>> getStocksByPlatform(
+            @NotEmptyString(exception = MissingPlatformNameException.class)
+            @PathVariable
+            String platform) {
         StocksByPlatformResponse stocksByPlatformResponse = stockService.getStocksByPlatform(platform);
 
         String successMessage = messageSource.getMessage(
@@ -96,13 +104,12 @@ public class StockController {
     /**
      * GET /api/user/portfolios/{portfolioId}/stocks/{stockSymbol}/trading-capacity
      * Retrieve trading capacity for a specific stock in a portfolio
-     *
-     * This is a read operation, so GET is appropriate.
-     * Resources are identified in the URL path.
      */
     @GetMapping("/portfolios/{portfolioId}/stocks/{stockSymbol}/trading-capacity")
     public ResponseEntity<Map<String, Object>> getTradingCapacity(
+            @NotNullField(exception = MissingPortfolioIdException.class)
             @PathVariable Integer portfolioId,
+            @NotEmptyString(exception = MissingStockSymbolException.class)
             @PathVariable String stockSymbol) {
 
         TradingCapacityResponse tradingCapacityResponse = tradingCapacityService.getTradingCapacity(
@@ -127,9 +134,6 @@ public class StockController {
     /**
      * POST /api/user/trades
      * Execute a market order (buy or sell)
-     *
-     * POST is correct here - we're creating a new trade/order resource.
-     * Changed URL from /trade to /trades (noun, plural for collection)
      */
     @PostMapping("/trades")
     public ResponseEntity<Map<String, Object>> executeTrade(
@@ -140,7 +144,7 @@ public class StockController {
                 request.getPortfolioId(),
                 request.getStockSymbol(),
                 request.getAction(),
-                request.getAmount(),
+                request.getQuantity(),
                 request.getQuantityType());
 
         String successMessage = messageSource.getMessage(
@@ -154,15 +158,12 @@ public class StockController {
         responseBody.put("message", successMessage);
         responseBody.put("order", tradeExecutionResponse);
 
-        // 201 Created is more appropriate for resource creation
         return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 
     /**
      * GET /api/user/candles/by-sequence?platform=X&stockSymbol=Y&timeframe=Z&fromSequence=1&toSequence=100
      * Retrieve candles by sequence number range
-     *
-     * This is a read operation, so GET with query parameters is appropriate.
      */
     @GetMapping("/candles/by-sequence")
     public ResponseEntity<Map<String, Object>> getCandlesBySequence(
@@ -193,8 +194,6 @@ public class StockController {
     /**
      * GET /api/user/candles/by-date?platform=X&stockSymbol=Y&timeframe=Z&fromDate=2024-01-01T00:00:00&toDate=2024-12-31T23:59:59
      * Retrieve candles by date range
-     *
-     * This is a read operation, so GET with query parameters is appropriate.
      */
     @GetMapping("/candles/by-date")
     public ResponseEntity<Map<String, Object>> getCandlesByDate(

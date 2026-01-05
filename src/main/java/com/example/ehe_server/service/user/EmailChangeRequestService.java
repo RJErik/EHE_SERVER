@@ -12,15 +12,14 @@ import com.example.ehe_server.repository.UserRepository;
 import com.example.ehe_server.repository.VerificationTokenRepository;
 import com.example.ehe_server.service.audit.UserContextService;
 import com.example.ehe_server.service.intf.email.EmailSenderServiceInterface;
+import com.example.ehe_server.service.intf.token.TokenHashServiceInterface;
 import com.example.ehe_server.service.intf.user.EmailChangeRequestServiceInterface;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 @Service
 @Transactional
@@ -29,10 +28,6 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
     private static final int RATE_LIMIT_MAX_REQUESTS = 3;
     private static final int RATE_LIMIT_MINUTES = 30;
 
-    private static final Pattern EMAIL_PATTERN =
-            Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    private static final int EMAIL_MAX_LENGTH = 255;
-
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailChangeRequestRepository emailChangeRequestRepository;
@@ -40,7 +35,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
     private final UserContextService userContextService;
     private final AdminRepository adminRepository;
     private final VerificationTokenProperties verificationTokenProperties;
-    private final PasswordEncoder passwordEncoder;
+    private final TokenHashServiceInterface tokenHashService;
 
     public EmailChangeRequestService(
             UserRepository userRepository,
@@ -50,7 +45,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
             UserContextService userContextService,
             AdminRepository adminRepository,
             VerificationTokenProperties verificationTokenProperties,
-            PasswordEncoder passwordEncoder) {
+            TokenHashServiceInterface tokenHashService) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.emailChangeRequestRepository = emailChangeRequestRepository;
@@ -58,33 +53,16 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
         this.userContextService = userContextService;
         this.adminRepository = adminRepository;
         this.verificationTokenProperties = verificationTokenProperties;
-        this.passwordEncoder = passwordEncoder;
+        this.tokenHashService = tokenHashService;
     }
 
     @LogMessage(messageKey = "log.message.user.emailChangeRequest")
     @Override
     public void requestEmailChange(Integer userId, String newEmail) {
-        // Validate email format
-        if (userId == null) {
-            throw new MissingUserIdException();
-        }
-
-        if (newEmail == null || newEmail.trim().isEmpty()) {
-            throw new MissingEmailException();
-        }
-
-        if (newEmail.length() > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.matcher(newEmail).matches()) {
-            throw new InvalidEmailFormatException(newEmail);
-        }
 
         // Find the user
-        Optional<User> userOpt = userRepository.findById(userId);
-
-        if (userOpt.isEmpty()) {
-            throw new UserNotFoundException(userId);
-        }
-
-        User user = userOpt.get();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
 
         // Set audit context
         boolean isAdmin = adminRepository.existsByAdminId(user.getUserId());
@@ -96,11 +74,6 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
             role = "ADMIN"; // Add ADMIN role if user is in Admin table
         }
         userContextService.setUser(String.valueOf(user.getUserId()), role);
-
-        // Check if account is active
-        if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-            throw new InactiveAccountException(userId.toString(), user.getAccountStatus().name());
-        }
 
         // Check if the new email is the same as the current one
         if (user.getEmail().equals(newEmail)) {
@@ -124,7 +97,7 @@ public class EmailChangeRequestService implements EmailChangeRequestServiceInter
 
         // Create new token
         String plainToken = UUID.randomUUID().toString();
-        String hashedToken = passwordEncoder.encode(plainToken);
+        String hashedToken = tokenHashService.hashToken(plainToken);
         LocalDateTime expiryDate = LocalDateTime.now().plusHours(verificationTokenProperties.getTokenExpiryHours());
         VerificationToken newToken = new VerificationToken(
                 user, hashedToken, VerificationToken.TokenType.EMAIL_CHANGE, expiryDate);

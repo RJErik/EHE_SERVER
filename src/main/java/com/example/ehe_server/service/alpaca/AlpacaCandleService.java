@@ -202,9 +202,7 @@ public class AlpacaCandleService {
         }
 
         // Save all candles (new and updated ones)
-        if (!candlesToSave.isEmpty()) {
-            candleRepository.saveAll(candlesToSave);
-        }
+        candleRepository.saveAll(candlesToSave);
 
         // Aggregate after saving
         aggregateCandles(stock, candlesToSave);
@@ -399,7 +397,7 @@ public class AlpacaCandleService {
             existingCandle.setLowPrice(newLow);
         }
 
-        existingCandle.setClosePrice(minuteCandles.get(minuteCandles.size() - 1).getClosePrice());
+        existingCandle.setClosePrice(minuteCandles.getLast().getClosePrice());
     }
 
     private LocalDateTime calculateTimeframeStart(LocalDateTime time, int minutes) {
@@ -415,8 +413,8 @@ public class AlpacaCandleService {
 
     private MarketCandle createAggregatedCandle(PlatformStock stock, MarketCandle.Timeframe timeframe,
                                                 LocalDateTime timeframeStart, List<MarketCandle> candles) {
-        BigDecimal open = candles.get(0).getOpenPrice();
-        BigDecimal close = candles.get(candles.size() - 1).getClosePrice();
+        BigDecimal open = candles.getFirst().getOpenPrice();
+        BigDecimal close = candles.getLast().getClosePrice();
         BigDecimal high = candles.stream()
                 .map(MarketCandle::getHighPrice)
                 .max(BigDecimal::compareTo)
@@ -444,18 +442,18 @@ public class AlpacaCandleService {
 
     private PlatformStock getOrCreateStock(String symbol) {
         // Try to find existing platform stock
-        List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockName(
+        List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockSymbol(
                 PLATFORM_NAME, symbol);
 
         if (!stocks.isEmpty()) {
-            return stocks.get(0);
+            return stocks.getFirst();
         }
 
         // Create new stock entry - need to find or create Platform and Stock entities
         Platform platform = platformRepository.findByPlatformName(PLATFORM_NAME)
                 .orElseThrow(() -> new RuntimeException("Platform not found: " + PLATFORM_NAME));
 
-        Stock stock = stockRepository.findByStockName(symbol)
+        Stock stock = stockRepository.findByStockSymbol(symbol)
                 .orElseThrow(() -> new RuntimeException("Stock not found: " + symbol));
 
         PlatformStock platformStock = new PlatformStock();
