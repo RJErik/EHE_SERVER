@@ -1,6 +1,9 @@
 package ehe_server.service.session;
 
 import ehe_server.annotation.LogMessage;
+import ehe_server.exception.custom.RefreshTokenNotFoundException;
+import ehe_server.exception.custom.RefreshTokenReuseException;
+import ehe_server.exception.custom.SessionLimitExceededException;
 import ehe_server.properties.JwtProperties;
 import ehe_server.service.audit.UserContextService;
 import ehe_server.service.intf.auth.CookieServiceInterface;
@@ -72,7 +75,7 @@ public class JwtTokenRenewalService implements JwtTokenRenewalServiceInterface {
 
                         cookieService.clearJwtCookies(response);
 
-                        throw new RuntimeException("Invalid Refresh Token");
+                        throw new RefreshTokenReuseException();
                     }
                     break;
                 }
@@ -80,14 +83,15 @@ public class JwtTokenRenewalService implements JwtTokenRenewalServiceInterface {
         }
 
         if (!tokenFoundInRequest) {
-            // Handle missing token case appropriately
-            throw new RuntimeException("No refresh token found in request");
+            cookieService.clearJwtCookies(response);
+            throw new RefreshTokenNotFoundException();
+
         }
 
         // Check if the "Anchor" date has passed. If so, the session chain is dead.
         if (LocalDateTime.now().isAfter(anchorMaxExpiry)) {
-            loggingService.logAction("Session limit exceeded.. Forcing re-login.");
-            throw new RuntimeException("Session limit exceeded. Please log in again.");
+            cookieService.clearJwtCookies(response);
+            throw new SessionLimitExceededException(anchorMaxExpiry);
         }
 
         // Generate new JWT tokens

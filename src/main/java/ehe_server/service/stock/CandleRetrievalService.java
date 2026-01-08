@@ -5,7 +5,6 @@ import ehe_server.dto.CandleDTO;
 import ehe_server.dto.CandlesResponse;
 import ehe_server.entity.MarketCandle;
 import ehe_server.entity.PlatformStock;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.PlatformStockNotFoundException;
 import ehe_server.repository.MarketCandleRepository;
 import ehe_server.repository.PlatformStockRepository;

@@ -10,12 +10,12 @@ import ehe_server.exception.custom.SubscriptionNotFoundException;
 import ehe_server.repository.AlertRepository;
 import ehe_server.repository.JwtRefreshTokenRepository;
 import ehe_server.service.audit.UserContextService;
+import ehe_server.service.intf.alert.websocket.AlertInitialCheckServiceInterface;
 import ehe_server.service.intf.alert.websocket.AlertNotificationServiceInterface;
 import ehe_server.service.intf.alert.websocket.AlertProcessingServiceInterface;
 import ehe_server.service.intf.alert.websocket.AlertWebSocketSubscriptionManagerInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import ehe_server.service.websocket.WebSocketSessionRegistry;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +40,7 @@ public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscrip
     private final WebSocketSessionRegistry sessionRegistry;
     private final AlertProcessingServiceInterface processingService;
     private final AlertNotificationServiceInterface notificationService;
+    private final AlertInitialCheckServiceInterface initialCheckService;
     private final LoggingServiceInterface loggingService;
     private final AlertRepository alertRepository;
 
@@ -49,6 +50,7 @@ public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscrip
             WebSocketSessionRegistry sessionRegistry,
             AlertProcessingServiceInterface processingService,
             AlertNotificationServiceInterface notificationService,
+            AlertInitialCheckServiceInterface initialCheckService,
             LoggingServiceInterface loggingService,
             AlertRepository alertRepository) {
         this.userContextService = userContextService;
@@ -56,11 +58,13 @@ public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscrip
         this.sessionRegistry = sessionRegistry;
         this.processingService = processingService;
         this.notificationService = notificationService;
+        this.initialCheckService = initialCheckService;
         this.loggingService = loggingService;
         this.alertRepository = alertRepository;
     }
 
     @Override
+    @Transactional
     public AlertSubscriptionResponse createSubscription(Integer userId, String sessionId, String destination) {
         validateDestination(destination);
 
@@ -70,7 +74,7 @@ public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscrip
         loggingService.logAction(String.format("Created alert subscription: %s for user: %d, session: %s",
                 subscription.getId(), userId, sessionId));
 
-        performInitialAlertCheckAsync(subscription);
+        initialCheckService.performInitialAlertCheckAsync(subscription);
 
         return new AlertSubscriptionResponse(subscription.getId());
     }
@@ -117,7 +121,7 @@ public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscrip
 
         activeSubscriptions.put(subscriptionId, subscription);
         sessionToSubscriptionIds
-                .computeIfAbsent(sessionId, k -> ConcurrentHashMap.newKeySet())
+                .computeIfAbsent(sessionId, _ -> ConcurrentHashMap.newKeySet())
                 .add(subscriptionId);
 
         return subscription;
@@ -153,60 +157,6 @@ public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscrip
         }
     }
 
-    // ==================== Initial Alert Check ====================
-
-    @Async
-    protected void performInitialAlertCheckAsync(AlertSubscription subscription) {
-        try {
-            performInitialAlertCheck(subscription);
-        } catch (Exception e) {
-            loggingService.logAction("Error during initial alert check for subscription " +
-                    subscription.getId() + ": " + e.getMessage());
-        }
-    }
-
-    private void performInitialAlertCheck(AlertSubscription subscription) {
-        List<Alert> userAlerts = alertRepository.findByUser_UserId(subscription.getUserId());
-
-        if (userAlerts.isEmpty()) {
-            loggingService.logAction("No active alerts found for initial check");
-            subscription.markInitialCheckCompleted();
-            return;
-        }
-
-        loggingService.logAction("Starting initial check for " + userAlerts.size() + " alerts");
-
-        for (Alert alert : userAlerts) {
-            processInitialAlertCheck(alert, subscription);
-        }
-
-        subscription.markInitialCheckCompleted();
-        subscription.updateLastCheckedMinuteCandle(LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES));
-
-        loggingService.logAction("Completed initial alert check for subscription: " + subscription.getId());
-    }
-
-    private void processInitialAlertCheck(Alert alert, AlertSubscription subscription) {
-        LocalDateTime checkStartTime = alert.getDateCreated()
-                .truncatedTo(ChronoUnit.MINUTES)
-                .plusMinutes(1)
-                .minusHours(UTC_OFFSET_HOURS);
-
-        loggingService.logAction(String.format("Checking alert #%d for %s:%s starting from %s",
-                alert.getAlertId(),
-                alert.getPlatformStock().getPlatform().getPlatformName(),
-                alert.getPlatformStock().getStock().getStockSymbol(),
-                checkStartTime));
-
-        Optional<MarketCandle> triggeringCandle = processingService.checkAlertAgainstTimeframe(
-                alert,
-                MarketCandle.Timeframe.M1,
-                checkStartTime,
-                LocalDateTime.now());
-
-        triggeringCandle.ifPresent(marketCandle -> handleTriggeredAlert(alert, marketCandle, subscription));
-    }
-
     // ==================== Scheduled Alert Checking ====================
 
     private boolean shouldCheckSubscription(AlertSubscription subscription, LocalDateTime currentMinute) {
@@ -214,7 +164,7 @@ public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscrip
         return lastChecked == null || currentMinute.isAfter(lastChecked);
     }
 
-    private void processSubscriptionAlerts(AlertSubscription subscription, LocalDateTime currentMinute) {
+    protected void processSubscriptionAlerts(AlertSubscription subscription, LocalDateTime currentMinute) {
         List<Alert> activeAlerts = alertRepository.findByUser_UserId(subscription.getUserId());
 
         if (activeAlerts.isEmpty()) {
@@ -265,7 +215,7 @@ public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscrip
 
     // ==================== Subscription Cleanup ====================
 
-    private void cleanupInvalidSubscriptions() {
+    protected void cleanupInvalidSubscriptions() {
         List<String> toRemove = activeSubscriptions.values().stream()
                 .filter(this::hasNoValidRefreshToken)
                 .map(AlertSubscription::getId)

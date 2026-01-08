@@ -1,13 +1,11 @@
 package ehe_server.service.trade;
 
 import ehe_server.dto.TradingCapacityResponse;
-import com.example.ehe_server.entity.*;
 import ehe_server.entity.*;
 import ehe_server.exception.custom.ApiKeyMissingException;
 import ehe_server.exception.custom.PlatformStockNotFoundException;
 import ehe_server.exception.custom.PortfolioNotFoundException;
 import ehe_server.exception.custom.PriceDataNotFoundException;
-import com.example.ehe_server.repository.*;
 import ehe_server.repository.HoldingRepository;
 import ehe_server.repository.MarketCandleRepository;
 import ehe_server.repository.PlatformStockRepository;
@@ -155,12 +153,8 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
     }
 
     private void updateHoldingsFromExchange(Portfolio portfolio, ApiKey apiKey) {
-        String encryptedApiKey = apiKey.getApiKeyValue();
-        String encryptedSecretKey = apiKey.getSecretKey();
-
-        // For now they are not encrypted
-        String apiKeyValue = encryptedApiKey; // decryptionService.decrypt(encryptedApiKey);
-        String secretKeyValue = encryptedSecretKey; // decryptionService.decrypt(encryptedSecretKey);
+        String apiKeyValue = apiKey.getApiKeyValue();
+        String secretKeyValue = apiKey.getSecretKey();
 
         // Get account information from Binance
         Map<String, Object> accountInfo = binanceAccountService.getAccountInfo(apiKeyValue, secretKeyValue);

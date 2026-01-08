@@ -5,7 +5,6 @@ import ehe_server.dto.websocket.StockCandleSubscriptionResponse;
 import ehe_server.entity.JwtRefreshToken;
 import ehe_server.entity.MarketCandle;
 import ehe_server.entity.PlatformStock;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.*;
 import ehe_server.repository.JwtRefreshTokenRepository;
 import ehe_server.repository.PlatformStockRepository;
@@ -202,7 +201,7 @@ public class StockWebSocketSubscriptionManager implements StockWebSocketSubscrip
 
         activeSubscriptions.put(subscriptionId, subscription);
         sessionToSubscriptionIds
-                .computeIfAbsent(sessionId, k -> ConcurrentHashMap.newKeySet())
+                .computeIfAbsent(sessionId, _ -> ConcurrentHashMap.newKeySet())
                 .add(subscriptionId);
 
         return subscription;
@@ -211,9 +210,7 @@ public class StockWebSocketSubscriptionManager implements StockWebSocketSubscrip
     private void registerSessionCleanupIfNeeded(String sessionId) {
         Set<String> sessionSubs = sessionToSubscriptionIds.get(sessionId);
         if (sessionSubs != null && sessionSubs.size() == 1) {
-            sessionRegistry.registerSessionCleanup(sessionId, () -> {
-                cleanupSessionSubscriptions(sessionId);
-            });
+            sessionRegistry.registerSessionCleanup(sessionId, () -> cleanupSessionSubscriptions(sessionId));
         }
     }
 

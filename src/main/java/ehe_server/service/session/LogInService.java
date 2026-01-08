@@ -2,7 +2,6 @@ package ehe_server.service.session;
 
 import ehe_server.annotation.LogMessage;
 import ehe_server.entity.User;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.InactiveAccountException;
 import ehe_server.exception.custom.InvalidCredentialsException;
 import ehe_server.exception.custom.NonVerifiedAccountException;

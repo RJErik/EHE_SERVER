@@ -5,6 +5,7 @@ import ehe_server.service.intf.binance.BinanceWebSocketClientInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.client.WebSocketClient;
@@ -141,7 +142,10 @@ public class BinanceWebSocketClient extends TextWebSocketHandler implements Bina
 
         try {
             WebSocketClient client = new StandardWebSocketClient();
-            session = client.doHandshake(this, null, URI.create(WS_BASE_URL)).get();
+
+            // FIX: Use 'execute' instead of 'doHandshake'
+            // 'execute' returns a CompletableFuture<WebSocketSession>
+            session = client.execute(this, new WebSocketHttpHeaders(), URI.create(WS_BASE_URL)).get();
 
             TextMessage subscribeMsg = createSubscriptionMessage(new ArrayList<>(subscriptions));
             session.sendMessage(subscribeMsg);
@@ -173,7 +177,7 @@ public class BinanceWebSocketClient extends TextWebSocketHandler implements Bina
     }
 
     @Override
-    public void handleTextMessage(WebSocketSession session, TextMessage message) {
+    public void handleTextMessage(@NonNull WebSocketSession session,@NonNull TextMessage message) {
         userContextService.setUser("SYSTEM", "SYSTEM");
         try {
             JsonNode jsonNode = objectMapper.readTree(message.getPayload());
@@ -186,7 +190,6 @@ public class BinanceWebSocketClient extends TextWebSocketHandler implements Bina
 
             // Handle kline stream data
             if (jsonNode.has("e") && "kline".equals(jsonNode.get("e").asText())) {
-                JsonNode k = jsonNode.get("k");
                 String symbol = jsonNode.get("s").asText().toLowerCase();
 
                 Consumer<JsonNode> handler = handlers.get(symbol);
@@ -202,14 +205,14 @@ public class BinanceWebSocketClient extends TextWebSocketHandler implements Bina
     }
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) {
+    public void afterConnectionEstablished(@NonNull WebSocketSession session) {
         userContextService.setUser("SYSTEM", "SYSTEM");
         loggingService.logAction("Binance WebSocket connection established with " +
                 subscriptions.size() + " subscriptions");
     }
 
     @Override
-    public void handleTransportError(WebSocketSession session, Throwable exception) {
+    public void handleTransportError(@NonNull WebSocketSession session,@NonNull Throwable exception) {
         userContextService.setUser("SYSTEM", "SYSTEM");
         loggingService.logError("Binance WebSocket transport error: " + exception.getMessage(), exception);
 
@@ -230,7 +233,7 @@ public class BinanceWebSocketClient extends TextWebSocketHandler implements Bina
     }
 
     @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+    public void afterConnectionClosed(@NonNull WebSocketSession session,@NonNull CloseStatus status) {
         userContextService.setUser("SYSTEM", "SYSTEM");
         loggingService.logAction("Binance WebSocket connection closed: " + status);
 

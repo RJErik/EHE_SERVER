@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,7 +22,6 @@ public class MarketCandleService implements MarketCandleServiceInterface {
     private final MarketCandleRepository marketCandleRepository;
     private final PlatformStockRepository platformStockRepository;
     private final LoggingServiceInterface loggingService;
-    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public MarketCandleService(
             MarketCandleRepository marketCandleRepository,
@@ -57,9 +55,6 @@ public class MarketCandleService implements MarketCandleServiceInterface {
             // Parse timeframe
             Timeframe timeframe;
             timeframe = parseTimeframe(timeframeStr);
-
-            // Fetch the latest candle with sequence
-            long startTime = System.currentTimeMillis();
 
             Optional<CandleWithSequenceInterface> candleOpt = marketCandleRepository
                     .findLatestCandleWithSequence(stock.getPlatformStockId(), timeframe);

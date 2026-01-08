@@ -115,7 +115,7 @@ public class SessionController {
         responseBody.put("message", successMessage);
 
         if (userContextService.getCurrentUserRole().contains("ROLE_ADMIN")) {
-            responseBody.put("redirectUrl", frontendProperties.getUrl() + frontendProperties.getAdmin());
+            responseBody.put("redirectUrl", frontendProperties.getUrl() + frontendProperties.getAdmin().getSuffix());
         } else {
             String fullUrl = frontendProperties.getUrl() + frontendProperties.getUser().getSuffix();
             responseBody.put("redirectUrl", fullUrl);

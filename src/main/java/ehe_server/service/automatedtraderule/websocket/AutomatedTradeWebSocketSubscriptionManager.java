@@ -4,7 +4,6 @@ import ehe_server.dto.websocket.AutomatedTradeSubscriptionResponse;
 import ehe_server.entity.AutomatedTradeRule;
 import ehe_server.entity.JwtRefreshToken;
 import ehe_server.entity.MarketCandle;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.*;
 import ehe_server.repository.AutomatedTradeRuleRepository;
 import ehe_server.repository.JwtRefreshTokenRepository;
@@ -162,7 +161,7 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
 
         activeSubscriptions.put(subscriptionId, subscription);
         sessionToSubscriptionIds
-                .computeIfAbsent(sessionId, k -> ConcurrentHashMap.newKeySet())
+                .computeIfAbsent(sessionId, _ -> ConcurrentHashMap.newKeySet())
                 .add(subscriptionId);
 
         return subscription;

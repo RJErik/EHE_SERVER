@@ -34,13 +34,7 @@ public class StockCandleNotificationService implements StockCandleNotificationSe
 
         messagingTemplate.convertAndSend(subscription.getDestination(), message);
 
-        logCandleSent("initial", subscription, candle);
-        loggingService.logAction(String.format(
-                "Sent initial candle for subscription: %s (%s:%s %s)",
-                subscription.getId(),
-                subscription.getPlatformName(),
-                subscription.getStockSymbol(),
-                subscription.getTimeframe()));
+        logCandlesSent("INITIAL", subscription, List.of(candle));
     }
 
     @Override
@@ -57,23 +51,7 @@ public class StockCandleNotificationService implements StockCandleNotificationSe
 
         messagingTemplate.convertAndSend(subscription.getDestination(), message);
 
-        System.out.println(">>> SENT " + candles.size() + " candle update(s) for subscription " +
-                subscription.getId() + " <<<");
-        candles.forEach(candle -> {
-                    System.out.printf(
-                            "  Candle: %s | Seq:%s | O:%s H:%s L:%s C:%s V:%s%n",
-                            candle.getTimestamp(),
-                            candle.getSequence(),
-                            candle.getOpenPrice(),
-                            candle.getHighPrice(),
-                            candle.getLowPrice(),
-                            candle.getClosePrice(),
-                            candle.getVolume());
-                });
-        loggingService.logAction(String.format(
-                "Sent %d candle update(s) for subscription %s",
-                candles.size(),
-                subscription.getId()));
+        logCandlesSent("UPDATE", subscription, candles);
     }
 
     @Override
@@ -103,32 +81,29 @@ public class StockCandleNotificationService implements StockCandleNotificationSe
         return message;
     }
 
-    private void logCandleSent(String type, StockCandleSubscription subscription, CandleData candle) {
-        System.out.printf(
-                "Sent %s candle: %s | Seq:%s | O:%s H:%s L:%s C:%s V:%s%n",
+    private void logCandlesSent(String type, StockCandleSubscription subscription, List<CandleData> candles) {
+        System.out.printf(">>> SENT %d %s candle(s) for subscription %s (%s:%s %s) <<<%n",
+                candles.size(),
                 type,
+                subscription.getId(),
+                subscription.getPlatformName(),
+                subscription.getStockSymbol(),
+                subscription.getTimeframe());
+
+        candles.forEach(candle -> System.out.printf(
+                "  Candle: %s | Seq:%s | O:%s H:%s L:%s C:%s V:%s%n",
                 candle.getTimestamp(),
                 candle.getSequence(),
                 candle.getOpenPrice(),
                 candle.getHighPrice(),
                 candle.getLowPrice(),
                 candle.getClosePrice(),
-                candle.getVolume());
-    }
+                candle.getVolume()));
 
-    private void logUpdatesSent(StockCandleSubscription subscription, List<CandleData> candles) {
-        System.out.println(">>> SENT " + candles.size() + " candle update(s) for subscription " +
-                subscription.getId() + " <<<");
-        candles.forEach(candle -> {
-            System.out.printf(
-                    "  Candle: %s | Seq:%s | O:%s H:%s L:%s C:%s V:%s%n",
-                    candle.getTimestamp(),
-                    candle.getSequence(),
-                    candle.getOpenPrice(),
-                    candle.getHighPrice(),
-                    candle.getLowPrice(),
-                    candle.getClosePrice(),
-                    candle.getVolume());
-        });
+        loggingService.logAction(String.format(
+                "Sent %d %s candle(s) for subscription %s",
+                candles.size(),
+                type,
+                subscription.getId()));
     }
 }
