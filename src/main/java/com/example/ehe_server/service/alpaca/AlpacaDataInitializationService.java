@@ -51,7 +51,7 @@ public class AlpacaDataInitializationService {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    @Async("alpacaTaskExecutor")
+    @Async()
     public void initializeDataAsync() {
         try {
             userContextService.setUser("SYSTEM", "SYSTEM");

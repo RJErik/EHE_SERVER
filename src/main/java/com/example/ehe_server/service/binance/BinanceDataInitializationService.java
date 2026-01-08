@@ -50,7 +50,7 @@ public class BinanceDataInitializationService implements BinanceDataInitializati
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    @Async("binanceTaskExecutor")
+    @Async()
     public void initializeDataAsync() {
         try {
             userContextService.setUser("SYSTEM", "SYSTEM");

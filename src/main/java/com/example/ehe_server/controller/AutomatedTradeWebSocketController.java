@@ -4,7 +4,7 @@ import com.example.ehe_server.annotation.validation.NotEmptyString;
 import com.example.ehe_server.dto.websocket.AutomatedTradeSubscriptionResponse;
 import com.example.ehe_server.dto.websocket.AutomatedTradeUnsubscriptionRequest;
 import com.example.ehe_server.exception.custom.MissingSessionIdException;
-import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
+import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.automatictrade.websocket.AutomatedTradeWebSocketSubscriptionManagerInterface;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -24,15 +24,15 @@ import java.util.Map;
 public class AutomatedTradeWebSocketController {
 
     private final AutomatedTradeWebSocketSubscriptionManagerInterface automatedTradeWebSocketSubscriptionManager;
-    private final WebSocketAuthServiceInterface webSocketAuthService;
+    private final UserContextServiceInterface userContextService;
     private final MessageSource messageSource;
 
     public AutomatedTradeWebSocketController(
             AutomatedTradeWebSocketSubscriptionManagerInterface automatedTradeWebSocketSubscriptionManager,
-            WebSocketAuthServiceInterface webSocketAuthService,
+            UserContextServiceInterface userContextService,
             MessageSource messageSource) {
         this.automatedTradeWebSocketSubscriptionManager = automatedTradeWebSocketSubscriptionManager;
-        this.webSocketAuthService = webSocketAuthService;
+        this.userContextService = userContextService;
         this.messageSource = messageSource;
     }
 
@@ -47,7 +47,7 @@ public class AutomatedTradeWebSocketController {
         Map<String, Object> response = new HashMap<>();
 
         // Extract user ID from WebSocket authentication
-        Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
+        Integer userId = userContextService.getUserIdFromWebSocketAuth(headerAccessor);
 
         // Create subscription for this user
         AutomatedTradeSubscriptionResponse automatedTradeSubscriptionResponse = automatedTradeWebSocketSubscriptionManager.createSubscription(

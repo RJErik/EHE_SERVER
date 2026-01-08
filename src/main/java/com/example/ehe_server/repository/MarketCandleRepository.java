@@ -3,7 +3,7 @@ package com.example.ehe_server.repository;
 import com.example.ehe_server.entity.MarketCandle;
 import com.example.ehe_server.entity.MarketCandle.Timeframe;
 import com.example.ehe_server.entity.PlatformStock;
-import com.example.ehe_server.service.stock.ICandleWithSequence;
+import com.example.ehe_server.service.stock.CandleWithSequenceInterface;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -52,7 +52,7 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
         WHERE sequenced_data.timestamp BETWEEN :startDate AND :endDate
         ORDER BY sequenced_data.timestamp
         """, nativeQuery = true)
-    List<ICandleWithSequence> findCandlesByDateRangeWithSequence(
+    List<CandleWithSequenceInterface> findCandlesByDateRangeWithSequence(
             @Param("stockId") Integer stockId,
             @Param("timeframe") Timeframe timeframe,
             @Param("startDate") LocalDateTime startDate,
@@ -91,7 +91,7 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
         ORDER BY sequenced_data.timestamp DESC
         LIMIT 1
         """, nativeQuery = true)
-    Optional<ICandleWithSequence> findLatestCandleWithSequence(
+    Optional<CandleWithSequenceInterface> findLatestCandleWithSequence(
             @Param("stockId") Integer stockId,
             @Param("timeframe") Timeframe timeframe);
 
@@ -116,7 +116,7 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
         ) as sequenced_data
         WHERE sequenced_data.timestamp = :timestamp
         """, nativeQuery = true)
-    Optional<ICandleWithSequence> findCandleWithSequenceByTimestamp(
+    Optional<CandleWithSequenceInterface> findCandleWithSequenceByTimestamp(
             @Param("stockId") Integer stockId,
             @Param("timeframe") Timeframe timeframe,
             @Param("timestamp") LocalDateTime timestamp);
@@ -162,7 +162,7 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
         WHERE sequenced_data.sequence BETWEEN :fromSequence AND :toSequence
         ORDER BY sequenced_data.timestamp
         """, nativeQuery = true)
-    List<ICandleWithSequence> findByStockAndTimeframeAndSequenceRange(
+    List<CandleWithSequenceInterface> findByStockAndTimeframeAndSequenceRange(
             @Param("stockId") Integer stockId,
             @Param("timeframe") Timeframe timeframe,
             @Param("fromSequence") long fromSequence,

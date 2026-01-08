@@ -28,7 +28,7 @@ public class WebSocketEventListener {
         String sessionId = headerAccessor.getSessionId();
 
         if (headerAccessor.getUser() instanceof Authentication auth) {
-            if (auth.getPrincipal() instanceof Long) {
+            if (auth.getPrincipal() instanceof String) {
                 System.out.println("WebSocket connected - Session ID: " + sessionId);
                 loggingService.logAction("WebSocket connected - Session ID: " + sessionId);
             }

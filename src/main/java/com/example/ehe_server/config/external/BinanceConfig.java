@@ -27,19 +27,4 @@ public class BinanceConfig {
 
         return restTemplate;
     }
-
-    /**
-     * Provides a dedicated thread pool for processing Binance data.
-     * This prevents Binance API operations from blocking the main application threads.
-     */
-    @Bean(name = "binanceTaskExecutor")
-    public Executor binanceTaskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(5);
-        executor.setQueueCapacity(100);
-        executor.setThreadNamePrefix("binance-");
-        executor.initialize();
-        return executor;
-    }
 }

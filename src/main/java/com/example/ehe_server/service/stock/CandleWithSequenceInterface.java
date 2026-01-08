@@ -3,7 +3,7 @@ package com.example.ehe_server.service.stock;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-public interface ICandleWithSequence {
+public interface CandleWithSequenceInterface {
     Integer getMarketCandleId();
     LocalDateTime getTimestamp();
     BigDecimal getOpenPrice();

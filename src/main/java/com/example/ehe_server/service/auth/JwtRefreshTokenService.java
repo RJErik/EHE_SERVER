@@ -6,9 +6,11 @@ import com.example.ehe_server.repository.JwtRefreshTokenRepository;
 import com.example.ehe_server.service.intf.auth.JwtRefreshTokenServiceInterface;
 import com.example.ehe_server.service.intf.log.LoggingServiceInterface;
 import com.example.ehe_server.service.intf.token.TokenHashServiceInterface;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,15 +43,11 @@ public class JwtRefreshTokenService implements JwtRefreshTokenServiceInterface {
         this.jwtRefreshTokenRepository = jwtRefreshTokenRepository;
         this.loggingService = loggingService;
         this.tokenHashService = tokenHashService;
-
-        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
-        scheduler.setPoolSize(1);
-        scheduler.setThreadNamePrefix("jwt-cleanup-");
-        scheduler.initialize();
-        this.taskScheduler = scheduler;
+        this.taskScheduler = new ThreadPoolTaskScheduler();
     }
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
+    @Async
     public void initialize() {
         loggingService.logAction("Initializing JWT refresh token cleanup service");
         performImmediateCleanup();

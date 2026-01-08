@@ -40,7 +40,7 @@ public class CandleRetrievalService implements CandleRetrievalServiceInterface {
         PlatformStock platformStock = findPlatformStock(platform, stockSymbol);
 
         // Retrieve candles by sequence range (Now returns Projection)
-        List<ICandleWithSequence> candles = marketCandleRepository.findByStockAndTimeframeAndSequenceRange(
+        List<CandleWithSequenceInterface> candles = marketCandleRepository.findByStockAndTimeframeAndSequenceRange(
                 platformStock.getPlatformStockId(),
                 timeframe,
                 fromSequence,
@@ -73,7 +73,7 @@ public class CandleRetrievalService implements CandleRetrievalServiceInterface {
         PlatformStock platformStock = findPlatformStock(platform, stockSymbol);
 
         // Retrieve candles by date range (Using new method to get sequence numbers)
-        List<ICandleWithSequence> candles = marketCandleRepository
+        List<CandleWithSequenceInterface> candles = marketCandleRepository
                 .findCandlesByDateRangeWithSequence(
                         platformStock.getPlatformStockId(),
                         timeframe,
@@ -107,7 +107,7 @@ public class CandleRetrievalService implements CandleRetrievalServiceInterface {
         return platformStocks.getFirst();
     }
 
-    private CandleDTO convertToDTO(ICandleWithSequence candle) {
+    private CandleDTO convertToDTO(CandleWithSequenceInterface candle) {
         return new CandleDTO(
                 candle.getMarketCandleId(),
                 candle.getTimestamp(),

@@ -27,19 +27,4 @@ public class AlpacaConfig {
 
         return restTemplate;
     }
-
-    /**
-     * Provides a dedicated thread pool for processing Alpaca data.
-     * This prevents Alpaca API operations from blocking the main application threads.
-     */
-    @Bean(name = "alpacaTaskExecutor")
-    public Executor alpacaTaskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(5);
-        executor.setQueueCapacity(100);
-        executor.setThreadNamePrefix("alpaca-");
-        executor.initialize();
-        return executor;
-    }
 }

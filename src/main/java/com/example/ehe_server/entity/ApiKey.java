@@ -23,9 +23,11 @@ public class ApiKey {
     private Platform platform;
 
     @Column(name = "api_key_value", nullable = false)
+    @Convert(converter = ColumnEncryptor.class)
     private String apiKeyValue;
 
     @Column(name = "secret_key", nullable = false)
+    @Convert(converter = ColumnEncryptor.class)
     private String secretKey;
 
     @CreationTimestamp

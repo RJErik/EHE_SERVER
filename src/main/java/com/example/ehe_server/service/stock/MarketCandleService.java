@@ -61,14 +61,14 @@ public class MarketCandleService implements MarketCandleServiceInterface {
             // Fetch the latest candle with sequence
             long startTime = System.currentTimeMillis();
 
-            Optional<ICandleWithSequence> candleOpt = marketCandleRepository
+            Optional<CandleWithSequenceInterface> candleOpt = marketCandleRepository
                     .findLatestCandleWithSequence(stock.getPlatformStockId(), timeframe);
 
             if (candleOpt.isEmpty()) {
                 return null;
             }
 
-            ICandleWithSequence candle = candleOpt.get();
+            CandleWithSequenceInterface candle = candleOpt.get();
 
             return convertToDTO(candle);
 
@@ -114,14 +114,14 @@ public class MarketCandleService implements MarketCandleServiceInterface {
             timeframe = parseTimeframe(timeframeStr);
 
             // Get the candle at the specific timestamp WITH SEQUENCE
-            Optional<ICandleWithSequence> candleOpt = marketCandleRepository
+            Optional<CandleWithSequenceInterface> candleOpt = marketCandleRepository
                     .findCandleWithSequenceByTimestamp(stock.getPlatformStockId(), timeframe, candleTimestamp);
 
             if (candleOpt.isEmpty()) {
                 return null;
             }
 
-            ICandleWithSequence candle = candleOpt.get();
+            CandleWithSequenceInterface candle = candleOpt.get();
 
             // Check if the candle has been modified
             boolean isModified = false;
@@ -187,7 +187,7 @@ public class MarketCandleService implements MarketCandleServiceInterface {
         return result;
     }
 
-    private CandleData convertToDTO(ICandleWithSequence candle) {
+    private CandleData convertToDTO(CandleWithSequenceInterface candle) {
         CandleData dto = new CandleData();
         dto.setTimestamp(candle.getTimestamp());
         dto.setOpenPrice(candle.getOpenPrice());

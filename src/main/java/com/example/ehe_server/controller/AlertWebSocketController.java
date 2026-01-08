@@ -6,7 +6,7 @@ import com.example.ehe_server.dto.websocket.AlertUnsubscriptionRequest;
 import com.example.ehe_server.dto.websocket.AlertUnsubscriptionResponse;
 import com.example.ehe_server.exception.custom.MissingSessionIdException;
 import com.example.ehe_server.service.intf.alert.websocket.AlertWebSocketSubscriptionManagerInterface;
-import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
+import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.messaging.handler.annotation.Header;
@@ -25,15 +25,15 @@ import java.util.Map;
 public class AlertWebSocketController {
 
     private final AlertWebSocketSubscriptionManagerInterface alertWebSocketSubscriptionManager;
-    private final WebSocketAuthServiceInterface webSocketAuthService;
+    private final UserContextServiceInterface userContextService;
     private final MessageSource messageSource;
 
     public AlertWebSocketController(
             AlertWebSocketSubscriptionManagerInterface alertWebSocketSubscriptionManager,
-            WebSocketAuthServiceInterface webSocketAuthService,
+            UserContextServiceInterface userContextService,
             MessageSource messageSource) {
         this.alertWebSocketSubscriptionManager = alertWebSocketSubscriptionManager;
-        this.webSocketAuthService = webSocketAuthService;
+        this.userContextService = userContextService;
         this.messageSource = messageSource;
     }
 
@@ -48,7 +48,7 @@ public class AlertWebSocketController {
         Map<String, Object> response = new HashMap<>();
 
         // Extract user ID from WebSocket authentication
-        Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
+        Integer userId = userContextService.getUserIdFromWebSocketAuth(headerAccessor);
 
         // Create subscription for this user
         AlertSubscriptionResponse alertSubscriptionResponse = alertWebSocketSubscriptionManager.createSubscription(

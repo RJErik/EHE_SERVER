@@ -1,7 +1,7 @@
 package com.example.ehe_server.controller;
 
 import com.example.ehe_server.dto.websocket.*;
-import com.example.ehe_server.service.intf.audit.WebSocketAuthServiceInterface;
+import com.example.ehe_server.service.intf.audit.UserContextServiceInterface;
 import com.example.ehe_server.service.intf.stock.websocket.StockWebSocketSubscriptionManagerInterface;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -19,15 +19,15 @@ import java.util.Map;
 public class StockCandleWebSocketController {
 
     private final StockWebSocketSubscriptionManagerInterface stockWebSocketSubscriptionManager;
-    private final WebSocketAuthServiceInterface webSocketAuthService;
+    private final UserContextServiceInterface userContextService;
     private final MessageSource messageSource;
 
     public StockCandleWebSocketController(
             StockWebSocketSubscriptionManagerInterface stockWebSocketSubscriptionManager,
-            WebSocketAuthServiceInterface webSocketAuthService,
+            UserContextServiceInterface userContextService,
             MessageSource messageSource) {
         this.stockWebSocketSubscriptionManager = stockWebSocketSubscriptionManager;
-        this.webSocketAuthService = webSocketAuthService;
+        this.userContextService = userContextService;
         this.messageSource = messageSource;
     }
 
@@ -41,7 +41,7 @@ public class StockCandleWebSocketController {
         Map<String, Object> response = new HashMap<>();
 
         // Extract user ID from WebSocket authentication
-        Integer userId = webSocketAuthService.getUserIdFromWebSocketAuth(headerAccessor);
+        Integer userId = userContextService.getUserIdFromWebSocketAuth(headerAccessor);
 
         // Create subscription
         StockCandleSubscriptionResponse stockCandleSubscriptionResponse = stockWebSocketSubscriptionManager.createSubscription(
