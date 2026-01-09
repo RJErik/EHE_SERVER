@@ -12,7 +12,7 @@ public class Stock {
     @Column(name = "stock_id")
     private Integer stockId;
 
-    @Column(name = "stock_symbol", length = 255)
+    @Column(name = "stock_symbol", nullable = false, unique = true, length = 255)
     private String stockSymbol;
 
     @OneToMany(mappedBy = "stock", fetch = FetchType.LAZY)

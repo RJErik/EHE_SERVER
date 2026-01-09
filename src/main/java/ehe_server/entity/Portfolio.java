@@ -21,7 +21,7 @@ public class Portfolio {
     private User user;
 
     @OneToOne
-    @JoinColumn(name = "api_key_id")
+    @JoinColumn(name = "api_key_id",  nullable = false)
     private ApiKey apiKey;
 
     @Size(max = 100)

@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
 public class Alert {
 
     public enum ConditionType {
-        @Column(name = "Price above") PRICE_ABOVE,
-        @Column(name = "Price below") PRICE_BELOW
+        PRICE_ABOVE,
+        PRICE_BELOW
     }
 
     @Id

@@ -10,25 +10,27 @@ import javax.crypto.spec.SecretKeySpec;
 import java.util.Base64;
 import java.util.HexFormat;
 
-@Component
 @Converter
 public class ColumnEncryptor implements AttributeConverter<String, String> {
 
     private static final String AES = "AES";
-    private final SecretKeySpec keySpec;
+    private static SecretKeySpec keySpec;
 
-    public ColumnEncryptor(ColumnEncryptionProperties properties) {
-        if (properties.getSecretKey() == null || properties.getSecretKey().isBlank()) {
-            throw new IllegalStateException("Database encryption key (spring.column.secret-key) is missing!");
+    @Component
+    public static class KeyInitializer {
+        public KeyInitializer(ColumnEncryptionProperties properties) {
+            if (properties.getSecretKey() == null || properties.getSecretKey().isBlank()) {
+                throw new IllegalStateException("Database encryption key is missing!");
+            }
+            byte[] keyBytes = HexFormat.of().parseHex(properties.getSecretKey());
+            ColumnEncryptor.keySpec = new SecretKeySpec(keyBytes, AES);
         }
-        byte[] keyBytes = HexFormat.of().parseHex(properties.getSecretKey());
-
-        this.keySpec = new SecretKeySpec(keyBytes, AES);
     }
 
     @Override
     public String convertToDatabaseColumn(String attribute) {
         if (attribute == null) return null;
+        if (keySpec == null) throw new IllegalStateException("Encryption key not initialized");
         try {
             Cipher cipher = Cipher.getInstance(AES);
             cipher.init(Cipher.ENCRYPT_MODE, keySpec);
@@ -41,6 +43,7 @@ public class ColumnEncryptor implements AttributeConverter<String, String> {
     @Override
     public String convertToEntityAttribute(String dbData) {
         if (dbData == null) return null;
+        if (keySpec == null) throw new IllegalStateException("Encryption key not initialized");
         try {
             Cipher cipher = Cipher.getInstance(AES);
             cipher.init(Cipher.DECRYPT_MODE, keySpec);

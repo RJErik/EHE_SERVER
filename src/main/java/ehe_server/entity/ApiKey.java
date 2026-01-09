@@ -31,7 +31,7 @@ public class ApiKey {
     private String secretKey;
 
     @CreationTimestamp
-    @Column(name = "date_added", nullable = false, updatable = false, insertable = false)
+    @Column(name = "date_added", nullable = false, updatable = false)
     private LocalDateTime dateAdded;
 
     public Integer getApiKeyId() {

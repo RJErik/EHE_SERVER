@@ -25,13 +25,6 @@ public class Log {
     @Column(name = "log_date", nullable = false, updatable = false)
     private LocalDateTime logDate;
 
-    @PrePersist
-    protected void onCreate() {
-        if (logDate == null) {
-            logDate = LocalDateTime.now();
-        }
-    }
-
     public Integer getLogId() {
         return logId;
     }

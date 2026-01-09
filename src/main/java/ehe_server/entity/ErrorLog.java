@@ -25,7 +25,7 @@ public class ErrorLog {
     private String stackTrace;
 
     @CreationTimestamp
-    @Column(name = "error_date", nullable = false, updatable = false, insertable = false)
+    @Column(name = "error_date", nullable = false, updatable = false)
     private LocalDateTime errorDate;
 
     public Integer getErrorLogId() {

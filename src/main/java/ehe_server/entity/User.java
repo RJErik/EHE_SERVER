@@ -24,6 +24,7 @@ public class User {
     private String userName;
 
     @NotBlank
+    @Pattern(regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
     @Column(name = "email", nullable = false, unique = true, length = 255)
     private String email;
 
