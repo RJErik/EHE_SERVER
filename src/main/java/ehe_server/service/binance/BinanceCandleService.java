@@ -8,7 +8,7 @@ import ehe_server.repository.MarketCandleRepository;
 import ehe_server.repository.PlatformRepository;
 import ehe_server.repository.PlatformStockRepository;
 import ehe_server.repository.StockRepository;
-import ehe_server.service.audit.UserContextService;
+import ehe_server.service.intf.audit.UserContextServiceInterface;
 import ehe_server.service.intf.binance.BinanceApiClientInterface;
 import ehe_server.service.intf.binance.BinanceCandleServiceInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
@@ -31,29 +31,29 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
     private static final int UPDATE_TARGET_TIME_EVERY_N_BATCHES = 5;
     private static final int UPDATE_TARGET_TIME_AFTER_MINUTES = 15;
 
-    private final BinanceApiClientInterface apiClient;
-    private final MarketCandleRepository candleRepository;
-    private final PlatformStockRepository stockRepository;
+    private final BinanceApiClientInterface binanceApiClient;
+    private final MarketCandleRepository marketCandleRepository;
+    private final PlatformStockRepository platformStockRepository;
     private final PlatformRepository platformRepository;
-    private final StockRepository stockRepositoryForStock;
+    private final StockRepository stockRepository;
     private final ObjectMapper objectMapper;
     private final LoggingServiceInterface loggingService;
-    private final UserContextService userContextService;
+    private final UserContextServiceInterface userContextService;
 
     public BinanceCandleService(
-            BinanceApiClientInterface apiClient,
-            MarketCandleRepository candleRepository,
-            PlatformStockRepository stockRepository,
+            BinanceApiClientInterface binanceApiClient,
+            MarketCandleRepository marketCandleRepository,
+            PlatformStockRepository platformStockRepository,
             PlatformRepository platformRepository,
-            StockRepository stockRepositoryForStock,
+            StockRepository stockRepository,
             ObjectMapper objectMapper,
             LoggingServiceInterface loggingService,
-            UserContextService userContextService) {
-        this.apiClient = apiClient;
-        this.candleRepository = candleRepository;
-        this.stockRepository = stockRepository;
+            UserContextServiceInterface userContextService) {
+        this.binanceApiClient = binanceApiClient;
+        this.marketCandleRepository = marketCandleRepository;
+        this.platformStockRepository = platformStockRepository;
         this.platformRepository = platformRepository;
-        this.stockRepositoryForStock = stockRepositoryForStock;
+        this.stockRepository = stockRepository;
         this.objectMapper = objectMapper;
         this.loggingService = loggingService;
         this.userContextService = userContextService;
@@ -68,7 +68,7 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
         userContextService.setUser("SYSTEM", "SYSTEM");
         PlatformStock stock = getOrCreateStock(symbol);
 
-        MarketCandle latestCandle = candleRepository
+        MarketCandle latestCandle = marketCandleRepository
                 .findTopByPlatformStockAndTimeframeOrderByTimestampDesc(
                         stock, MarketCandle.Timeframe.M1);
 
@@ -107,7 +107,7 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
         List<MarketCandle> candlesToSave = new ArrayList<>();
 
         for (MarketCandle candle : candles) {
-            Optional<MarketCandle> existingCandle = candleRepository
+            Optional<MarketCandle> existingCandle = marketCandleRepository
                     .findByPlatformStockAndTimeframeAndTimestampEquals(
                             stock, candle.getTimeframe(), candle.getTimestamp());
 
@@ -124,7 +124,7 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
             }
         }
 
-        candleRepository.saveAll(candlesToSave);
+        marketCandleRepository.saveAll(candlesToSave);
         aggregateCandles(stock, candlesToSave);
     }
 
@@ -151,7 +151,7 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
                     lastTimeUpdate = Instant.now();
                 }
 
-                ResponseEntity<String> response = apiClient.getKlines(
+                ResponseEntity<String> response = binanceApiClient.getKlines(
                         symbol, "1m", currentStartTime, null, MAX_CANDLES_PER_REQUEST);
                 List<MarketCandle> candles = parseCandles(response.getBody(), stock);
                 batchesFetched++;
@@ -237,7 +237,7 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
      */
     private boolean checkForCandles(String symbol, Instant startTime, Instant endTime) {
         try {
-            ResponseEntity<String> response = apiClient.getKlines(
+            ResponseEntity<String> response = binanceApiClient.getKlines(
                     symbol, "1m",
                     startTime.toEpochMilli(),
                     endTime.toEpochMilli(),
@@ -319,7 +319,7 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
                 List<MarketCandle> candlesInPeriod = entry.getValue();
 
                 if (!candlesInPeriod.isEmpty()) {
-                    MarketCandle candle = candleRepository
+                    MarketCandle candle = marketCandleRepository
                             .findByPlatformStockAndTimeframeAndTimestampEquals(
                                     stock, timeframe, timeframeStart)
                             .orElse(null);
@@ -335,7 +335,7 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
             }
 
             if (!candles.isEmpty()) {
-                candleRepository.saveAll(candles);
+                marketCandleRepository.saveAll(candles);
             }
         } catch (Exception e) {
             loggingService.logError(String.format("Error aggregating to %s: %s",
@@ -431,7 +431,7 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
             LocalDateTime timestamp = LocalDateTime.ofInstant(
                     Instant.ofEpochMilli(openTime), ZoneOffset.UTC);
 
-            MarketCandle candle = candleRepository
+            MarketCandle candle = marketCandleRepository
                     .findByPlatformStockAndTimeframeAndTimestampEquals(
                             stock, MarketCandle.Timeframe.M1, timestamp)
                     .orElseGet(() -> {
@@ -448,7 +448,7 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
             candle.setClosePrice(new BigDecimal(k.get("c").asText()));
             candle.setVolume(new BigDecimal(k.get("v").asText()));
 
-            candle = candleRepository.save(candle);
+            candle = marketCandleRepository.save(candle);
 
             if (isFinal) {
                 aggregateCandles(stock, Collections.singletonList(candle));
@@ -463,7 +463,7 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
      * Retrieves or creates a PlatformStock entity for the given symbol.
      */
     private PlatformStock getOrCreateStock(String symbol) {
-        List<PlatformStock> stocks = stockRepository.findByPlatformPlatformNameAndStockStockSymbol(
+        List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockSymbol(
                 PLATFORM_NAME, symbol);
         if (!stocks.isEmpty()) {
             return stocks.getFirst();
@@ -472,16 +472,16 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
         Platform platform = platformRepository.findByPlatformName(PLATFORM_NAME)
                 .orElseThrow(() -> new RuntimeException("Platform not found: " + PLATFORM_NAME));
 
-        Stock stock = stockRepositoryForStock.findByStockSymbol(symbol)
+        Stock stock = stockRepository.findByStockSymbol(symbol)
                 .orElseGet(() -> {
                     Stock newStock = new Stock();
                     newStock.setStockSymbol(symbol);
-                    return stockRepositoryForStock.save(newStock);
+                    return stockRepository.save(newStock);
                 });
 
         PlatformStock platformStock = new PlatformStock();
         platformStock.setPlatform(platform);
         platformStock.setStock(stock);
-        return stockRepository.save(platformStock);
+        return platformStockRepository.save(platformStock);
     }
 }

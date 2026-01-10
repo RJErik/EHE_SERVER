@@ -1,6 +1,7 @@
 package ehe_server.service.binance;
 
 import ehe_server.service.audit.UserContextService;
+import ehe_server.service.intf.audit.UserContextServiceInterface;
 import ehe_server.service.intf.binance.BinanceWebSocketClientInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -23,7 +24,7 @@ import java.util.stream.Collectors;
 public class BinanceWebSocketClient extends TextWebSocketHandler implements BinanceWebSocketClientInterface {
     private final ObjectMapper objectMapper;
     private final LoggingServiceInterface loggingService;
-    private final UserContextService userContextService;
+    private final UserContextServiceInterface userContextService;
 
     // Single connection for all subscriptions
     private volatile WebSocketSession session;
@@ -38,7 +39,7 @@ public class BinanceWebSocketClient extends TextWebSocketHandler implements Bina
     public BinanceWebSocketClient(
             ObjectMapper objectMapper,
             LoggingServiceInterface loggingService,
-            UserContextService userContextService) {
+            UserContextServiceInterface userContextService) {
         this.objectMapper = objectMapper;
         this.loggingService = loggingService;
         this.userContextService = userContextService;

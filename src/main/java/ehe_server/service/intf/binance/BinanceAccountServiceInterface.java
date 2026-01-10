@@ -1,5 +1,7 @@
 package ehe_server.service.intf.binance;
 
+import ehe_server.entity.AutomatedTradeRule;
+
 import java.math.BigDecimal;
 import java.util.Map;
 
@@ -25,8 +27,8 @@ public interface BinanceAccountServiceInterface {
      * @param symbol        The trading pair symbol (e.g., "BTCUSDT")
      * @param side          "BUY" or "SELL"
      * @param type          Order type (e.g., "MARKET")
-     * @param quantity      The quantity to trade (for SELL orders)
-     * @param quoteOrderQty The quote currency amount to spend (for BUY orders)
+     * @param quantity      The quantity to trade
+     * @param quantityType  The quantity type (e.g., QUANTITY, QUOTE_ORDER_QTY)
      * @return Response from Binance API
      */
     Map<String, Object> placeMarketOrder(
@@ -36,6 +38,6 @@ public interface BinanceAccountServiceInterface {
             String side,
             String type,
             BigDecimal quantity,
-            BigDecimal quoteOrderQty
+            AutomatedTradeRule.QuantityType quantityType
     );
 }

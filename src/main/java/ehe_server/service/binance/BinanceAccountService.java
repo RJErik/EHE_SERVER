@@ -1,5 +1,6 @@
 package ehe_server.service.binance;
 
+import ehe_server.entity.AutomatedTradeRule;
 import ehe_server.service.intf.binance.BinanceAccountServiceInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.http.HttpEntity;
@@ -82,12 +83,12 @@ public class BinanceAccountService implements BinanceAccountServiceInterface {
      * @param symbol        The trading pair symbol (e.g., "BTCUSDT")
      * @param side          "BUY" or "SELL"
      * @param type          Order type (e.g., "MARKET")
-     * @param quantity      The quantity to trade (for SELL orders)
-     * @param quoteOrderQty The quote currency amount to spend (for BUY orders)
+     * @param quantity      The quantity to trade
+     * @param quantityType  The quantity type (e.g., QUANTITY, QUOTE_ORDER_QTY)
      * @return Response from Binance API
      */
     public Map<String, Object> placeMarketOrder(String apiKey, String secretKey, String symbol,
-                                                String side, String type, BigDecimal quantity, BigDecimal quoteOrderQty) {
+                                                String side, String type, BigDecimal quantity, AutomatedTradeRule.QuantityType quantityType) {
         try {
             // Build URL with required parameters
             long timestamp = Instant.now().toEpochMilli();
@@ -98,11 +99,11 @@ public class BinanceAccountService implements BinanceAccountServiceInterface {
                     .append("&timestamp=").append(timestamp);
 
             // Add either quantity or quoteOrderQty based on which one is provided
-            if (quantity != null) {
+            if (quantityType.equals(AutomatedTradeRule.QuantityType.QUANTITY)) {
                 queryParamsBuilder.append("&quantity=").append(quantity.toPlainString());
             }
-            if (quoteOrderQty != null) {
-                queryParamsBuilder.append("&quoteOrderQty=").append(quoteOrderQty.toPlainString());
+            if (quantityType.equals(AutomatedTradeRule.QuantityType.QUOTE_ORDER_QTY)) {
+                queryParamsBuilder.append("&quoteOrderQty=").append(quantity.toPlainString());
             }
 
             String queryParams = queryParamsBuilder.toString();

@@ -1,6 +1,7 @@
 package ehe_server.service.alpaca;
 
 import ehe_server.properties.AlpacaProperties;
+import ehe_server.service.intf.alpaca.AlpacaTradingApiClientInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
@@ -15,7 +16,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class AlpacaTradingApiClient {
+public class AlpacaTradingApiClient implements AlpacaTradingApiClientInterface {
 
     private final RestTemplate restTemplate;
     private final AlpacaProperties alpacaProperties;
@@ -38,6 +39,7 @@ public class AlpacaTradingApiClient {
     /**
      * Makes an authenticated request to Alpaca Trading API
      */
+    @Override
     public ResponseEntity<String> makeRequest(String endpoint, HttpMethod method) {
         return makeRequest(endpoint, method, null);
     }
@@ -45,6 +47,7 @@ public class AlpacaTradingApiClient {
     /**
      * Makes an authenticated request to Alpaca Trading API with body
      */
+    @Override
     public ResponseEntity<String> makeRequest(String endpoint, HttpMethod method, Object body) {
         String requestKey = "trading_" + endpoint;
         waitForRateLimitIfNeeded(requestKey);

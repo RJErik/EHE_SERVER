@@ -2,7 +2,11 @@ package ehe_server.service.alpaca;
 
 import ehe_server.entity.PlatformStock;
 import ehe_server.repository.PlatformStockRepository;
-import ehe_server.service.audit.UserContextService;
+import ehe_server.service.intf.alpaca.AlpacaCandleServiceInterface;
+import ehe_server.service.intf.alpaca.AlpacaDataInitializationServiceInterface;
+import ehe_server.service.intf.alpaca.AlpacaWebSocketClientInterface;
+import ehe_server.service.intf.alpaca.MarketHoursServiceInterface;
+import ehe_server.service.intf.audit.UserContextServiceInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import jakarta.annotation.PostConstruct;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -15,30 +19,30 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class AlpacaDataInitializationService {
+public class AlpacaDataInitializationService implements AlpacaDataInitializationServiceInterface {
 
     private static final String PLATFORM_NAME = "Alpaca";
 
-    private final AlpacaCandleService candleService;
-    private final AlpacaWebSocketClient webSocketClient;
-    private final PlatformStockRepository stockRepository;
+    private final AlpacaCandleServiceInterface alpacaCandleService;
+    private final AlpacaWebSocketClientInterface alpacaWebSocketClient;
+    private final PlatformStockRepository platformStockRepository;
     private final LoggingServiceInterface loggingService;
-    private final UserContextService userContextService;
-    private final MarketHoursService marketHoursService;
+    private final UserContextServiceInterface userContextService;
+    private final MarketHoursServiceInterface marketHoursService;
 
     private final Set<String> liveSymbols = ConcurrentHashMap.newKeySet();
     private final Map<String, Boolean> historicalSyncInProgress = new ConcurrentHashMap<>();
 
     public AlpacaDataInitializationService(
-            AlpacaCandleService candleService,
-            AlpacaWebSocketClient webSocketClient,
-            PlatformStockRepository stockRepository,
+            AlpacaCandleServiceInterface alpacaCandleService,
+            AlpacaWebSocketClientInterface alpacaWebSocketClient,
+            PlatformStockRepository platformStockRepository,
             LoggingServiceInterface loggingService,
-            UserContextService userContextService,
-            MarketHoursService marketHoursService) {
-        this.candleService = candleService;
-        this.webSocketClient = webSocketClient;
-        this.stockRepository = stockRepository;
+            UserContextServiceInterface userContextService,
+            MarketHoursServiceInterface marketHoursService) {
+        this.alpacaCandleService = alpacaCandleService;
+        this.alpacaWebSocketClient = alpacaWebSocketClient;
+        this.platformStockRepository = platformStockRepository;
         this.loggingService = loggingService;
         this.userContextService = userContextService;
         this.marketHoursService = marketHoursService;
@@ -57,7 +61,7 @@ public class AlpacaDataInitializationService {
             userContextService.setUser("SYSTEM", "SYSTEM");
             loggingService.logAction("Starting async Alpaca data synchronization");
 
-            List<PlatformStock> stocks = stockRepository.findByPlatformPlatformName(PLATFORM_NAME);
+            List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformName(PLATFORM_NAME);
 
             if (!stocks.isEmpty()) {
                 loggingService.logAction("Found " + stocks.size() + " Alpaca symbols. Starting initialization...");
@@ -105,6 +109,7 @@ public class AlpacaDataInitializationService {
     /**
      * Sets up a symbol: sync historical data, then add to live WebSocket
      */
+    @Override
     public void setupSymbol(String symbol) {
         try {
             // Check if it's a stock and market is closed
@@ -116,7 +121,7 @@ public class AlpacaDataInitializationService {
             historicalSyncInProgress.put(symbol, true);
 
             loggingService.logAction("Starting historical data sync for " + symbol);
-            candleService.syncHistoricalData(symbol);
+            alpacaCandleService.syncHistoricalData(symbol);
 
             // Get the stock entity for handler
             PlatformStock stock = getStock(symbol);
@@ -125,12 +130,12 @@ public class AlpacaDataInitializationService {
             }
 
             // Register handler with WebSocket
-            webSocketClient.registerHandler(symbol,
-                    candleData -> candleService.processRealtimeCandle(candleData, stock));
+            alpacaWebSocketClient.registerHandler(symbol,
+                    candleData -> alpacaCandleService.processRealtimeCandle(candleData, stock));
 
             // Add to live symbols (this triggers WebSocket reconnection)
             liveSymbols.add(symbol);
-            webSocketClient.updateSubscriptions(new ArrayList<>(liveSymbols));
+            alpacaWebSocketClient.updateSubscriptions(new ArrayList<>(liveSymbols));
 
             historicalSyncInProgress.put(symbol, false);
             loggingService.logAction("Successfully initialized " + symbol);
@@ -144,11 +149,12 @@ public class AlpacaDataInitializationService {
     /**
      * Remove a symbol from live subscriptions
      */
+    @Override
     public void removeSymbol(String symbol) {
         try {
             liveSymbols.remove(symbol);
-            webSocketClient.unregisterHandler(symbol);
-            webSocketClient.updateSubscriptions(new ArrayList<>(liveSymbols));
+            alpacaWebSocketClient.unregisterHandler(symbol);
+            alpacaWebSocketClient.updateSubscriptions(new ArrayList<>(liveSymbols));
 
             loggingService.logAction("Removed " + symbol + " from live subscriptions. " +
                     "Remaining symbols: " + liveSymbols.size());
@@ -167,7 +173,7 @@ public class AlpacaDataInitializationService {
             userContextService.setUser("SYSTEM", "SYSTEM");
             loggingService.logAction("Running daily maintenance");
 
-            List<PlatformStock> stocks = stockRepository.findByPlatformPlatformName(PLATFORM_NAME);
+            List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformName(PLATFORM_NAME);
 
             for (PlatformStock stock : stocks) {
                 String symbol = stock.getStock().getStockSymbol();
@@ -180,7 +186,7 @@ public class AlpacaDataInitializationService {
 
                 if (liveSymbols.contains(symbol)) {
                     loggingService.logAction("Syncing any missing data for " + symbol);
-                    candleService.syncHistoricalData(symbol);
+                    alpacaCandleService.syncHistoricalData(symbol);
                 }
             }
         } catch (Exception e) {
@@ -198,7 +204,7 @@ public class AlpacaDataInitializationService {
             userContextService.setUser("SYSTEM", "SYSTEM");
             loggingService.logAction("Running market open initialization");
 
-            List<PlatformStock> stocks = stockRepository.findByPlatformPlatformName(PLATFORM_NAME);
+            List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformName(PLATFORM_NAME);
 
             for (PlatformStock stock : stocks) {
                 String symbol = stock.getStock().getStockSymbol();
@@ -228,19 +234,19 @@ public class AlpacaDataInitializationService {
                 return;
             }
 
-            if (!webSocketClient.isConnected()) {
+            if (!alpacaWebSocketClient.isConnected()) {
                 loggingService.logAction("WebSocket disconnected! Reconnecting with " +
                         liveSymbols.size() + " symbols");
-                webSocketClient.updateSubscriptions(new ArrayList<>(liveSymbols));
+                alpacaWebSocketClient.updateSubscriptions(new ArrayList<>(liveSymbols));
             } else {
                 // Verify subscription count matches
                 int expected = liveSymbols.size();
-                int actual = webSocketClient.getSubscriptionCount();
+                int actual = alpacaWebSocketClient.getSubscriptionCount();
 
                 if (expected != actual) {
                     loggingService.logAction("Subscription mismatch! Expected: " + expected +
                             ", Actual: " + actual + ". Reconnecting...");
-                    webSocketClient.updateSubscriptions(new ArrayList<>(liveSymbols));
+                    alpacaWebSocketClient.updateSubscriptions(new ArrayList<>(liveSymbols));
                 } else {
                     loggingService.logAction("WebSocket healthy with " + actual + " subscriptions");
                 }
@@ -253,6 +259,7 @@ public class AlpacaDataInitializationService {
     /**
      * Get list of symbols currently live
      */
+    @Override
     public Set<String> getLiveSymbols() {
         return new HashSet<>(liveSymbols);
     }
@@ -260,14 +267,15 @@ public class AlpacaDataInitializationService {
     /**
      * Get sync status for a symbol
      */
+    @Override
     public boolean isSyncing(String symbol) {
         return historicalSyncInProgress.getOrDefault(symbol, false);
     }
 
     private PlatformStock getStock(String symbol) {
-        List<PlatformStock> stocks = stockRepository.findByPlatformPlatformNameAndStockStockSymbol(
+        List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockSymbol(
                 PLATFORM_NAME, symbol);
-        return stocks.isEmpty() ? null : stocks.get(0);
+        return stocks.isEmpty() ? null : stocks.getFirst();
     }
 
     /**

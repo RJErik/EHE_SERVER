@@ -29,7 +29,6 @@ public class TradingService implements TradingServiceInterface {
     private final TransactionRepository transactionRepository;
     private final PlatformStockRepository platformStockRepository;
 
-    private static final int QUOTE_ORDER_QTY_PRECISION = 8;
     private static final int QUANTITY_PRECISION = 8;
 
     public TradingService(
@@ -79,21 +78,14 @@ public class TradingService implements TradingServiceInterface {
         }
 
         // Determine quantity and quoteOrderQty based on action and quantityType
-        BigDecimal quantity = null;
-        BigDecimal quoteOrderQty = null;
-
-        if (quantityType.equals(AutomatedTradeRule.QuantityType.QUANTITY)) {
-            quantity = amount.setScale(QUANTITY_PRECISION, RoundingMode.DOWN);
-        } else if (quantityType.equals(AutomatedTradeRule.QuantityType.QUOTE_ORDER_QTY)) {
-            quoteOrderQty = amount.setScale(QUOTE_ORDER_QTY_PRECISION, RoundingMode.DOWN);
-        }
+        BigDecimal quantity = amount.setScale(QUANTITY_PRECISION, RoundingMode.DOWN);
 
         Transaction transaction;
 
         try {
             // Execute the order
             Map<String, Object> orderResult = binanceAccountService.placeMarketOrder(
-                    apiKey.getApiKeyValue(), apiKey.getSecretKey(), binanceSymbol, action.toString(), "MARKET", quantity, quoteOrderQty);
+                    apiKey.getApiKeyValue(), apiKey.getSecretKey(), binanceSymbol, action.toString(), "MARKET", quantity, quantityType);
 
             // Extract trade details from order result
             BigDecimal executedQty = orderResult.get("executedQty") != null ?
@@ -151,7 +143,7 @@ public class TradingService implements TradingServiceInterface {
             transaction.setPortfolio(portfolio);
             transaction.setPlatformStock(platformStock);
             transaction.setTransactionType(action);
-            transaction.setQuantity(quantity != null ? quantity : BigDecimal.ZERO);
+            transaction.setQuantity(quantity);
             transaction.setPrice(BigDecimal.ZERO);
             transaction.setStatus(Transaction.Status.FAILED);
 

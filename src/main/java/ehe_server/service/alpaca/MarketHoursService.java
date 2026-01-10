@@ -1,6 +1,7 @@
 package ehe_server.service.alpaca;
 
 import ehe_server.properties.AlpacaProperties;
+import ehe_server.service.intf.alpaca.MarketHoursServiceInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,7 +16,7 @@ import org.springframework.web.client.RestTemplate;
 import java.time.Instant;
 
 @Service
-public class MarketHoursService {
+public class MarketHoursService implements MarketHoursServiceInterface {
 
     private final RestTemplate restTemplate;
     private final AlpacaProperties alpacaProperties;
@@ -43,6 +44,7 @@ public class MarketHoursService {
      * Checks if the stock market is currently open
      * Note: Crypto markets are always open (24/7)
      */
+    @Override
     public boolean isMarketOpen() {
         // Check cache first
         if (cachedIsOpen != null && cacheExpiry != null && Instant.now().isBefore(cacheExpiry)) {

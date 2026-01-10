@@ -1,6 +1,7 @@
 package ehe_server.service.alpaca;
 
 import ehe_server.properties.AlpacaProperties;
+import ehe_server.service.intf.alpaca.AlpacaDataApiClientInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.*;
@@ -15,7 +16,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class AlpacaDataApiClient {
+public class AlpacaDataApiClient implements AlpacaDataApiClientInterface {
 
     private final RestTemplate restTemplate;
     private final AlpacaProperties alpacaProperties;
@@ -39,6 +40,7 @@ public class AlpacaDataApiClient {
      * Gets historical bars for a stock symbol
      * Uses /v2/stocks/{symbol}/bars endpoint
      */
+    @Override
     public ResponseEntity<String> getStockBars(String symbol, String timeframe,
                                                ZonedDateTime start, ZonedDateTime end,
                                                String pageToken) {
@@ -84,6 +86,7 @@ public class AlpacaDataApiClient {
      *
      * Note: Crypto symbols should be in format "BTC/USD"
      */
+    @Override
     public ResponseEntity<String> getCryptoBars(String symbol, String timeframe,
                                                 ZonedDateTime start, ZonedDateTime end,
                                                 String pageToken) {
@@ -127,6 +130,7 @@ public class AlpacaDataApiClient {
     /**
      * Automatically detects if symbol is crypto (contains "/") and calls appropriate endpoint
      */
+    @Override
     public ResponseEntity<String> getBars(String symbol, String timeframe,
                                           ZonedDateTime start, ZonedDateTime end,
                                           String pageToken) {

@@ -8,7 +8,9 @@ import ehe_server.repository.MarketCandleRepository;
 import ehe_server.repository.PlatformRepository;
 import ehe_server.repository.PlatformStockRepository;
 import ehe_server.repository.StockRepository;
-import ehe_server.service.audit.UserContextService;
+import ehe_server.service.intf.alpaca.AlpacaCandleServiceInterface;
+import ehe_server.service.intf.alpaca.AlpacaDataApiClientInterface;
+import ehe_server.service.intf.audit.UserContextServiceInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,30 +23,32 @@ import java.time.*;
 import java.util.*;
 
 @Service
-public class AlpacaCandleService {
+public class AlpacaCandleService implements AlpacaCandleServiceInterface {
 
     private static final String PLATFORM_NAME = "Alpaca";
+    private static final int WEEK_IN_MINUTES = 7 * 24 * 60;
+    private static final int HALF_WEEK_IN_MINUTES = WEEK_IN_MINUTES / 2;
 
-    private final AlpacaDataApiClient apiClient;
-    private final MarketCandleRepository candleRepository;
+    private final AlpacaDataApiClientInterface alpacaDataApiClient;
+    private final MarketCandleRepository marketCandleRepository;
     private final PlatformStockRepository platformStockRepository;
     private final PlatformRepository platformRepository;
     private final StockRepository stockRepository;
     private final ObjectMapper objectMapper;
     private final LoggingServiceInterface loggingService;
-    private final UserContextService userContextService;
+    private final UserContextServiceInterface userContextService;
 
     public AlpacaCandleService(
-            AlpacaDataApiClient apiClient,
-            MarketCandleRepository candleRepository,
+            AlpacaDataApiClientInterface alpacaDataApiClient,
+            MarketCandleRepository marketCandleRepository,
             PlatformStockRepository platformStockRepository,
             PlatformRepository platformRepository,
             StockRepository stockRepository,
             ObjectMapper objectMapper,
             LoggingServiceInterface loggingService,
-            UserContextService userContextService) {
-        this.apiClient = apiClient;
-        this.candleRepository = candleRepository;
+            UserContextServiceInterface userContextService) {
+        this.alpacaDataApiClient = alpacaDataApiClient;
+        this.marketCandleRepository = marketCandleRepository;
         this.platformStockRepository = platformStockRepository;
         this.platformRepository = platformRepository;
         this.stockRepository = stockRepository;
@@ -57,12 +61,13 @@ public class AlpacaCandleService {
      * Syncs historical data for a symbol
      * This will fetch all available historical data from the earliest point to now
      */
+    @Override
     public void syncHistoricalData(String symbol) {
         userContextService.setUser("SYSTEM", "SYSTEM");
         PlatformStock stock = getOrCreateStock(symbol);
 
         // Find latest existing candle
-        MarketCandle latestCandle = candleRepository
+        MarketCandle latestCandle = marketCandleRepository
                 .findTopByPlatformStockAndTimeframeOrderByTimestampDesc(
                         stock, MarketCandle.Timeframe.M1);
 
@@ -80,19 +85,83 @@ public class AlpacaCandleService {
 
             fetchCandlesInRange(stock, symbol, startTime, endTime);
         } else {
-            // No existing data - fetch from a reasonable starting point
-            // For stocks: Start from 1 year ago (or when the stock was listed)
-            // For crypto: Start from 1 year ago (crypto has limited free history on Alpaca)
+            // No existing data - search backward to find earliest available data
             loggingService.logAction("No existing candles for " + symbol +
-                    ". Fetching historical data...");
+                    ". Searching for earliest available data...");
 
-            ZonedDateTime startTime = ZonedDateTime.now(ZoneOffset.UTC).minusYears(1);
-            ZonedDateTime endTime = ZonedDateTime.now(ZoneOffset.UTC);
+            ZonedDateTime firstCheckpoint = ZonedDateTime.now(ZoneOffset.UTC);
+            Optional<ZonedDateTime> earliestDataPoint = findEarliestAvailableData(symbol, firstCheckpoint);
 
-            loggingService.logAction("Fetching historical data for " + symbol +
-                    " from " + startTime + " to " + endTime);
+            if (earliestDataPoint.isPresent()) {
+                loggingService.logAction("Fetching " + symbol + " from " +
+                        earliestDataPoint.get() + " to present");
+                fetchCandlesInRange(stock, symbol, earliestDataPoint.get(),
+                        ZonedDateTime.now(ZoneOffset.UTC));
+            } else {
+                loggingService.logAction("No historical data available for " + symbol);
+            }
+        }
+    }
 
-            fetchCandlesInRange(stock, symbol, startTime, endTime);
+    /**
+     * Searches backward week-by-week to find the earliest available data point.
+     * Uses an expanding search when gaps are detected.
+     */
+    private Optional<ZonedDateTime> findEarliestAvailableData(String symbol, ZonedDateTime firstCheckpoint) {
+        ZonedDateTime checkPoint = firstCheckpoint;
+        ZonedDateTime lastDataPoint = null;
+        boolean foundGap = false;
+
+        while (!foundGap) {
+            checkPoint = checkPoint.minusMinutes(WEEK_IN_MINUTES);
+
+            boolean hasCandles = checkForCandles(symbol, checkPoint,
+                    checkPoint.plusMinutes(WEEK_IN_MINUTES));
+
+            if (hasCandles) {
+                lastDataPoint = checkPoint;
+            } else {
+                // Expand search range to confirm gap
+                ZonedDateTime expandedStart = checkPoint.minusMinutes(HALF_WEEK_IN_MINUTES);
+                ZonedDateTime expandedEnd = checkPoint.plusMinutes(WEEK_IN_MINUTES + HALF_WEEK_IN_MINUTES);
+
+                boolean hasExpandedCandles = checkForCandles(symbol, expandedStart, expandedEnd);
+
+                if (hasExpandedCandles) {
+                    lastDataPoint = expandedStart;
+                } else {
+                    foundGap = true;
+                }
+            }
+        }
+
+        return Optional.ofNullable(lastDataPoint);
+    }
+
+    /**
+     * Checks if any candles exist in the specified time range.
+     */
+    private boolean checkForCandles(String symbol, ZonedDateTime startTime, ZonedDateTime endTime) {
+        try {
+            ResponseEntity<String> response = alpacaDataApiClient.getBars(
+                    symbol, "1Min", startTime, endTime, null);
+
+            JsonNode responseData = objectMapper.readTree(response.getBody());
+
+            // Handle different response formats for crypto vs stock
+            if (isCryptoSymbol(symbol)) {
+                JsonNode barsObject = responseData.get("bars");
+                if (barsObject != null && barsObject.has(symbol)) {
+                    return !barsObject.get(symbol).isEmpty();
+                }
+                return false;
+            } else {
+                JsonNode barsArray = responseData.get("bars");
+                return barsArray != null && barsArray.isArray() && !barsArray.isEmpty();
+            }
+        } catch (Exception e) {
+            loggingService.logError("Error checking for candles: " + e.getMessage(), e);
+            return false;
         }
     }
 
@@ -111,7 +180,7 @@ public class AlpacaCandleService {
         try {
             do {
                 // Fetch a page of data
-                ResponseEntity<String> response = apiClient.getBars(
+                ResponseEntity<String> response = alpacaDataApiClient.getBars(
                         symbol, "1Min", startTime, endTime, pageToken);
 
                 JsonNode responseData = objectMapper.readTree(response.getBody());
@@ -173,6 +242,7 @@ public class AlpacaCandleService {
      * Saves a batch of candles and their aggregations in a single transaction
      */
     @Transactional
+    @Override
     public void saveCandleBatch(PlatformStock stock, List<MarketCandle> candles) {
         if (candles == null || candles.isEmpty()) {
             return;
@@ -182,7 +252,7 @@ public class AlpacaCandleService {
 
         for (MarketCandle candle : candles) {
             // Check if candle already exists
-            Optional<MarketCandle> existingCandle = candleRepository
+            Optional<MarketCandle> existingCandle = marketCandleRepository
                     .findByPlatformStockAndTimeframeAndTimestampEquals(
                             stock, candle.getTimeframe(), candle.getTimestamp());
 
@@ -202,7 +272,7 @@ public class AlpacaCandleService {
         }
 
         // Save all candles (new and updated ones)
-        candleRepository.saveAll(candlesToSave);
+        marketCandleRepository.saveAll(candlesToSave);
 
         // Aggregate after saving
         aggregateCandles(stock, candlesToSave);
@@ -259,6 +329,7 @@ public class AlpacaCandleService {
      * Processes a real-time candle from WebSocket
      */
     @Transactional
+    @Override
     public void processRealtimeCandle(JsonNode candleData, PlatformStock stock) {
         if (!userContextService.isAuthenticated()) {
             userContextService.setUser("SYSTEM", "SYSTEM");
@@ -280,7 +351,7 @@ public class AlpacaCandleService {
                     .toLocalDateTime();
 
             // Find existing candle or create new one
-            MarketCandle candle = candleRepository
+            MarketCandle candle = marketCandleRepository
                     .findByPlatformStockAndTimeframeAndTimestampEquals(
                             stock, MarketCandle.Timeframe.M1, localDateTime)
                     .orElseGet(() -> {
@@ -299,7 +370,7 @@ public class AlpacaCandleService {
             candle.setVolume(new BigDecimal(volume));
 
             // Save the candle
-            candle = candleRepository.save(candle);
+            candle = marketCandleRepository.save(candle);
 
             // Aggregate to higher timeframes
             List<MarketCandle> minuteCandles = new ArrayList<>();
@@ -339,7 +410,7 @@ public class AlpacaCandleService {
                 LocalDateTime timestamp = candle.getTimestamp();
                 LocalDateTime timeframeStart = calculateTimeframeStart(timestamp, minutes);
 
-                groupedCandles.computeIfAbsent(timeframeStart, k -> new ArrayList<>()).add(candle);
+                groupedCandles.computeIfAbsent(timeframeStart, _ -> new ArrayList<>()).add(candle);
             }
 
             // Process each group to create or update aggregated candles
@@ -350,7 +421,7 @@ public class AlpacaCandleService {
                 List<MarketCandle> candlesInPeriod = entry.getValue();
 
                 if (!candlesInPeriod.isEmpty()) {
-                    MarketCandle candle = candleRepository
+                    MarketCandle candle = marketCandleRepository
                             .findByPlatformStockAndTimeframeAndTimestampEquals(
                                     stock, timeframe, timeframeStart)
                             .orElse(null);
@@ -366,7 +437,7 @@ public class AlpacaCandleService {
             }
 
             if (!candles.isEmpty()) {
-                candleRepository.saveAll(candles);
+                marketCandleRepository.saveAll(candles);
                 loggingService.logAction("Saved/updated " + candles.size() +
                         " candles for timeframe " + timeframe);
             }
@@ -461,7 +532,6 @@ public class AlpacaCandleService {
         platformStock.setStock(stock);
         return platformStockRepository.save(platformStock);
     }
-
 
     /**
      * Determines if a symbol is crypto based on the presence of "/"

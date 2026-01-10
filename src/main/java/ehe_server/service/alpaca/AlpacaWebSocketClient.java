@@ -2,9 +2,12 @@ package ehe_server.service.alpaca;
 
 import ehe_server.properties.AlpacaProperties;
 import ehe_server.service.audit.UserContextService;
+import ehe_server.service.intf.alpaca.AlpacaWebSocketClientInterface;
+import ehe_server.service.intf.audit.UserContextServiceInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.client.WebSocketClient;
@@ -16,30 +19,44 @@ import java.net.URI;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 @Service
-public class AlpacaWebSocketClient extends TextWebSocketHandler {
+public class AlpacaWebSocketClient extends TextWebSocketHandler implements AlpacaWebSocketClientInterface {
 
     private final ObjectMapper objectMapper;
     private final LoggingServiceInterface loggingService;
-    private final UserContextService userContextService;
+    private final UserContextServiceInterface userContextService;
     private final AlpacaProperties alpacaProperties;
 
-    private volatile WebSocketSession session;
-    private volatile boolean authenticated = false;
+    // Separate sessions for stock and crypto feeds
+    private volatile WebSocketSession stockSession;
+    private volatile WebSocketSession cryptoSession;
 
-    private final Set<String> subscriptions = ConcurrentHashMap.newKeySet();
+    // Track authentication state per feed
+    private volatile boolean stockAuthenticated = false;
+    private volatile boolean cryptoAuthenticated = false;
+
+    // Track subscriptions per feed type
+    private final Set<String> stockSubscriptions = ConcurrentHashMap.newKeySet();
+    private final Set<String> cryptoSubscriptions = ConcurrentHashMap.newKeySet();
 
     private final Map<String, Consumer<JsonNode>> handlers = new ConcurrentHashMap<>();
 
+    // Map sessions to their feed type for message handling
+    private final Map<WebSocketSession, FeedType> sessionFeedTypeMap = new ConcurrentHashMap<>();
+
     private static final String STOCK_FEED_PATH = "/v2/iex"; // or /v2/sip for paid plans
-    private static final String CRYPTO_FEED_PATH = "/v1beta3/crypto";
+    private static final String CRYPTO_FEED_PATH = "/v1beta3/crypto/us";
+
+    private enum FeedType {
+        STOCK,
+        CRYPTO
+    }
 
     public AlpacaWebSocketClient(
             ObjectMapper objectMapper,
             LoggingServiceInterface loggingService,
-            UserContextService userContextService,
+            UserContextServiceInterface userContextService,
             AlpacaProperties alpacaProperties) {
         this.objectMapper = objectMapper;
         this.loggingService = loggingService;
@@ -49,94 +66,130 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler {
 
     /**
      * Update subscriptions with a complete list of symbols
-     * This will reconnect the websocket if the symbol list changes
+     * This will reconnect the websockets if the symbol list changes
      */
+    @Override
     public synchronized void updateSubscriptions(List<String> symbols) {
         userContextService.setUser("SYSTEM", "SYSTEM");
 
-        Set<String> normalizedSymbols = symbols.stream()
-                .map(String::toUpperCase)
-                .collect(Collectors.toSet());
+        // Separate symbols into stocks and crypto
+        Set<String> newStockSymbols = new HashSet<>();
+        Set<String> newCryptoSymbols = new HashSet<>();
 
-        // If nothing changed, don't reconnect
-        if (normalizedSymbols.equals(subscriptions)) {
-            loggingService.logAction("Subscription list unchanged, skipping reconnection");
-            return;
-        }
-
-        loggingService.logAction("Updating subscriptions. Old: " + subscriptions.size() +
-                ", New: " + normalizedSymbols.size());
-
-        // Close existing connection
-        if (session != null && session.isOpen()) {
-            try {
-                session.close();
-                loggingService.logAction("Closed existing WebSocket connection");
-            } catch (Exception e) {
-                loggingService.logError("Error closing WebSocket: " + e.getMessage(), e);
+        for (String symbol : symbols) {
+            String normalized = symbol.toUpperCase();
+            if (isCryptoSymbol(normalized)) {
+                newCryptoSymbols.add(normalized);
+            } else {
+                newStockSymbols.add(normalized);
             }
         }
 
-        subscriptions.clear();
-        subscriptions.addAll(normalizedSymbols);
-        authenticated = false;
+        // Update stock subscriptions if changed
+        if (!newStockSymbols.equals(stockSubscriptions)) {
+            loggingService.logAction("Updating stock subscriptions. Old: " + stockSubscriptions.size() +
+                    ", New: " + newStockSymbols.size());
 
-        // Connect with new symbols if any
-        if (!subscriptions.isEmpty()) {
-            // Separate stocks and crypto
-            List<String> stocks = new ArrayList<>();
-            List<String> cryptos = new ArrayList<>();
+            closeSession(stockSession, "stock");
+            stockSession = null;
+            stockAuthenticated = false;
 
-            for (String symbol : subscriptions) {
-                if (isCryptoSymbol(symbol)) {
-                    cryptos.add(symbol);
-                } else {
-                    stocks.add(symbol);
-                }
-            }
+            stockSubscriptions.clear();
+            stockSubscriptions.addAll(newStockSymbols);
 
-            // Connect to appropriate feeds
-            if (!stocks.isEmpty()) {
-                connectToFeed(STOCK_FEED_PATH);
-            }
-            if (!cryptos.isEmpty()) {
-                connectToFeed(CRYPTO_FEED_PATH);
+            if (!stockSubscriptions.isEmpty()) {
+                connectToFeed(FeedType.STOCK);
+            } else {
+                loggingService.logAction("No stock symbols to subscribe to");
             }
         } else {
-            loggingService.logAction("No symbols to subscribe to, connection idle");
-            session = null;
+            loggingService.logAction("Stock subscription list unchanged, skipping reconnection");
+        }
+
+        // Update crypto subscriptions if changed
+        if (!newCryptoSymbols.equals(cryptoSubscriptions)) {
+            loggingService.logAction("Updating crypto subscriptions. Old: " + cryptoSubscriptions.size() +
+                    ", New: " + newCryptoSymbols.size());
+
+            closeSession(cryptoSession, "crypto");
+            cryptoSession = null;
+            cryptoAuthenticated = false;
+
+            cryptoSubscriptions.clear();
+            cryptoSubscriptions.addAll(newCryptoSymbols);
+
+            if (!cryptoSubscriptions.isEmpty()) {
+                connectToFeed(FeedType.CRYPTO);
+            } else {
+                loggingService.logAction("No crypto symbols to subscribe to");
+            }
+        } else {
+            loggingService.logAction("Crypto subscription list unchanged, skipping reconnection");
+        }
+    }
+
+    /**
+     * Closes a WebSocket session safely
+     */
+    private void closeSession(WebSocketSession session, String feedName) {
+        if (session != null && session.isOpen()) {
+            try {
+                sessionFeedTypeMap.remove(session);
+                session.close();
+                loggingService.logAction("Closed existing " + feedName + " WebSocket connection");
+            } catch (Exception e) {
+                loggingService.logError("Error closing " + feedName + " WebSocket: " + e.getMessage(), e);
+            }
         }
     }
 
     /**
      * Connect to a specific Alpaca data feed
      */
-    private void connectToFeed(String feedPath) {
+    private void connectToFeed(FeedType feedType) {
         userContextService.setUser("SYSTEM", "SYSTEM");
+
+        String feedPath = feedType == FeedType.STOCK ? STOCK_FEED_PATH : CRYPTO_FEED_PATH;
+        String feedName = feedType == FeedType.STOCK ? "stock" : "crypto";
 
         try {
             String wsUrl = alpacaProperties.getWebsocketurl() + feedPath;
 
             WebSocketClient client = new StandardWebSocketClient();
-            session = client.doHandshake(this, null, URI.create(wsUrl)).get();
 
-            loggingService.logAction("WebSocket connected to " + feedPath +
-                    ". Awaiting authentication...");
+            WebSocketSession newSession = client.execute(this, new WebSocketHttpHeaders(), URI.create(wsUrl)).get();
 
-            // Authentication will happen in afterConnectionEstablished()
-            // Subscription will happen after auth confirmation
+            // Store session and map it to feed type
+            sessionFeedTypeMap.put(newSession, feedType);
+
+            if (feedType == FeedType.STOCK) {
+                stockSession = newSession;
+            } else {
+                cryptoSession = newSession;
+            }
+
+            loggingService.logAction("WebSocket connected to " + feedName + " feed (" + feedPath +
+                    "). Awaiting authentication...");
 
         } catch (Exception e) {
-            loggingService.logError("Failed to connect to Alpaca WebSocket: " + e.getMessage(), e);
-            session = null;
-            authenticated = false;
-            throw new RuntimeException("WebSocket connection failed", e);
+            loggingService.logError("Failed to connect to Alpaca " + feedName + " WebSocket: " + e.getMessage(), e);
+
+            if (feedType == FeedType.STOCK) {
+                stockSession = null;
+                stockAuthenticated = false;
+            } else {
+                cryptoSession = null;
+                cryptoAuthenticated = false;
+            }
+
+            throw new RuntimeException(feedName + " WebSocket connection failed", e);
         }
     }
 
     /**
      * Register a message handler for a specific symbol
      */
+    @Override
     public void registerHandler(String symbol, Consumer<JsonNode> handler) {
         handlers.put(symbol.toUpperCase(), handler);
         loggingService.logAction("Registered handler for symbol: " + symbol);
@@ -145,35 +198,48 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler {
     /**
      * Unregister a message handler for a specific symbol
      */
+    @Override
     public void unregisterHandler(String symbol) {
         handlers.remove(symbol.toUpperCase());
         loggingService.logAction("Unregistered handler for symbol: " + symbol);
     }
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) {
+    public void afterConnectionEstablished(@NonNull WebSocketSession session) {
         userContextService.setUser("SYSTEM", "SYSTEM");
-        loggingService.logAction("Alpaca WebSocket connection established. Sending authentication...");
+
+        FeedType feedType = sessionFeedTypeMap.get(session);
+        String feedName = feedType == FeedType.STOCK ? "stock" : "crypto";
+
+        loggingService.logAction("Alpaca " + feedName + " WebSocket connection established. Sending authentication...");
 
         try {
             // Send authentication message
             TextMessage authMsg = createAuthMessage();
             session.sendMessage(authMsg);
         } catch (IOException e) {
-            loggingService.logError("Failed to send auth message: " + e.getMessage(), e);
+            loggingService.logError("Failed to send auth message to " + feedName + " feed: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public void handleTextMessage(WebSocketSession session, TextMessage message) {
+    public void handleTextMessage(@NonNull WebSocketSession session, @NonNull TextMessage message) {
         userContextService.setUser("SYSTEM", "SYSTEM");
+
+        FeedType feedType = sessionFeedTypeMap.get(session);
+        if (feedType == null) {
+            loggingService.logError("Received message from unknown session", null);
+            return;
+        }
+
+        String feedName = feedType == FeedType.STOCK ? "stock" : "crypto";
 
         try {
             JsonNode jsonArray = objectMapper.readTree(message.getPayload());
 
             // Alpaca sends messages as an array
             if (!jsonArray.isArray()) {
-                loggingService.logAction("Received non-array message: " + message.getPayload());
+                loggingService.logAction("Received non-array message from " + feedName + " feed: " + message.getPayload());
                 return;
             }
 
@@ -182,13 +248,13 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler {
 
                 switch (messageType) {
                     case "success":
-                        handleSuccessMessage(jsonNode);
+                        handleSuccessMessage(jsonNode, session, feedType);
                         break;
                     case "error":
-                        handleErrorMessage(jsonNode);
+                        handleErrorMessage(jsonNode, feedName);
                         break;
                     case "subscription":
-                        handleSubscriptionMessage(jsonNode);
+                        handleSubscriptionMessage(jsonNode, feedName);
                         break;
                     case "b": // bar/candle
                         handleBarMessage(jsonNode);
@@ -198,40 +264,49 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler {
                         // Handle if needed
                         break;
                     default:
-                        loggingService.logAction("Unknown message type: " + messageType);
+                        loggingService.logAction("Unknown message type from " + feedName + " feed: " + messageType);
                 }
             }
         } catch (Exception e) {
-            loggingService.logError("Error processing WebSocket message: " + e.getMessage(), e);
+            loggingService.logError("Error processing " + feedName + " WebSocket message: " + e.getMessage(), e);
         }
     }
 
-    private void handleSuccessMessage(JsonNode jsonNode) {
+    private void handleSuccessMessage(JsonNode jsonNode, WebSocketSession session, FeedType feedType) {
         String msg = jsonNode.get("msg").asText();
-        loggingService.logAction("WebSocket success: " + msg);
+        String feedName = feedType == FeedType.STOCK ? "stock" : "crypto";
+
+        loggingService.logAction(feedName + " WebSocket success: " + msg);
 
         if (msg.contains("authenticated")) {
-            authenticated = true;
-            loggingService.logAction("Authentication successful");
+            // Set authenticated flag for the appropriate feed
+            if (feedType == FeedType.STOCK) {
+                stockAuthenticated = true;
+            } else {
+                cryptoAuthenticated = true;
+            }
 
-            // Now send subscription message
+            loggingService.logAction(feedName + " feed authentication successful");
+
+            // Now send subscription message for the appropriate symbols
             try {
-                TextMessage subscribeMsg = createSubscriptionMessage(new ArrayList<>(subscriptions));
+                Set<String> symbolsToSubscribe = feedType == FeedType.STOCK ? stockSubscriptions : cryptoSubscriptions;
+                TextMessage subscribeMsg = createSubscriptionMessage(new ArrayList<>(symbolsToSubscribe));
                 session.sendMessage(subscribeMsg);
             } catch (IOException e) {
-                loggingService.logError("Failed to send subscription message: " + e.getMessage(), e);
+                loggingService.logError("Failed to send subscription message to " + feedName + " feed: " + e.getMessage(), e);
             }
         }
     }
 
-    private void handleErrorMessage(JsonNode jsonNode) {
+    private void handleErrorMessage(JsonNode jsonNode, String feedName) {
         int code = jsonNode.get("code").asInt();
         String msg = jsonNode.get("msg").asText();
-        loggingService.logError("WebSocket error (code " + code + "): " + msg, null);
+        loggingService.logError(feedName + " WebSocket error (code " + code + "): " + msg, null);
     }
 
-    private void handleSubscriptionMessage(JsonNode jsonNode) {
-        loggingService.logAction("Subscription confirmed: " + jsonNode.toString());
+    private void handleSubscriptionMessage(JsonNode jsonNode, String feedName) {
+        loggingService.logAction(feedName + " subscription confirmed: " + jsonNode.toString());
     }
 
     private void handleBarMessage(JsonNode jsonNode) {
@@ -269,23 +344,28 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler {
         subscribePayload.put("bars", symbols);
 
         String json = objectMapper.writeValueAsString(subscribePayload);
-        loggingService.logAction("Sending subscription for " + symbols.size() + " symbols");
+        loggingService.logAction("Sending subscription for " + symbols.size() + " symbols: " + symbols);
         return new TextMessage(json);
     }
 
     @Override
-    public void handleTransportError(WebSocketSession session, Throwable exception) {
+    public void handleTransportError(@NonNull WebSocketSession session, @NonNull Throwable exception) {
         userContextService.setUser("SYSTEM", "SYSTEM");
-        loggingService.logError("Alpaca WebSocket transport error: " + exception.getMessage(), exception);
+
+        FeedType feedType = sessionFeedTypeMap.get(session);
+        String feedName = feedType != null ? (feedType == FeedType.STOCK ? "stock" : "crypto") : "unknown";
+
+        loggingService.logError("Alpaca " + feedName + " WebSocket transport error: " + exception.getMessage(), exception);
 
         // Schedule reconnection attempt
+        final FeedType reconnectFeedType = feedType;
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
-                loggingService.logAction("Attempting to reconnect after transport error");
-                synchronized (this) {
-                    if (!subscriptions.isEmpty()) {
-                        updateSubscriptions(new ArrayList<>(subscriptions));
+                loggingService.logAction("Attempting to reconnect " + feedName + " feed after transport error");
+                synchronized (AlpacaWebSocketClient.this) {
+                    if (reconnectFeedType != null) {
+                        reconnectFeed(reconnectFeedType);
                     }
                 }
             } catch (InterruptedException e) {
@@ -295,19 +375,33 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler {
     }
 
     @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+    public void afterConnectionClosed(@NonNull WebSocketSession session, @NonNull CloseStatus status) {
         userContextService.setUser("SYSTEM", "SYSTEM");
-        loggingService.logAction("Alpaca WebSocket connection closed: " + status);
-        authenticated = false;
 
-        // Attempt reconnect if we still have subscriptions
-        if (!subscriptions.isEmpty()) {
+        FeedType feedType = sessionFeedTypeMap.remove(session);
+        String feedName = feedType != null ? (feedType == FeedType.STOCK ? "stock" : "crypto") : "unknown";
+
+        loggingService.logAction("Alpaca " + feedName + " WebSocket connection closed: " + status);
+
+        // Reset authentication state
+        if (feedType == FeedType.STOCK) {
+            stockAuthenticated = false;
+            stockSession = null;
+        } else if (feedType == FeedType.CRYPTO) {
+            cryptoAuthenticated = false;
+            cryptoSession = null;
+        }
+
+        // Attempt reconnect if we still have subscriptions for this feed
+        final FeedType reconnectFeedType = feedType;
+        if (reconnectFeedType != null && hasSubscriptionsForFeed(reconnectFeedType)) {
             new Thread(() -> {
                 try {
                     Thread.sleep(5000);
-                    loggingService.logAction("Attempting to reconnect with " + subscriptions.size() + " symbols");
-                    synchronized (this) {
-                        updateSubscriptions(new ArrayList<>(subscriptions));
+                    loggingService.logAction("Attempting to reconnect " + feedName + " feed with " +
+                            getSubscriptionCountForFeed(reconnectFeedType) + " symbols");
+                    synchronized (AlpacaWebSocketClient.this) {
+                        reconnectFeed(reconnectFeedType);
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -317,17 +411,62 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler {
     }
 
     /**
-     * Check if WebSocket is currently connected and authenticated
+     * Reconnects a specific feed if it's not already connected
      */
-    public boolean isConnected() {
-        return session != null && session.isOpen() && authenticated;
+    private void reconnectFeed(FeedType feedType) {
+        if (feedType == FeedType.STOCK) {
+            if ((stockSession == null || !stockSession.isOpen()) && !stockSubscriptions.isEmpty()) {
+                connectToFeed(FeedType.STOCK);
+            }
+        } else {
+            if ((cryptoSession == null || !cryptoSession.isOpen()) && !cryptoSubscriptions.isEmpty()) {
+                connectToFeed(FeedType.CRYPTO);
+            }
+        }
     }
 
     /**
-     * Get current subscription count
+     * Checks if there are subscriptions for a specific feed
      */
+    private boolean hasSubscriptionsForFeed(FeedType feedType) {
+        if (feedType == FeedType.STOCK) {
+            return !stockSubscriptions.isEmpty();
+        } else {
+            return !cryptoSubscriptions.isEmpty();
+        }
+    }
+
+    /**
+     * Gets subscription count for a specific feed
+     */
+    private int getSubscriptionCountForFeed(FeedType feedType) {
+        if (feedType == FeedType.STOCK) {
+            return stockSubscriptions.size();
+        } else {
+            return cryptoSubscriptions.size();
+        }
+    }
+
+    /**
+     * Check if WebSocket is currently connected and authenticated
+     * Returns true if at least one feed with subscriptions is connected
+     */
+    @Override
+    public boolean isConnected() {
+        boolean stockConnected = stockSubscriptions.isEmpty() ||
+                (stockSession != null && stockSession.isOpen() && stockAuthenticated);
+        boolean cryptoConnected = cryptoSubscriptions.isEmpty() ||
+                (cryptoSession != null && cryptoSession.isOpen() && cryptoAuthenticated);
+
+        return stockConnected && cryptoConnected;
+    }
+
+    /**
+     * Get current subscription count (total across both feeds)
+     */
+    @Override
     public int getSubscriptionCount() {
-        return subscriptions.size();
+        return stockSubscriptions.size() + cryptoSubscriptions.size();
     }
 
     /**
