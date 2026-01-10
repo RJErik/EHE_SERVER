@@ -1,7 +1,6 @@
 package ehe_server.controller;
 
 import ehe_server.annotation.validation.NotNullField;
-import com.example.ehe_server.dto.*;
 import ehe_server.dto.AlertCreationRequest;
 import ehe_server.dto.AlertResponse;
 import ehe_server.dto.AlertSearchRequest;

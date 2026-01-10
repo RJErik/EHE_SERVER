@@ -2,7 +2,6 @@ package ehe_server.service.alert;
 
 import ehe_server.annotation.LogMessage;
 import ehe_server.entity.Alert;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.AlertNotFoundException;
 import ehe_server.exception.custom.UnauthorizedAlertAccessException;
 import ehe_server.repository.AlertRepository;

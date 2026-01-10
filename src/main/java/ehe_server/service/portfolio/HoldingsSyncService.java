@@ -1,9 +1,6 @@
 package ehe_server.service.portfolio;
 
 import ehe_server.dto.HoldingsUpdateResponse;
-import com.example.ehe_server.entity.*;
-import com.example.ehe_server.exception.custom.*;
-import com.example.ehe_server.repository.*;
 import ehe_server.entity.ApiKey;
 import ehe_server.entity.Holding;
 import ehe_server.entity.PlatformStock;
@@ -81,10 +78,6 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
 
         List<Map<String, Object>> rawBalances = fetchBalancesFromExchange(apiKey);
         List<ParsedBalance> balances = parseBalances(rawBalances);
-
-        if (balances.isEmpty()) {
-            throw new NoBalancesFoundException(portfolio.getPortfolioId());
-        }
 
         return syncHoldingsWithBalances(portfolio, balances, apiKey.getPlatform().getPlatformName());
     }

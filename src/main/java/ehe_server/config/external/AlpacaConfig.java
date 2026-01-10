@@ -2,11 +2,8 @@ package ehe_server.config.external;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.DefaultUriBuilderFactory;
-
-import java.util.concurrent.Executor;
 
 @Configuration
 public class AlpacaConfig {

@@ -73,7 +73,7 @@ public class StockWebSocketSubscriptionManager implements StockWebSocketSubscrip
             String timeframe,
             String destination) {
 
-        validateSubscriptionRequest(userId, sessionId, platformName, stockSymbol, timeframe, destination);
+        validateSubscriptionRequest(sessionId, platformName, stockSymbol, timeframe, destination);
 
         StockCandleSubscription subscription = createAndRegisterSubscription(
                 userId, sessionId, platformName, stockSymbol, timeframe, destination);
@@ -119,26 +119,18 @@ public class StockWebSocketSubscriptionManager implements StockWebSocketSubscrip
     // ==================== Validation ====================
 
     private void validateSubscriptionRequest(
-            Integer userId,
             String sessionId,
             String platformName,
             String stockSymbol,
             String timeframe,
             String destination) {
 
-        validateUserId(userId);
         validateSessionId(sessionId);
         validatePlatformName(platformName);
         validateStockSymbol(stockSymbol);
         validateTimeframe(timeframe);
         validateDestination(destination);
         validatePlatformStockCombination(platformName, stockSymbol);
-    }
-
-    private void validateUserId(Integer userId) {
-        if (userId == null) {
-            throw new MissingUserIdException();
-        }
     }
 
     private void validateSessionId(String sessionId) {

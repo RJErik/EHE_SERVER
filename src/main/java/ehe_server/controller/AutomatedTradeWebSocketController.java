@@ -1,9 +1,7 @@
 package ehe_server.controller;
 
-import ehe_server.annotation.validation.NotEmptyString;
 import ehe_server.dto.websocket.AutomatedTradeSubscriptionResponse;
 import ehe_server.dto.websocket.AutomatedTradeUnsubscriptionRequest;
-import ehe_server.exception.custom.MissingSessionIdException;
 import ehe_server.service.intf.audit.UserContextServiceInterface;
 import ehe_server.service.intf.automatictrade.websocket.AutomatedTradeWebSocketSubscriptionManagerInterface;
 import org.springframework.context.MessageSource;
@@ -14,13 +12,11 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Controller;
-import org.springframework.validation.annotation.Validated;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Controller
-@Validated
 public class AutomatedTradeWebSocketController {
 
     private final AutomatedTradeWebSocketSubscriptionManagerInterface automatedTradeWebSocketSubscriptionManager;
@@ -39,7 +35,6 @@ public class AutomatedTradeWebSocketController {
     @MessageMapping("/automated-trades/subscribe")
     @SendToUser("/queue/automated-trades")
     public Map<String, Object> subscribeToAutomatedTrades(
-            @NotEmptyString(exception = MissingSessionIdException.class)
             @Header("simpSessionId")
             String sessionId,
             StompHeaderAccessor headerAccessor) {

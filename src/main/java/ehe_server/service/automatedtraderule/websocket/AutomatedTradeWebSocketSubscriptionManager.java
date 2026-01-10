@@ -120,16 +120,8 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
     // ==================== Validation ====================
 
     private void validateSubscriptionRequest(Integer userId, String sessionId, String destination) {
-        validateUserId(userId);
         validateSessionId(sessionId);
         validateDestination(destination);
-        validateUserExists(userId);
-    }
-
-    private void validateUserId(Integer userId) {
-        if (userId == null) {
-            throw new MissingUserIdException();
-        }
     }
 
     private void validateSessionId(String sessionId) {
@@ -141,12 +133,6 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
     private void validateDestination(String destination) {
         if (destination == null || destination.trim().isEmpty()) {
             throw new MissingDestinationException();
-        }
-    }
-
-    private void validateUserExists(Integer userId) {
-        if (!userRepository.existsById(userId)) {
-            throw new UserNotFoundException(userId);
         }
     }
 

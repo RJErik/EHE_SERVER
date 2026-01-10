@@ -6,4 +6,8 @@ public class InvalidThresholdValueException extends ValidationException {
     public InvalidThresholdValueException(BigDecimal value) {
         super("error.message.invalidThresholdValue", "error.logDetail.invalidThresholdValue", value);
     }
+
+    public InvalidThresholdValueException() {
+        super("error.message.invalidThresholdValue", "error.logDetail.invalidThresholdValue");
+    }
 }

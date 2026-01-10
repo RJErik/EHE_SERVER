@@ -5,7 +5,6 @@ import ehe_server.dto.WatchlistResponse;
 import ehe_server.entity.PlatformStock;
 import ehe_server.entity.User;
 import ehe_server.entity.WatchlistItem;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.PlatformStockNotFoundException;
 import ehe_server.exception.custom.UserNotFoundException;
 import ehe_server.exception.custom.WatchlistItemAlreadyExistsException;

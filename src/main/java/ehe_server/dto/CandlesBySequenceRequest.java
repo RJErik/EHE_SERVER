@@ -3,11 +3,7 @@ package ehe_server.dto;
 import ehe_server.annotation.validation.NotEmptyString;
 import ehe_server.annotation.validation.NotNullField;
 import ehe_server.entity.MarketCandle;
-import com.example.ehe_server.exception.custom.*;
-import ehe_server.exception.custom.MissingEndSequenceNumberException;
-import ehe_server.exception.custom.MissingPlatformNameException;
-import ehe_server.exception.custom.MissingStartSequenceNumberException;
-import ehe_server.exception.custom.MissingStockSymbolException;
+import ehe_server.exception.custom.*;
 
 public class CandlesBySequenceRequest {
 
@@ -17,7 +13,7 @@ public class CandlesBySequenceRequest {
     @NotEmptyString(exception = MissingStockSymbolException.class)
     private String stockSymbol;
 
-//    @NotNullField(exception = MissingTimeframeException.class)
+    @NotNullField(exception = MissingTimeframeException.class)
     private MarketCandle.Timeframe timeframe;
 
     @NotNullField(exception = MissingStartSequenceNumberException.class)

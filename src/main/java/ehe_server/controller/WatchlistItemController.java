@@ -1,7 +1,6 @@
 package ehe_server.controller;
 
 import ehe_server.annotation.validation.NotNullField;
-import com.example.ehe_server.dto.*;
 import ehe_server.dto.WatchlistCandleResponse;
 import ehe_server.dto.WatchlistCreationRequest;
 import ehe_server.dto.WatchlistResponse;

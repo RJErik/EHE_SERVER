@@ -2,7 +2,6 @@ package ehe_server.service.automatedtraderule;
 
 import ehe_server.annotation.LogMessage;
 import ehe_server.entity.AutomatedTradeRule;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.AutomatedTradeRuleNotFoundException;
 import ehe_server.exception.custom.UnauthorizedAutomatedTradeRuleAccessException;
 import ehe_server.repository.AutomatedTradeRuleRepository;

@@ -1,9 +1,7 @@
-// src/main/java/com/example/ehe_server/dto/RegistrationRequest.java
 package ehe_server.dto;
 
 import ehe_server.annotation.validation.NotEmptyString;
 import ehe_server.annotation.validation.RegexPattern;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.*;
 
 public class RegistrationRequest {

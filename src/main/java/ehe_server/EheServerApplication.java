@@ -11,8 +11,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import java.security.Security;
 
 @SpringBootApplication
-@EntityScan(basePackages = {"com.example.ehe_server.entity"})
-@EnableJpaRepositories(basePackages = {"com.example.ehe_server.repository"})
+@EntityScan(basePackages = {"ehe_server.entity"})
+@EnableJpaRepositories(basePackages = {"ehe_server.repository"})
 @EnableScheduling
 @EnableAsync
 public class EheServerApplication {

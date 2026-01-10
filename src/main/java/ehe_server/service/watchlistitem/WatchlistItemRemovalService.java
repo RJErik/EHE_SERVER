@@ -2,7 +2,6 @@ package ehe_server.service.watchlistitem;
 
 import ehe_server.annotation.LogMessage;
 import ehe_server.entity.WatchlistItem;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.UnauthorizedWatchlistAccessException;
 import ehe_server.exception.custom.WatchlistItemNotFoundException;
 import ehe_server.repository.WatchlistItemRepository;

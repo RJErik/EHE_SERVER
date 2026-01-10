@@ -2,7 +2,6 @@ package ehe_server.service.intf.stock.websocket;
 
 import ehe_server.dto.websocket.StockCandleSubscriptionResponse;
 import ehe_server.exception.custom.InvalidSubscriptionIdException;
-import ehe_server.exception.custom.MissingStockSubscriptionParametersException;
 import ehe_server.exception.custom.SubscriptionNotFoundException;
 
 /**
@@ -21,7 +20,6 @@ public interface StockWebSocketSubscriptionManagerInterface {
      * @param timeframe The candle timeframe (e.g., "M1", "H1", "D1")
      * @param destination The destination endpoint for candle updates
      * @return StockCandleSubscriptionResponse containing the subscription ID
-     * @throws MissingStockSubscriptionParametersException if any required parameters are missing or invalid
      */
     StockCandleSubscriptionResponse createSubscription(
             Integer userId,

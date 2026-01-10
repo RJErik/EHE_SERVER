@@ -4,7 +4,6 @@ import ehe_server.annotation.LogMessage;
 import ehe_server.entity.EmailChangeRequest;
 import ehe_server.entity.User;
 import ehe_server.entity.VerificationToken;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.*;
 import ehe_server.repository.AdminRepository;
 import ehe_server.repository.EmailChangeRequestRepository;

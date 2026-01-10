@@ -1,6 +1,5 @@
 package ehe_server.exception;
 
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.*;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import ehe_server.annotation.validation.ExceptionInstantiator;

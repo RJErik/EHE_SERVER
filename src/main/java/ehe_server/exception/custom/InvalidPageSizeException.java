@@ -8,4 +8,8 @@ public class InvalidPageSizeException extends ValidationException {
                 size
         );
     }
+
+    public InvalidPageSizeException() {
+        super("error.message.invalidPageSize", "error.logDetail.invalidPageSize");
+    }
 }

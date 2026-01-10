@@ -2,8 +2,6 @@ package ehe_server.service.automatedtraderule;
 
 import ehe_server.annotation.LogMessage;
 import ehe_server.dto.AutomatedTradeRuleResponse;
-import com.example.ehe_server.entity.*;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.entity.AutomatedTradeRule;
 import ehe_server.entity.PlatformStock;
 import ehe_server.entity.Portfolio;

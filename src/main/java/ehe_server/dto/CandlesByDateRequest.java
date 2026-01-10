@@ -1,9 +1,11 @@
 package ehe_server.dto;
 
 import ehe_server.annotation.validation.NotEmptyString;
+import ehe_server.annotation.validation.NotNullField;
 import ehe_server.entity.MarketCandle;
 import ehe_server.exception.custom.MissingPlatformNameException;
 import ehe_server.exception.custom.MissingStockSymbolException;
+import ehe_server.exception.custom.MissingTimeframeException;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDateTime;
@@ -16,7 +18,7 @@ public class CandlesByDateRequest {
     @NotEmptyString(exception = MissingStockSymbolException.class)
     private String stockSymbol;
 
-//    @NotNullField(exception = MissingTimeframeException.class)
+    @NotNullField(exception = MissingTimeframeException.class)
     private MarketCandle.Timeframe timeframe;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)

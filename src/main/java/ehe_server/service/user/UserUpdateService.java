@@ -4,7 +4,6 @@ import ehe_server.annotation.LogMessage;
 import ehe_server.dto.UserResponse;
 import ehe_server.entity.User;
 import ehe_server.entity.VerificationToken;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.AdminModificationForbiddenException;
 import ehe_server.exception.custom.EmailAlreadyRegisteredException;
 import ehe_server.exception.custom.UserNotFoundException;

@@ -2,7 +2,6 @@ package ehe_server.service.portfolio;
 
 import ehe_server.annotation.LogMessage;
 import ehe_server.entity.Portfolio;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.PortfolioNotFoundException;
 import ehe_server.exception.custom.UnauthorizedPortfolioAccessException;
 import ehe_server.repository.PortfolioRepository;

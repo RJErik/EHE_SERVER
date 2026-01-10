@@ -1,4 +1,3 @@
-// src/main/java/com/example/ehe_server/dto/portfolio/PortfolioDetailsResponse.java
 package ehe_server.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;

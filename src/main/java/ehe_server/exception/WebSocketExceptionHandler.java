@@ -1,6 +1,5 @@
 package ehe_server.exception;
 
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.CustomBaseException;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import org.springframework.context.MessageSource;
@@ -46,7 +45,7 @@ public class WebSocketExceptionHandler {
         String logPattern = messageSource.getMessage(ex.getLogDetailKey(), null, defaultLogMessage, LocaleContextHolder.getLocale());
         String logMessage = MessageFormat.format(logPattern, ex.getLogArgs());
         String finalLogMessage = prefix + " " + logMessage;
-        loggingService.logError(finalLogMessage, ex);
+        loggingService.logAction(finalLogMessage);
 
         String baseUserMessage = messageSource.getMessage(ex.getMessage(), null, defaultUserMessage, LocaleContextHolder.getLocale());
         String finalUserMessage = prefix + " " + baseUserMessage;
@@ -62,7 +61,7 @@ public class WebSocketExceptionHandler {
             errorResponse.put("showResendButton", true);
         }
 
-        sendErrorToUser(message, destination, errorResponse);
+        sendErrorToUser(destination, errorResponse);
     }
 
     @MessageExceptionHandler(Exception.class)
@@ -75,7 +74,7 @@ public class WebSocketExceptionHandler {
         errorResponse.put("success", false);
         errorResponse.put("message", "An unexpected error occurred. Please contact support.");
 
-        sendErrorToUser(message, destination, errorResponse);
+        sendErrorToUser(destination, errorResponse);
     }
 
     /**
@@ -99,8 +98,10 @@ public class WebSocketExceptionHandler {
      * Falls back to a default error queue if destination cannot be determined.
      */
     private String extractDestination(Message<?> message) {
-        if (message == null || message.getHeaders() == null) {
+        if (message == null) {
             return DEFAULT_WEBSOCKET_QUEUE;
+        } else {
+            message.getHeaders();
         }
 
         String destination = message.getHeaders().get(SIMP_DESTINATION_HEADER, String.class);
@@ -110,7 +111,7 @@ public class WebSocketExceptionHandler {
     /**
      * Sends the error response back to the user on the original destination.
      */
-    private void sendErrorToUser(Message<?> message, String destination, Map<String, Object> errorResponse) {
+    private void sendErrorToUser(String destination, Map<String, Object> errorResponse) {
         try {
             messagingTemplate.convertAndSend(destination, errorResponse);
         } catch (Exception e) {

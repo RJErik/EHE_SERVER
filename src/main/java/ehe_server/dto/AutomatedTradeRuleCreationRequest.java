@@ -5,7 +5,6 @@ import ehe_server.annotation.validation.NotEmptyString;
 import ehe_server.annotation.validation.NotNullField;
 import ehe_server.annotation.validation.PositiveAmount;
 import ehe_server.entity.AutomatedTradeRule;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.*;
 
 import java.math.BigDecimal;

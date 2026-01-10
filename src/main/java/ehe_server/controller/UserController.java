@@ -1,11 +1,9 @@
 package ehe_server.controller;
 
-import com.example.ehe_server.dto.*;
 import ehe_server.dto.EmailChangeRequest;
 import ehe_server.dto.UserInfoResponse;
 import ehe_server.service.intf.audit.UserContextServiceInterface;
 import ehe_server.service.intf.auth.PasswordResetRequestServiceInterface;
-import com.example.ehe_server.service.intf.user.*;
 import ehe_server.service.intf.user.EmailChangeRequestServiceInterface;
 import ehe_server.service.intf.user.UserDeactivationServiceInterface;
 import ehe_server.service.intf.user.UserInfoServiceInterface;

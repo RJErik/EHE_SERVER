@@ -1,4 +1,3 @@
-// src/main/java/com/example/ehe_server/dto/portfolio/CashDetails.java
 package ehe_server.dto;
 
 import java.math.BigDecimal;

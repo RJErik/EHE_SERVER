@@ -8,4 +8,8 @@ public class InvalidPageNumberException extends ValidationException {
                 page
         );
     }
+
+    public InvalidPageNumberException() {
+        super("error.message.invalidPageNumber", "error.logDetail.invalidPageNumber");
+    }
 }

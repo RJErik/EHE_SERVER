@@ -5,7 +5,6 @@ import ehe_server.dto.ApiKeyResponse;
 import ehe_server.entity.ApiKey;
 import ehe_server.entity.Platform;
 import ehe_server.entity.User;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.PlatformNotFoundException;
 import ehe_server.exception.custom.UserNotFoundException;
 import ehe_server.repository.ApiKeyRepository;

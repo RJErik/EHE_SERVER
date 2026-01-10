@@ -1,5 +1,4 @@
-// src/main/java/com/example/ehe_server/dto/HoldingDetails.java
-        package ehe_server.dto;
+package ehe_server.dto;
 
 import java.math.BigDecimal;
 import java.util.Objects;

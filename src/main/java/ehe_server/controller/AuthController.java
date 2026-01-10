@@ -1,13 +1,11 @@
 package ehe_server.controller;
 
 import ehe_server.annotation.validation.NotEmptyString;
-import com.example.ehe_server.dto.*;
 import ehe_server.dto.PasswordResetRequest;
 import ehe_server.dto.RegistrationRequest;
 import ehe_server.dto.ResendVerificationRequest;
 import ehe_server.dto.ResetPasswordRequest;
 import ehe_server.exception.custom.MissingVerificationTokenException;
-import com.example.ehe_server.service.intf.auth.*;
 import ehe_server.service.intf.auth.*;
 import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;

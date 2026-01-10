@@ -5,7 +5,6 @@ import ehe_server.dto.AlertResponse;
 import ehe_server.entity.Alert;
 import ehe_server.entity.PlatformStock;
 import ehe_server.entity.User;
-import com.example.ehe_server.exception.custom.*;
 import ehe_server.exception.custom.PlatformStockNotFoundException;
 import ehe_server.exception.custom.UserNotFoundException;
 import ehe_server.repository.AlertRepository;
