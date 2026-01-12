@@ -65,9 +65,15 @@ public class PortfolioDetailsService implements PortfolioDetailsServiceInterface
         List<StockDetails> stocksList = valueResponse.getHoldings().stream()
                 .map(h -> {
                     String symbol = h.getSymbol();
-                    String strippedSymbol = symbol.endsWith(cashCurrency)
-                            ? symbol.substring(0, symbol.length() - cashCurrency.length())
-                            : symbol;
+                    String strippedSymbol = symbol;
+
+                    if (symbol.endsWith(cashCurrency)) {
+                        strippedSymbol = symbol.substring(0, symbol.length() - cashCurrency.length());
+                        if (strippedSymbol.endsWith("/")) {
+                            strippedSymbol = strippedSymbol.substring(0, strippedSymbol.length() - 1);
+                        }
+                    }
+
                     return new StockDetails(strippedSymbol, h.getValueInUsdt());
                 })
                 .toList();

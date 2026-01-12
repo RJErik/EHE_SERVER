@@ -19,6 +19,13 @@ import java.util.Optional;
 @Repository
 public interface MarketCandleRepository extends JpaRepository<MarketCandle, Integer> {
 
+    List<MarketCandle> findByPlatformStockAndTimeframeAndTimestampBetween(
+            PlatformStock platformStock,
+            MarketCandle.Timeframe timeframe,
+            LocalDateTime startTime,
+            LocalDateTime endTime
+    );
+
     /**
      * Fetches the single latest candle for each provided stock within the given timeframe.
      */
@@ -130,9 +137,12 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
     INNER JOIN platform p ON ps.platform_id = p.platform_id
     INNER JOIN stock s ON ps.stock_id = s.stock_id
     WHERE mc.timeframe = '1d' AND CAST(mc.timestamp AS date) = CURRENT_DATE
-    AND mc.open_price > 0 ORDER BY ABS((mc.close_price - mc.open_price) / mc.open_price) DESC LIMIT 10
+    AND mc.open_price > 0 
+    ORDER BY (mc.close_price - mc.open_price) / mc.open_price DESC 
+    LIMIT 10
     """, nativeQuery = true)
     List<MarketCandle> findTopTenDailyCandlesByPercentageChange();
+
 
 
     @Query(value = """

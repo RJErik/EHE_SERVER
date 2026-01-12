@@ -31,12 +31,12 @@ public class Transaction {
     @Column(name = "transaction_type", nullable = false, length = 50)
     private TransactionType transactionType;
 
-    @DecimalMin("0.00000001")
+    @DecimalMin(value = "0")
     @Digits(integer = 10, fraction = 8)
     @Column(name = "quantity", nullable = false, precision = 18, scale = 8)
     private BigDecimal quantity;
 
-    @DecimalMin("0.00000001")
+    @DecimalMin(value = "0")
     @Digits(integer = 10, fraction = 8)
     @Column(name = "price", nullable = false, precision = 18, scale = 8)
     private BigDecimal price;

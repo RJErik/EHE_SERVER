@@ -28,7 +28,7 @@ public class AlpacaAccountService implements AlpacaAccountServiceInterface {
     private static final String ACCOUNT_ENDPOINT = "/v2/account";
     private static final String POSITIONS_ENDPOINT = "/v2/positions";
     private static final String ORDERS_ENDPOINT = "/v2/orders";
-    private static final String TIME_IN_FORCE = "gtc";
+    private static final String TIME_IN_FORCE = "day";
 
     public AlpacaAccountService(
             @Qualifier("alpacaRestTemplate") RestTemplate restTemplate,

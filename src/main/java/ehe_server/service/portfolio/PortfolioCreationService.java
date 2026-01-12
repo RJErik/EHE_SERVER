@@ -38,11 +38,11 @@ public class PortfolioCreationService implements PortfolioCreationServiceInterfa
             messageKey = "log.message.portfolio.add",
             params = {
                     "#apiKeyId",
-                    "#result.portfolioId",
-                    "#result.portfolioName",
-                    "#result.platformName",
+                    "#result.id",
+                    "#result.name",
+                    "#result.platform",
                     "#result.creationDate",
-                    "#result.totalValue"
+                    "#result.value"
             }
     )
     @Override

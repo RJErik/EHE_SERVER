@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.*;
 import java.util.*;
 
@@ -24,6 +25,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
     private static final String PLATFORM_NAME = "Alpaca";
     private static final int WEEK_IN_MINUTES = 7 * 24 * 60;
     private static final int HALF_WEEK_IN_MINUTES = WEEK_IN_MINUTES / 2;
+    private static final int DECIMAL_SCALE = 8;
 
     private final AlpacaDataApiClientInterface alpacaDataApiClient;
     private final MarketCandleRepository marketCandleRepository;
@@ -47,15 +49,21 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
         this.userContextService = userContextService;
     }
 
-    /**
-     * Syncs historical data for a symbol
-     * This will fetch all available historical data from the earliest point to now
-     */
+    // Rounds BigDecimal to 8 decimal places for database compatibility
+    private BigDecimal scaleDecimal(BigDecimal value) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        return value.setScale(DECIMAL_SCALE, RoundingMode.HALF_UP);
+    }
+
+    // Syncs all available historical data for a symbol from earliest point to now
     @Override
     public void syncHistoricalData(String symbol) {
         userContextService.setUser("SYSTEM", "SYSTEM");
         PlatformStock stock = platformStockRepository.findByPlatformPlatformNameAndStockStockSymbol(PLATFORM_NAME, symbol).getFirst();
 
+        // Check for existing candles to determine start point
         MarketCandle latestCandle = marketCandleRepository
                 .findTopByPlatformStockAndTimeframeOrderByTimestampDesc(
                         stock, MarketCandle.Timeframe.M1);
@@ -64,10 +72,12 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
         ZonedDateTime initialEnd = ZonedDateTime.now(ZoneOffset.UTC);
 
         if (latestCandle != null) {
+            // Resume from last known candle
             startTime = latestCandle.getTimestamp().atZone(ZoneOffset.UTC);
             loggingService.logAction("Found existing candles for " + symbol +
                     ". Latest at " + latestCandle.getTimestamp());
         } else {
+            // Search backwards to find earliest available data
             loggingService.logAction("No existing candles for " + symbol +
                     ". Searching for earliest available data...");
             Optional<ZonedDateTime> earliest = findEarliestAvailableData(symbol, initialEnd);
@@ -78,11 +88,11 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
             startTime = earliest.get();
         }
 
-        // First sync (potentially long)
+        // Main sync pass
         loggingService.logAction("Starting main sync for " + symbol);
         ZonedDateTime firstSyncEnd = fetchCandlesInRange(stock, symbol, startTime, initialEnd);
 
-        // Second sync (catches anything generated during first sync)
+        // Catch-up sync for data generated during main sync
         loggingService.logAction("Running catch-up sync for " + symbol);
         ZonedDateTime finalEnd = ZonedDateTime.now(ZoneOffset.UTC);
         fetchCandlesInRange(stock, symbol, firstSyncEnd, finalEnd);
@@ -90,10 +100,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
         loggingService.logAction("Sync complete for " + symbol);
     }
 
-    /**
-     * Searches backward week-by-week to find the earliest available data point.
-     * Uses an expanding search when gaps are detected.
-     */
+    // Searches backward week-by-week to find the earliest available data point
     private Optional<ZonedDateTime> findEarliestAvailableData(String symbol, ZonedDateTime firstCheckpoint) {
         ZonedDateTime checkPoint = firstCheckpoint;
         ZonedDateTime lastDataPoint = null;
@@ -108,7 +115,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
             if (hasCandles) {
                 lastDataPoint = checkPoint;
             } else {
-                // Expand search range to confirm gap
+                // Expand search range to confirm gap is real
                 ZonedDateTime expandedStart = checkPoint.minusMinutes(HALF_WEEK_IN_MINUTES);
                 ZonedDateTime expandedEnd = checkPoint.plusMinutes(WEEK_IN_MINUTES + HALF_WEEK_IN_MINUTES);
 
@@ -125,9 +132,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
         return Optional.ofNullable(lastDataPoint);
     }
 
-    /**
-     * Checks if any candles exist in the specified time range.
-     */
+    // Checks if any candles exist in the specified time range
     private boolean checkForCandles(String symbol, ZonedDateTime startTime, ZonedDateTime endTime) {
         try {
             ResponseEntity<String> response = alpacaDataApiClient.getBars(
@@ -152,11 +157,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
         }
     }
 
-    /**
-     * Fetches candles for a specific date range using pagination
-     * Returns the timestamp when fetching completed (for catch-up)
-     */
-
+    // Fetches candles for a date range using pagination, returns completion timestamp
     private ZonedDateTime fetchCandlesInRange(PlatformStock stock, String symbol,
                                               ZonedDateTime startTime, ZonedDateTime endTime) {
         loggingService.logAction("Fetching " + symbol + " from " + startTime + " to " + endTime);
@@ -165,12 +166,14 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
         String pageToken = null;
 
         try {
+            // Paginate through all available data
             do {
                 ResponseEntity<String> response = alpacaDataApiClient.getBars(
                         symbol, "1Min", startTime, endTime, pageToken);
 
                 JsonNode responseData = objectMapper.readTree(response.getBody());
 
+                // Parse response based on symbol type
                 List<MarketCandle> candles;
                 if (isCryptoSymbol(symbol)) {
                     JsonNode barsObject = responseData.get("bars");
@@ -186,6 +189,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
 
                 pageToken = extractNextPageToken(responseData);
 
+                // Rate limiting between pages
                 if (pageToken != null) {
                     Thread.sleep(100);
                 }
@@ -198,13 +202,10 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
             loggingService.logError("Error fetching candles for " + symbol + ": " + e.getMessage(), e);
         }
 
-        return ZonedDateTime.now(ZoneOffset.UTC);  // Return completion time
+        return ZonedDateTime.now(ZoneOffset.UTC);
     }
 
-
-    /**
-     * Safely extracts the next page token, handling JSON null properly
-     */
+    // Extracts next page token from response, handling null and empty values
     private String extractNextPageToken(JsonNode responseData) {
         if (!responseData.has("next_page_token")) {
             return null;
@@ -212,14 +213,12 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
 
         JsonNode tokenNode = responseData.get("next_page_token");
 
-        // Check if the node is null, missing, or contains "null" string
         if (tokenNode == null || tokenNode.isNull()) {
             return null;
         }
 
         String tokenValue = tokenNode.asText();
 
-        // Additional safety: check for empty or "null" string
         if (tokenValue == null || tokenValue.isEmpty() || "null".equalsIgnoreCase(tokenValue)) {
             return null;
         }
@@ -227,10 +226,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
         return tokenValue;
     }
 
-
-    /**
-     * Saves a batch of candles and their aggregations in a single transaction
-     */
+    // Saves a batch of candles with deduplication and triggers aggregation
     @Transactional
     @Override
     public void saveCandleBatch(PlatformStock stock, List<MarketCandle> candles) {
@@ -238,7 +234,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
             return;
         }
 
-        // Deduplicate within batch and truncate timestamps
+        // Deduplicate by timestamp within batch
         Map<LocalDateTime, MarketCandle> uniqueCandles = new LinkedHashMap<>();
         for (MarketCandle candle : candles) {
             LocalDateTime truncatedTimestamp = candle.getTimestamp()
@@ -249,18 +245,18 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
 
         loggingService.logAction("Upserting " + uniqueCandles.size() + " candles for stock ID: " + stock.getPlatformStockId());
 
-        // Use native upsert
+        // Upsert each candle with scaled values
         int count = 0;
         for (MarketCandle candle : uniqueCandles.values()) {
             marketCandleRepository.upsertCandle(
                     stock.getPlatformStockId(),
                     candle.getTimeframe().getValue(),
                     candle.getTimestamp(),
-                    candle.getOpenPrice(),
-                    candle.getHighPrice(),
-                    candle.getLowPrice(),
-                    candle.getClosePrice(),
-                    candle.getVolume()
+                    scaleDecimal(candle.getOpenPrice()),
+                    scaleDecimal(candle.getHighPrice()),
+                    scaleDecimal(candle.getLowPrice()),
+                    scaleDecimal(candle.getClosePrice()),
+                    scaleDecimal(candle.getVolume())
             );
 
             count++;
@@ -268,15 +264,11 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
 
         loggingService.logAction("Completed upserting " + count + " candles");
 
-        // Aggregate after saving
+        // Trigger aggregation to higher timeframes
         aggregateCandles(stock, new ArrayList<>(uniqueCandles.values()));
     }
 
-    /**
-     * Parses Alpaca bar data into MarketCandle entities
-     * Alpaca format: { "t": "2021-02-01T16:01:00Z", "o": 133.32, "h": 133.74,
-     *                  "l": 133.31, "c": 133.5, "v": 1000, "n": 10, "vw": 133.5 }
-     */
+    // Parses Alpaca bar JSON into MarketCandle entities
     private List<MarketCandle> parseCandles(JsonNode barsArray, PlatformStock stock) {
         List<MarketCandle> candles = new ArrayList<>();
 
@@ -286,6 +278,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
             }
 
             for (JsonNode barNode : barsArray) {
+                // Extract fields from Alpaca format
                 String timestamp = barNode.get("t").asText();
                 String open = barNode.get("o").asText();
                 String high = barNode.get("h").asText();
@@ -293,21 +286,21 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
                 String close = barNode.get("c").asText();
                 String volume = barNode.get("v").asText();
 
-                // Parse timestamp
+                // Convert to UTC LocalDateTime
                 ZonedDateTime zonedDateTime = ZonedDateTime.parse(timestamp);
                 LocalDateTime localDateTime = zonedDateTime.withZoneSameInstant(ZoneOffset.UTC)
                         .toLocalDateTime();
 
-                // Create candle entity
+                // Build candle entity with scaled values
                 MarketCandle candle = new MarketCandle();
                 candle.setPlatformStock(stock);
                 candle.setTimeframe(MarketCandle.Timeframe.M1);
                 candle.setTimestamp(localDateTime);
-                candle.setOpenPrice(new BigDecimal(open));
-                candle.setHighPrice(new BigDecimal(high));
-                candle.setLowPrice(new BigDecimal(low));
-                candle.setClosePrice(new BigDecimal(close));
-                candle.setVolume(new BigDecimal(volume));
+                candle.setOpenPrice(scaleDecimal(new BigDecimal(open)));
+                candle.setHighPrice(scaleDecimal(new BigDecimal(high)));
+                candle.setLowPrice(scaleDecimal(new BigDecimal(low)));
+                candle.setClosePrice(scaleDecimal(new BigDecimal(close)));
+                candle.setVolume(scaleDecimal(new BigDecimal(volume)));
 
                 candles.add(candle);
             }
@@ -319,9 +312,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
         return candles;
     }
 
-    /**
-     * Processes a real-time candle from WebSocket
-     */
+    // Processes a real-time candle from WebSocket and triggers aggregation
     @Transactional
     @Override
     public void processRealtimeCandle(JsonNode candleData, PlatformStock stock) {
@@ -330,8 +321,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
         }
 
         try {
-            // Extract fields from Alpaca bar message
-            // Format: {"T":"b","S":"AAPL","o":133.32,"h":133.74,"l":133.31,"c":133.5,"v":1000,"t":"2021-02-01T16:01:00Z"}
+            // Extract fields from WebSocket message
             String timestamp = candleData.get("t").asText();
             String open = candleData.get("o").asText();
             String high = candleData.get("h").asText();
@@ -339,12 +329,12 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
             String close = candleData.get("c").asText();
             String volume = candleData.get("v").asText();
 
-            // Parse timestamp
+            // Convert to UTC LocalDateTime
             ZonedDateTime zonedDateTime = ZonedDateTime.parse(timestamp);
             LocalDateTime localDateTime = zonedDateTime.withZoneSameInstant(ZoneOffset.UTC)
                     .toLocalDateTime();
 
-            // Find existing candle or create new one
+            // Find existing or create new candle
             MarketCandle candle = marketCandleRepository
                     .findByPlatformStockAndTimeframeAndTimestampEquals(
                             stock, MarketCandle.Timeframe.M1, localDateTime)
@@ -356,17 +346,16 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
                         return newCandle;
                     });
 
-            // Update candle data
-            candle.setOpenPrice(new BigDecimal(open));
-            candle.setHighPrice(new BigDecimal(high));
-            candle.setLowPrice(new BigDecimal(low));
-            candle.setClosePrice(new BigDecimal(close));
-            candle.setVolume(new BigDecimal(volume));
+            // Update with scaled values
+            candle.setOpenPrice(scaleDecimal(new BigDecimal(open)));
+            candle.setHighPrice(scaleDecimal(new BigDecimal(high)));
+            candle.setLowPrice(scaleDecimal(new BigDecimal(low)));
+            candle.setClosePrice(scaleDecimal(new BigDecimal(close)));
+            candle.setVolume(scaleDecimal(new BigDecimal(volume)));
 
-            // Save the candle
             candle = marketCandleRepository.save(candle);
 
-            // Aggregate to higher timeframes
+            // Trigger aggregation
             List<MarketCandle> minuteCandles = new ArrayList<>();
             minuteCandles.add(candle);
             aggregateCandles(stock, minuteCandles);
@@ -376,28 +365,22 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
         }
     }
 
-    /**
-     * Aggregates minute candles to higher timeframes
-     */
+    // Aggregates minute candles to all higher timeframes
     private void aggregateCandles(PlatformStock stock, List<MarketCandle> minuteCandles) {
         if (minuteCandles.isEmpty()) return;
 
-        // Aggregate to 5m timeframe
         aggregateTimeframe(stock, minuteCandles, MarketCandle.Timeframe.M5, 5);
-        // Aggregate to 15m timeframe
         aggregateTimeframe(stock, minuteCandles, MarketCandle.Timeframe.M15, 15);
-        // Aggregate to 1h timeframe
         aggregateTimeframe(stock, minuteCandles, MarketCandle.Timeframe.H1, 60);
-        // Aggregate to 4h timeframe
         aggregateTimeframe(stock, minuteCandles, MarketCandle.Timeframe.H4, 240);
-        // Aggregate to 1d timeframe
         aggregateTimeframe(stock, minuteCandles, MarketCandle.Timeframe.D1, 1440);
     }
 
+    // Aggregates M1 candles to a specific higher timeframe
     private void aggregateTimeframe(PlatformStock stock, List<MarketCandle> minuteCandles,
                                     MarketCandle.Timeframe timeframe, int minutes) {
         try {
-            // Group candles by timeframe boundary
+            // Group incoming candles by their timeframe period
             Map<LocalDateTime, List<MarketCandle>> groupedCandles = new HashMap<>();
 
             for (MarketCandle candle : minuteCandles) {
@@ -406,85 +389,55 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
                 groupedCandles.computeIfAbsent(timeframeStart, _ -> new ArrayList<>()).add(candle);
             }
 
-            // Process each group
+            // Process each affected timeframe period
             for (Map.Entry<LocalDateTime, List<MarketCandle>> entry : groupedCandles.entrySet()) {
                 LocalDateTime timeframeStart = entry.getKey();
-                List<MarketCandle> candlesInPeriod = entry.getValue();
+                LocalDateTime timeframeEnd = timeframeStart.plusMinutes(minutes);
 
-                if (candlesInPeriod.isEmpty()) {
+                // Fetch all M1 candles in this period for accurate aggregation
+                List<MarketCandle> allCandlesInPeriod = marketCandleRepository
+                        .findByPlatformStockAndTimeframeAndTimestampBetween(
+                                stock,
+                                MarketCandle.Timeframe.M1,
+                                timeframeStart,
+                                timeframeEnd.minusSeconds(1)
+                        );
+
+                if (allCandlesInPeriod.isEmpty()) {
                     continue;
                 }
 
-                // Sort candles by timestamp for correct open/close
-                candlesInPeriod.sort(Comparator.comparing(MarketCandle::getTimestamp));
+                // Sort for correct open/close determination
+                allCandlesInPeriod.sort(Comparator.comparing(MarketCandle::getTimestamp));
 
-                // Check if we need to merge with existing data
-                Optional<MarketCandle> existingCandle = marketCandleRepository
-                        .findByPlatformStockAndTimeframeAndTimestampEquals(
-                                stock, timeframe, timeframeStart);
+                // Calculate OHLCV from all source candles
+                BigDecimal openPrice = allCandlesInPeriod.getFirst().getOpenPrice();
+                BigDecimal closePrice = allCandlesInPeriod.getLast().getClosePrice();
 
-                BigDecimal openPrice;
-                BigDecimal closePrice;
-                BigDecimal highPrice;
-                BigDecimal lowPrice;
-                BigDecimal volume;
+                BigDecimal highPrice = allCandlesInPeriod.stream()
+                        .map(MarketCandle::getHighPrice)
+                        .max(BigDecimal::compareTo)
+                        .orElse(BigDecimal.ZERO);
 
-                if (existingCandle.isPresent()) {
-                    // Merge with existing candle
-                    MarketCandle existing = existingCandle.get();
+                BigDecimal lowPrice = allCandlesInPeriod.stream()
+                        .map(MarketCandle::getLowPrice)
+                        .min(BigDecimal::compareTo)
+                        .orElse(BigDecimal.ZERO);
 
-                    // Keep existing open if it's earlier data
-                    openPrice = existing.getOpenPrice();
+                BigDecimal volume = allCandlesInPeriod.stream()
+                        .map(MarketCandle::getVolume)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                    // Use new close (latest data)
-                    closePrice = candlesInPeriod.getLast().getClosePrice();
-
-                    // Max of existing and new highs
-                    BigDecimal newHigh = candlesInPeriod.stream()
-                            .map(MarketCandle::getHighPrice)
-                            .max(BigDecimal::compareTo)
-                            .orElse(BigDecimal.ZERO);
-                    highPrice = existing.getHighPrice().max(newHigh);
-
-                    // Min of existing and new lows
-                    BigDecimal newLow = candlesInPeriod.stream()
-                            .map(MarketCandle::getLowPrice)
-                            .min(BigDecimal::compareTo)
-                            .orElse(BigDecimal.ZERO);
-                    lowPrice = existing.getLowPrice().min(newLow);
-
-                    // Add volumes
-                    BigDecimal newVolume = candlesInPeriod.stream()
-                            .map(MarketCandle::getVolume)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-                    volume = existing.getVolume().add(newVolume);
-                } else {
-                    // Create new aggregation from scratch
-                    openPrice = candlesInPeriod.getFirst().getOpenPrice();
-                    closePrice = candlesInPeriod.getLast().getClosePrice();
-                    highPrice = candlesInPeriod.stream()
-                            .map(MarketCandle::getHighPrice)
-                            .max(BigDecimal::compareTo)
-                            .orElse(BigDecimal.ZERO);
-                    lowPrice = candlesInPeriod.stream()
-                            .map(MarketCandle::getLowPrice)
-                            .min(BigDecimal::compareTo)
-                            .orElse(BigDecimal.ZERO);
-                    volume = candlesInPeriod.stream()
-                            .map(MarketCandle::getVolume)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-                }
-
-                // Use upsert - can never fail on duplicates!
+                // Upsert aggregated candle with scaled values
                 marketCandleRepository.upsertCandle(
                         stock.getPlatformStockId(),
                         timeframe.getValue(),
                         timeframeStart,
-                        openPrice,
-                        highPrice,
-                        lowPrice,
-                        closePrice,
-                        volume
+                        scaleDecimal(openPrice),
+                        scaleDecimal(highPrice),
+                        scaleDecimal(lowPrice),
+                        scaleDecimal(closePrice),
+                        scaleDecimal(volume)
                 );
             }
 
@@ -494,6 +447,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
         }
     }
 
+    // Calculates the start timestamp for a given timeframe period
     private LocalDateTime calculateTimeframeStart(LocalDateTime time, int minutes) {
         int minuteOfDay = time.getHour() * 60 + time.getMinute();
         int timeframeIndex = minuteOfDay / minutes;
@@ -505,9 +459,7 @@ public class AlpacaCandleService implements AlpacaCandleServiceInterface {
                 .withNano(0);
     }
 
-    /**
-     * Determines if a symbol is crypto based on the presence of "/"
-     */
+    // Determines if a symbol is crypto based on "/" presence
     private boolean isCryptoSymbol(String symbol) {
         return symbol.contains("/");
     }

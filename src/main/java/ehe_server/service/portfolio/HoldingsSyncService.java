@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -40,6 +41,9 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
     private static final String ALPACA_SYMBOL_KEY = "symbol";
     private static final String ALPACA_QTY_KEY = "qty";
 
+    // Decimal precision constant (matches @Digits(integer=10, fraction=8) constraint)
+    private static final int DECIMAL_SCALE = 8;
+
     private final PortfolioRepository portfolioRepository;
     private final HoldingRepository holdingRepository;
     private final PlatformStockRepository platformStockRepository;
@@ -60,6 +64,19 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
         this.loggingService = loggingService;
         this.binanceAccountService = binanceAccountService;
         this.alpacaAccountService = alpacaAccountService;
+    }
+
+    // ==================== Decimal Scaling ====================
+
+    /**
+     * Rounds BigDecimal to 8 decimal places for database compatibility.
+     * Matches the @Digits(integer=10, fraction=8) constraint on entity fields.
+     */
+    private BigDecimal scaleDecimal(BigDecimal value) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        return value.setScale(DECIMAL_SCALE, RoundingMode.HALF_UP);
     }
 
     // ==================== Parsed Balance Record ====================
@@ -260,7 +277,7 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
             List<ParsedBalance> balances,
             String platformName) {
 
-        BigDecimal reservedCash = extractCashBalance(balances);
+        BigDecimal reservedCash = scaleDecimal(extractCashBalance(balances));
         List<ParsedBalance> tradableBalances = filterTradableBalances(balances);
 
         Map<String, PlatformStock> stockMap = buildStockMap(tradableBalances, platformName);
@@ -326,7 +343,7 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
         Holding holding = new Holding();
         holding.setPortfolio(portfolio);
         holding.setPlatformStock(stock);
-        holding.setQuantity(balance.quantity());
+        holding.setQuantity(scaleDecimal(balance.quantity()));
         return Optional.of(holding);
     }
 }

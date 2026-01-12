@@ -19,7 +19,7 @@ import java.util.Optional;
 @Service
 public class AlertInitialCheckService implements AlertInitialCheckServiceInterface {
 
-    private static final int UTC_OFFSET_HOURS = 2;
+    private static final int UTC_OFFSET_HOURS = 1;
 
     private final AlertRepository alertRepository;
     private final AlertProcessingServiceInterface processingService;

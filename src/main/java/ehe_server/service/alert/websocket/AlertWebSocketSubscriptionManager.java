@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscriptionManagerInterface {
 
     private static final int ALERT_CHECK_INTERVAL_MS = 60_000;
-    private static final int UTC_OFFSET_HOURS = 2;
+    private static final int UTC_OFFSET_HOURS = 1;
 
     private final Map<String, AlertSubscription> activeSubscriptions = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> sessionToSubscriptionIds = new ConcurrentHashMap<>();

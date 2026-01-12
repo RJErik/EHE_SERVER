@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
@@ -35,6 +36,8 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
     private final HoldingsSyncServiceInterface holdingsSyncService;
 
     private static final String USDT = "USDT";
+    private static final Set<String> CRYPTO_EXCHANGES = Set.of("Binance");
+
     private static final int DECIMAL_SCALE = 2;
 
     public PortfolioValueService(
@@ -127,12 +130,20 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
 
     private BigDecimal calculateHoldingValueInUsdt(Holding holding) {
         PlatformStock stock = holding.getPlatformStock();
+        String platformName = stock.getPlatform().getPlatformName();
         String symbol = stock.getStock().getStockSymbol();
-        String usdtPairSymbol = symbol.endsWith(USDT) ? symbol : symbol + USDT;
+
+        // For Alpaca and other USD-based platforms, use the symbol directly
+        // For Binance, ensure we have a USDT pair
+        String priceSymbol;
+        if (CRYPTO_EXCHANGES.contains(platformName)) {
+            priceSymbol = symbol.endsWith(USDT) ? symbol : symbol + USDT;
+        } else {
+            priceSymbol = symbol;
+        }
 
         return platformStockRepository
-                .findByPlatformPlatformNameAndStockStockSymbol(
-                        stock.getPlatform().getPlatformName(), usdtPairSymbol)
+                .findByPlatformPlatformNameAndStockStockSymbol(platformName, priceSymbol)
                 .stream()
                 .findFirst()
                 .map(this::getLatestPrice)

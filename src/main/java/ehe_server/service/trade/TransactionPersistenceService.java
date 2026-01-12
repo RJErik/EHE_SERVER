@@ -10,9 +10,12 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Service
 public class TransactionPersistenceService implements TransactionPersistenceServiceInterface {
+
+    private static final int DECIMAL_SCALE = 8;
 
     private final TransactionRepository transactionRepository;
 
@@ -34,10 +37,18 @@ public class TransactionPersistenceService implements TransactionPersistenceServ
         transaction.setPortfolio(portfolio);
         transaction.setPlatformStock(platformStock);
         transaction.setTransactionType(action);
-        transaction.setQuantity(quantity);
-        transaction.setPrice(price);
+        transaction.setQuantity(normalizeDecimal(quantity));
+        transaction.setPrice(normalizeDecimal(price));
         transaction.setStatus(status);
 
         return transactionRepository.save(transaction);
+    }
+
+    private BigDecimal normalizeDecimal(BigDecimal value) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+
+        return value.setScale(DECIMAL_SCALE, RoundingMode.DOWN);
     }
 }

@@ -332,59 +332,76 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
                 groupedCandles.computeIfAbsent(timeframeStart, _ -> new ArrayList<>()).add(candle);
             }
 
-            List<MarketCandle> candles = new ArrayList<>();
+            List<MarketCandle> candlesToSave = new ArrayList<>();
+
             for (Map.Entry<LocalDateTime, List<MarketCandle>> entry : groupedCandles.entrySet()) {
                 LocalDateTime timeframeStart = entry.getKey();
-                List<MarketCandle> candlesInPeriod = entry.getValue();
+                LocalDateTime timeframeEnd = timeframeStart.plusMinutes(minutes);
 
-                if (!candlesInPeriod.isEmpty()) {
-                    MarketCandle candle = marketCandleRepository
-                            .findByPlatformStockAndTimeframeAndTimestampEquals(
-                                    stock, timeframe, timeframeStart)
-                            .orElse(null);
+                // === FIX: Fetch ALL M1 candles in this timeframe period ===
+                List<MarketCandle> allCandlesInPeriod = marketCandleRepository
+                        .findByPlatformStockAndTimeframeAndTimestampBetween(
+                                stock,
+                                MarketCandle.Timeframe.M1,
+                                timeframeStart,
+                                timeframeEnd.minusSeconds(1)
+                        );
 
-                    if (candle == null) {
-                        candle = createAggregatedCandle(stock, timeframe, timeframeStart, candlesInPeriod);
-                    } else {
-                        updateExistingCandle(candle, candlesInPeriod);
-                    }
-
-                    candles.add(candle);
+                if (allCandlesInPeriod.isEmpty()) {
+                    continue;
                 }
+
+                // Sort by timestamp
+                allCandlesInPeriod.sort(Comparator.comparing(MarketCandle::getTimestamp));
+
+                // Calculate ALL values from source candles
+                BigDecimal openPrice = allCandlesInPeriod.getFirst().getOpenPrice();
+                BigDecimal closePrice = allCandlesInPeriod.getLast().getClosePrice();
+
+                BigDecimal highPrice = allCandlesInPeriod.stream()
+                        .map(MarketCandle::getHighPrice)
+                        .max(BigDecimal::compareTo)
+                        .orElse(BigDecimal.ZERO);
+
+                BigDecimal lowPrice = allCandlesInPeriod.stream()
+                        .map(MarketCandle::getLowPrice)
+                        .min(BigDecimal::compareTo)
+                        .orElse(BigDecimal.ZERO);
+
+                BigDecimal volume = allCandlesInPeriod.stream()
+                        .map(MarketCandle::getVolume)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                // Find or create the aggregated candle
+                MarketCandle aggregatedCandle = marketCandleRepository
+                        .findByPlatformStockAndTimeframeAndTimestampEquals(
+                                stock, timeframe, timeframeStart)
+                        .orElseGet(() -> {
+                            MarketCandle newCandle = new MarketCandle();
+                            newCandle.setPlatformStock(stock);
+                            newCandle.setTimeframe(timeframe);
+                            newCandle.setTimestamp(timeframeStart);
+                            return newCandle;
+                        });
+
+                // Update all fields
+                aggregatedCandle.setOpenPrice(openPrice);
+                aggregatedCandle.setHighPrice(highPrice);
+                aggregatedCandle.setLowPrice(lowPrice);
+                aggregatedCandle.setClosePrice(closePrice);
+                aggregatedCandle.setVolume(volume);
+
+                candlesToSave.add(aggregatedCandle);
             }
 
-            if (!candles.isEmpty()) {
-                marketCandleRepository.saveAll(candles);
+            if (!candlesToSave.isEmpty()) {
+                marketCandleRepository.saveAll(candlesToSave);
             }
+
         } catch (Exception e) {
             loggingService.logError(String.format("Error aggregating to %s: %s",
                     timeframe, e.getMessage()), e);
         }
-    }
-
-    /**
-     * Updates an existing aggregated candle with new minute candle data.
-     */
-    private void updateExistingCandle(MarketCandle existingCandle, List<MarketCandle> minuteCandles) {
-        minuteCandles.sort(Comparator.comparing(MarketCandle::getTimestamp));
-
-        BigDecimal newHigh = minuteCandles.stream()
-                .map(MarketCandle::getHighPrice)
-                .max(BigDecimal::compareTo)
-                .orElse(BigDecimal.ZERO);
-        if (newHigh.compareTo(existingCandle.getHighPrice()) > 0) {
-            existingCandle.setHighPrice(newHigh);
-        }
-
-        BigDecimal newLow = minuteCandles.stream()
-                .map(MarketCandle::getLowPrice)
-                .min(BigDecimal::compareTo)
-                .orElse(BigDecimal.ZERO);
-        if (newLow.compareTo(existingCandle.getLowPrice()) < 0) {
-            existingCandle.setLowPrice(newLow);
-        }
-
-        existingCandle.setClosePrice(minuteCandles.getLast().getClosePrice());
     }
 
     /**
@@ -399,38 +416,6 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
                 .withMinute((timeframeIndex * minutes) % 60)
                 .withSecond(0)
                 .withNano(0);
-    }
-
-    /**
-     * Creates a new aggregated candle from multiple minute candles.
-     */
-    private MarketCandle createAggregatedCandle(PlatformStock stock, MarketCandle.Timeframe timeframe,
-                                                LocalDateTime timeframeStart, List<MarketCandle> candles) {
-        BigDecimal open = candles.getFirst().getOpenPrice();
-        BigDecimal close = candles.getLast().getClosePrice();
-        BigDecimal high = candles.stream()
-                .map(MarketCandle::getHighPrice)
-                .max(BigDecimal::compareTo)
-                .orElse(BigDecimal.ZERO);
-        BigDecimal low = candles.stream()
-                .map(MarketCandle::getLowPrice)
-                .min(BigDecimal::compareTo)
-                .orElse(BigDecimal.ZERO);
-        BigDecimal volume = candles.stream()
-                .map(MarketCandle::getVolume)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        MarketCandle aggregated = new MarketCandle();
-        aggregated.setPlatformStock(stock);
-        aggregated.setTimeframe(timeframe);
-        aggregated.setTimestamp(timeframeStart);
-        aggregated.setOpenPrice(open);
-        aggregated.setHighPrice(high);
-        aggregated.setLowPrice(low);
-        aggregated.setClosePrice(close);
-        aggregated.setVolume(volume);
-
-        return aggregated;
     }
 
     /**
