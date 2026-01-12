@@ -129,17 +129,11 @@ public class AutomatedTradeNotificationService implements AutomatedTradeNotifica
     }
 
     private void appendExecutionDetails(StringBuilder message, TradeExecutionResponse tradeResult) {
-        if (tradeResult.getExecutedQty() != null) {
-            String formattedQty = new BigDecimal(String.valueOf(tradeResult.getExecutedQty()))
+        if (tradeResult.getQuantity() != null) {
+            String formattedQty = tradeResult.getQuantity()
                     .stripTrailingZeros()
                     .toPlainString();
             message.append(", executed quantity: ").append(formattedQty);
-        }
-        if (tradeResult.getCumulativeQuoteQty() != null) {
-            String formattedCost = new BigDecimal(String.valueOf(tradeResult.getCumulativeQuoteQty()))
-                    .stripTrailingZeros()
-                    .toPlainString();
-            message.append(", total cost: ").append(formattedCost);
         }
     }
 

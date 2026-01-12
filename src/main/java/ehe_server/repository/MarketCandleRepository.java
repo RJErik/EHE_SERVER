@@ -5,10 +5,13 @@ import ehe_server.entity.MarketCandle.Timeframe;
 import ehe_server.entity.PlatformStock;
 import ehe_server.service.stock.CandleWithSequenceInterface;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -170,4 +173,36 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
     );
 
     List<MarketCandle> findByPlatformStockAndTimeframeAndTimestampBetweenOrderByTimestampAsc(PlatformStock platformStock, Timeframe timeframe, LocalDateTime startTime, LocalDateTime endTime);
+
+    List<MarketCandle> findByPlatformStockAndTimeframeAndTimestampIn(
+            PlatformStock platformStock,
+            MarketCandle.Timeframe timeframe,
+            List<LocalDateTime> timestamps
+    );
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+    INSERT INTO market_candle 
+        (platform_stock_id, timeframe, timestamp, open_price, high_price, low_price, close_price, volume)
+    VALUES 
+        (:platformStockId, :timeframe, :timestamp, :openPrice, :highPrice, :lowPrice, :closePrice, :volume)
+    ON CONFLICT (platform_stock_id, timeframe, timestamp)
+    DO UPDATE SET 
+        open_price = EXCLUDED.open_price,
+        high_price = EXCLUDED.high_price,
+        low_price = EXCLUDED.low_price,
+        close_price = EXCLUDED.close_price,
+        volume = EXCLUDED.volume
+    """, nativeQuery = true)
+    void upsertCandle(
+            @Param("platformStockId") Integer platformStockId,
+            @Param("timeframe") String timeframe,
+            @Param("timestamp") LocalDateTime timestamp,
+            @Param("openPrice") BigDecimal openPrice,
+            @Param("highPrice") BigDecimal highPrice,
+            @Param("lowPrice") BigDecimal lowPrice,
+            @Param("closePrice") BigDecimal closePrice,
+            @Param("volume") BigDecimal volume);
+
 }

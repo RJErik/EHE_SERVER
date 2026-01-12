@@ -1,60 +1,52 @@
 package ehe_server.dto;
 
+import ehe_server.entity.Transaction;
+
 import java.math.BigDecimal;
 import java.util.Objects;
 
 public class TradeExecutionResponse {
-    private Integer orderId;
+    private Integer transactionId;
     private String symbol;
-    private String side;
-    private BigDecimal origQty;
-    private BigDecimal executedQty;
-    private BigDecimal cumulativeQuoteQty;
-    private String status;
+    private Transaction.TransactionType type;
+    private BigDecimal quantity;
+    private Transaction.Status status;
 
     public TradeExecutionResponse() {}
 
-    public TradeExecutionResponse(Integer orderId, String symbol, String side, BigDecimal origQty, BigDecimal executedQty, BigDecimal cummulativeQuoteQty, String status) {
-        this.orderId = orderId;
+    public TradeExecutionResponse(Integer orderId, String symbol, Transaction.TransactionType side, BigDecimal executedQty, Transaction.Status status) {
+        this.transactionId = orderId;
         this.symbol = symbol;
-        this.side = side;
-        this.origQty = origQty;
-        this.executedQty = executedQty;
-        this.cumulativeQuoteQty = cummulativeQuoteQty;
+        this.type = side;
+        this.quantity = executedQty;
         this.status = status;
     }
 
-    public Integer getOrderId() { return orderId; }
-    public void setOrderId(Integer orderId) { this.orderId = orderId; }
+    public Integer getTransactionId() { return transactionId; }
+    public void setTransactionId(Integer transactionId) { this.transactionId = transactionId; }
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
-    public String getSide() { return side; }
-    public void setSide(String side) { this.side = side; }
-    public BigDecimal getOrigQty() { return origQty; }
-    public void setOrigQty(BigDecimal origQty) { this.origQty = origQty; }
-    public BigDecimal getExecutedQty() { return executedQty; }
-    public void setExecutedQty(BigDecimal executedQty) { this.executedQty = executedQty; }
-    public BigDecimal getCumulativeQuoteQty() { return cumulativeQuoteQty; }
-    public void setCumulativeQuoteQty(BigDecimal cumulativeQuoteQty) { this.cumulativeQuoteQty = cumulativeQuoteQty; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public Transaction.TransactionType getType() { return type; }
+    public void setType(Transaction.TransactionType type) { this.type = type; }
+    public BigDecimal getQuantity() { return quantity; }
+    public void setQuantity(BigDecimal quantity) { this.quantity = quantity; }
+    public Transaction.Status getStatus() { return status; }
+    public void setStatus(Transaction.Status status) { this.status = status; }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         TradeExecutionResponse that = (TradeExecutionResponse) o;
-        return Objects.equals(orderId, that.orderId) &&
+        return Objects.equals(transactionId, that.transactionId) &&
                 Objects.equals(symbol, that.symbol) &&
-                Objects.equals(side, that.side) &&
-                Objects.equals(origQty, that.origQty) &&
-                Objects.equals(executedQty, that.executedQty) &&
-                Objects.equals(cumulativeQuoteQty, that.cumulativeQuoteQty) &&
+                Objects.equals(type, that.type) &&
+                Objects.equals(quantity, that.quantity) &&
                 Objects.equals(status, that.status);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(orderId, symbol, side, origQty, executedQty, cumulativeQuoteQty, status);
+        return Objects.hash(transactionId, symbol, type, quantity, status);
     }
 }

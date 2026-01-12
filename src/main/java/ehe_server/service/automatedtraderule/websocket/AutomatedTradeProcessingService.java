@@ -63,7 +63,7 @@ public class AutomatedTradeProcessingService implements AutomatedTradeProcessing
             loggingService.logAction("Executing automated trade for rule #" + rule.getAutomatedTradeRuleId());
 
             TradeExecutionResponse tradeResult = executeTradeOrder(rule, userId);
-            boolean success = isTradeSuccessful(tradeResult);
+            boolean success = !tradeResult.getStatus().equals(Transaction.Status.FAILED);
             Integer transactionId = success ? findTransactionId(rule, tradeResult) : null;
 
             return new TradeExecutionResult(success, tradeResult, transactionId);
@@ -85,12 +85,8 @@ public class AutomatedTradeProcessingService implements AutomatedTradeProcessing
                 rule.getQuantityType());
     }
 
-    private boolean isTradeSuccessful(TradeExecutionResponse tradeResult) {
-        return tradeResult != null && "FILLED".equals(tradeResult.getStatus());
-    }
-
     private Integer findTransactionId(AutomatedTradeRule rule, TradeExecutionResponse tradeResult) {
-        if (tradeResult.getOrderId() == null) {
+        if (tradeResult.getTransactionId() == null) {
             return null;
         }
 

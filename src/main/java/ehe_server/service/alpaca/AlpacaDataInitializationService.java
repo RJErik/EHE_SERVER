@@ -55,7 +55,7 @@ public class AlpacaDataInitializationService implements AlpacaDataInitialization
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    @Async()
+    @Async
     public void initializeDataAsync() {
         try {
             userContextService.setUser("SYSTEM", "SYSTEM");
@@ -64,9 +64,6 @@ public class AlpacaDataInitializationService implements AlpacaDataInitialization
             List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformName(PLATFORM_NAME);
 
             if (!stocks.isEmpty()) {
-                loggingService.logAction("Found " + stocks.size() + " Alpaca symbols. Starting initialization...");
-
-                // Separate stocks and crypto for different handling
                 List<PlatformStock> stockSymbols = new ArrayList<>();
                 List<PlatformStock> cryptoSymbols = new ArrayList<>();
 
@@ -87,24 +84,63 @@ public class AlpacaDataInitializationService implements AlpacaDataInitialization
                     setupSymbol(crypto.getStock().getStockSymbol());
                 }
 
-                // Initialize stock symbols only if market is open, otherwise schedule for next open
-                if (!stockSymbols.isEmpty()) {
+                // NEW: Always sync historical data, but only start WebSocket if market is open
+                for (PlatformStock stock : stockSymbols) {
+                    String symbol = stock.getStock().getStockSymbol();
+                    syncHistoricalDataOnly(symbol);  // New method - always runs
+
                     if (marketHoursService.isMarketOpen()) {
-                        loggingService.logAction("Market is open, initializing stock symbols");
-                        for (PlatformStock stock : stockSymbols) {
-                            setupSymbol(stock.getStock().getStockSymbol());
-                        }
-                    } else {
-                        loggingService.logAction("Market is closed. Stock data will sync on next market open");
+                        setupLiveStream(symbol);  // New method - only when market open
                     }
                 }
-            } else {
-                loggingService.logAction("No Alpaca symbols found in database");
+
+                if (!marketHoursService.isMarketOpen()) {
+                    loggingService.logAction("Market is closed. Live streaming will start on next market open");
+                }
             }
         } catch (Exception e) {
             loggingService.logError("Error during async initialization: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * Sync historical data regardless of market hours
+     */
+    private void syncHistoricalDataOnly(String symbol) {
+        try {
+            historicalSyncInProgress.put(symbol, true);
+            loggingService.logAction("Syncing historical data for " + symbol);
+            alpacaCandleService.syncHistoricalData(symbol);
+            historicalSyncInProgress.put(symbol, false);
+            loggingService.logAction("Historical sync complete for " + symbol);
+        } catch (Exception e) {
+            historicalSyncInProgress.put(symbol, false);
+            loggingService.logError("Failed to sync historical data for " + symbol + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Setup live WebSocket streaming (only when market is open)
+     */
+    private void setupLiveStream(String symbol) {
+        try {
+            PlatformStock stock = getStock(symbol);
+            if (stock == null) {
+                throw new RuntimeException("Stock not found: " + symbol);
+            }
+
+            alpacaWebSocketClient.registerHandler(symbol,
+                    candleData -> alpacaCandleService.processRealtimeCandle(candleData, stock));
+
+            liveSymbols.add(symbol);
+            alpacaWebSocketClient.updateSubscriptions(new ArrayList<>(liveSymbols));
+            loggingService.logAction("Live streaming started for " + symbol);
+        } catch (Exception e) {
+            loggingService.logError("Failed to setup live stream for " + symbol + ": " + e.getMessage(), e);
+        }
+    }
+
+
 
     /**
      * Sets up a symbol: sync historical data, then add to live WebSocket
@@ -196,9 +232,9 @@ public class AlpacaDataInitializationService implements AlpacaDataInitialization
 
     /**
      * Market open initialization for stock symbols
-     * Runs at 9:25 AM EST (5 minutes before market open)
+     * Runs at 9:30 AM EST, when the market opens
      */
-    @Scheduled(cron = "0 25 9 * * MON-FRI", zone = "America/New_York")
+    @Scheduled(cron = "0 30 9 * * MON-FRI", zone = "America/New_York")
     public void marketOpenInitialization() {
         try {
             userContextService.setUser("SYSTEM", "SYSTEM");

@@ -1,7 +1,6 @@
 package ehe_server.service.alpaca;
 
 import ehe_server.properties.AlpacaProperties;
-import ehe_server.service.audit.UserContextService;
 import ehe_server.service.intf.alpaca.AlpacaWebSocketClientInterface;
 import ehe_server.service.intf.audit.UserContextServiceInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
@@ -27,6 +26,8 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler implements Alpac
     private final LoggingServiceInterface loggingService;
     private final UserContextServiceInterface userContextService;
     private final AlpacaProperties alpacaProperties;
+
+    private volatile FeedType currentlyConnectingFeedType;
 
     // Separate sessions for stock and crypto feeds
     private volatile WebSocketSession stockSession;
@@ -157,11 +158,13 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler implements Alpac
 
             WebSocketClient client = new StandardWebSocketClient();
 
+            // Store the feed type BEFORE connecting so afterConnectionEstablished can access it
+            // This fixes the race condition where the callback fires before execute() returns
+            currentlyConnectingFeedType = feedType;
+
             WebSocketSession newSession = client.execute(this, new WebSocketHttpHeaders(), URI.create(wsUrl)).get();
 
-            // Store session and map it to feed type
-            sessionFeedTypeMap.put(newSession, feedType);
-
+            // Store session reference (the session is already mapped in afterConnectionEstablished)
             if (feedType == FeedType.STOCK) {
                 stockSession = newSession;
             } else {
@@ -183,6 +186,9 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler implements Alpac
             }
 
             throw new RuntimeException(feedName + " WebSocket connection failed", e);
+        } finally {
+            // Clean up the temporary field
+            currentlyConnectingFeedType = null;
         }
     }
 
@@ -208,7 +214,19 @@ public class AlpacaWebSocketClient extends TextWebSocketHandler implements Alpac
     public void afterConnectionEstablished(@NonNull WebSocketSession session) {
         userContextService.setUser("SYSTEM", "SYSTEM");
 
-        FeedType feedType = sessionFeedTypeMap.get(session);
+        // Get the feed type from the field that was set BEFORE connection started
+        // This fixes the race condition - we now have the feed type available
+        FeedType feedType = currentlyConnectingFeedType;
+
+        // Immediately store the mapping so other handlers can use it
+        if (feedType != null) {
+            sessionFeedTypeMap.put(session, feedType);
+        } else {
+            // Fallback: try to determine feed type from session URI if available
+            loggingService.logError("Feed type was null in afterConnectionEstablished - this should not happen", null);
+            return;
+        }
+
         String feedName = feedType == FeedType.STOCK ? "stock" : "crypto";
 
         loggingService.logAction("Alpaca " + feedName + " WebSocket connection established. Sending authentication...");

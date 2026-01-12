@@ -9,6 +9,7 @@ import ehe_server.exception.custom.*;
 import ehe_server.repository.HoldingRepository;
 import ehe_server.repository.PlatformStockRepository;
 import ehe_server.repository.PortfolioRepository;
+import ehe_server.service.intf.alpaca.AlpacaAccountServiceInterface;
 import ehe_server.service.intf.binance.BinanceAccountServiceInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
 import ehe_server.service.intf.portfolio.HoldingsSyncServiceInterface;
@@ -24,44 +25,79 @@ import java.util.stream.Collectors;
 @Transactional
 public class HoldingsSyncService implements HoldingsSyncServiceInterface {
 
-    private static final String USDT = "USDT";
-    private static final String BALANCE_KEY = "balances";
-    private static final String FREE_KEY = "free";
-    private static final String ASSET_KEY = "asset";
+    // Binance constants
+    private static final String BINANCE_PLATFORM = "Binance";
+    private static final String BINANCE_CASH_CURRENCY = "USDT";
+    private static final String BINANCE_BALANCE_KEY = "balances";
+    private static final String BINANCE_ASSET_KEY = "asset";
+    private static final String BINANCE_FREE_KEY = "free";
+
+    // Alpaca constants
+    private static final String ALPACA_PLATFORM = "Alpaca";
+    private static final String ALPACA_CASH_CURRENCY = "USD";
+    private static final String ALPACA_CASH_KEY = "cash";
+    private static final String ALPACA_POSITIONS_KEY = "positions";
+    private static final String ALPACA_SYMBOL_KEY = "symbol";
+    private static final String ALPACA_QTY_KEY = "qty";
 
     private final PortfolioRepository portfolioRepository;
     private final HoldingRepository holdingRepository;
     private final PlatformStockRepository platformStockRepository;
     private final LoggingServiceInterface loggingService;
     private final BinanceAccountServiceInterface binanceAccountService;
+    private final AlpacaAccountServiceInterface alpacaAccountService;
 
     public HoldingsSyncService(
             PortfolioRepository portfolioRepository,
             HoldingRepository holdingRepository,
             PlatformStockRepository platformStockRepository,
             LoggingServiceInterface loggingService,
-            BinanceAccountServiceInterface binanceAccountService) {
+            BinanceAccountServiceInterface binanceAccountService,
+            AlpacaAccountServiceInterface alpacaAccountService) {
         this.portfolioRepository = portfolioRepository;
         this.holdingRepository = holdingRepository;
         this.platformStockRepository = platformStockRepository;
         this.loggingService = loggingService;
         this.binanceAccountService = binanceAccountService;
+        this.alpacaAccountService = alpacaAccountService;
     }
 
-    private record ParsedBalance(String asset, BigDecimal quantity) {
+    // ==================== Parsed Balance Record ====================
 
-        boolean isUsdt() {
-            return USDT.equals(asset);
+    private record ParsedBalance(String asset, BigDecimal quantity, String platformName) {
+
+        boolean isCash() {
+            return BINANCE_CASH_CURRENCY.equals(asset) || ALPACA_CASH_CURRENCY.equals(asset);
         }
 
         boolean hasPositiveBalance() {
             return quantity.compareTo(BigDecimal.ZERO) > 0;
         }
 
-        String toTradingPair() {
-            return asset + USDT;
+        /**
+         * Converts asset to database trading pair format
+         * Binance: BTC → BTCUSDT
+         * Alpaca Crypto: BTCUSD → BTC/USD
+         * Alpaca Stock: AAPL → AAPL
+         */
+        String toDatabaseSymbol() {
+            if (BINANCE_PLATFORM.equals(platformName)) {
+                return asset + BINANCE_CASH_CURRENCY;
+            } else if (ALPACA_PLATFORM.equals(platformName)) {
+                // Check if it's a crypto symbol (ends with USD)
+                if (asset.endsWith(ALPACA_CASH_CURRENCY) && asset.length() > 3) {
+                    // BTCUSD → BTC/USD
+                    String base = asset.substring(0, asset.length() - 3);
+                    return base + "/" + ALPACA_CASH_CURRENCY;
+                }
+                // Regular stock symbol - keep as-is
+                return asset;
+            }
+            return asset;
         }
     }
+
+    // ==================== Public Interface ====================
 
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
@@ -76,10 +112,10 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
         validatePortfolioOwnership(portfolio, userId);
         ApiKey apiKey = getApiKeyOrThrow(portfolio);
 
-        List<Map<String, Object>> rawBalances = fetchBalancesFromExchange(apiKey);
-        List<ParsedBalance> balances = parseBalances(rawBalances);
+        String platformName = apiKey.getPlatform().getPlatformName();
+        List<ParsedBalance> balances = fetchAndParseBalances(apiKey, platformName);
 
-        return syncHoldingsWithBalances(portfolio, balances, apiKey.getPlatform().getPlatformName());
+        return syncHoldingsWithBalances(portfolio, balances, platformName);
     }
 
     // ==================== Portfolio Validation Helpers ====================
@@ -109,37 +145,103 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
 
     // ==================== Exchange Communication ====================
 
-    private List<Map<String, Object>> fetchBalancesFromExchange(ApiKey apiKey) {
+    private List<ParsedBalance> fetchAndParseBalances(ApiKey apiKey, String platformName) {
+        if (BINANCE_PLATFORM.equals(platformName)) {
+            return fetchAndParseBinanceBalances(apiKey);
+        } else if (ALPACA_PLATFORM.equals(platformName)) {
+            return fetchAndParseAlpacaBalances(apiKey);
+        } else {
+            throw new UnsupportedPlatformException(platformName);
+        }
+    }
+
+    // ==================== Binance Balance Fetching ====================
+
+    private List<ParsedBalance> fetchAndParseBinanceBalances(ApiKey apiKey) {
         Map<String, Object> accountInfo = binanceAccountService.getAccountInfo(
                 apiKey.getApiKeyValue(),
                 apiKey.getSecretKey()
         );
 
-        if (accountInfo == null || !accountInfo.containsKey(BALANCE_KEY)) {
+        if (accountInfo == null || !accountInfo.containsKey(BINANCE_BALANCE_KEY)) {
             throw new BinanceApiCommunicationException();
         }
 
-        return (List<Map<String, Object>>) accountInfo.get(BALANCE_KEY);
-    }
+        List<Map<String, Object>> rawBalances =
+                (List<Map<String, Object>>) accountInfo.get(BINANCE_BALANCE_KEY);
 
-    // ==================== Balance Parsing ====================
-
-    private List<ParsedBalance> parseBalances(List<Map<String, Object>> rawBalances) {
         return rawBalances.stream()
-                .map(this::toBalance)
+                .map(this::toBinanceBalance)
                 .filter(ParsedBalance::hasPositiveBalance)
                 .toList();
     }
 
-    private ParsedBalance toBalance(Map<String, Object> raw) {
-        String asset = (String) raw.get(ASSET_KEY);
-        BigDecimal quantity = new BigDecimal((String) raw.get(FREE_KEY));
-        return new ParsedBalance(asset, quantity);
+    private ParsedBalance toBinanceBalance(Map<String, Object> raw) {
+        String asset = (String) raw.get(BINANCE_ASSET_KEY);
+        BigDecimal quantity = new BigDecimal((String) raw.get(BINANCE_FREE_KEY));
+        return new ParsedBalance(asset, quantity, BINANCE_PLATFORM);
     }
 
-    private BigDecimal extractUsdtBalance(List<ParsedBalance> balances) {
+    // ==================== Alpaca Balance Fetching ====================
+
+    private List<ParsedBalance> fetchAndParseAlpacaBalances(ApiKey apiKey) {
+        Map<String, Object> accountInfo = alpacaAccountService.getAccountInfo(
+                apiKey.getApiKeyValue(),
+                apiKey.getSecretKey()
+        );
+
+        if (accountInfo == null) {
+            throw new AlpacaApiCommunicationException();
+        }
+
+        List<ParsedBalance> balances = new ArrayList<>();
+
+        // Extract cash balance from account info
+        if (accountInfo.containsKey(ALPACA_CASH_KEY)) {
+            String cashStr = (String) accountInfo.get(ALPACA_CASH_KEY);
+            BigDecimal cashAmount = new BigDecimal(cashStr);
+            if (cashAmount.compareTo(BigDecimal.ZERO) > 0) {
+                balances.add(new ParsedBalance(ALPACA_CASH_CURRENCY, cashAmount, ALPACA_PLATFORM));
+            }
+        }
+
+        // Extract positions if present
+        if (accountInfo.containsKey(ALPACA_POSITIONS_KEY)) {
+            List<Map<String, Object>> positions =
+                    (List<Map<String, Object>>) accountInfo.get(ALPACA_POSITIONS_KEY);
+
+            for (Map<String, Object> position : positions) {
+                ParsedBalance balance = toAlpacaBalance(position);
+                if (balance.hasPositiveBalance()) {
+                    balances.add(balance);
+                }
+            }
+        }
+
+        return balances;
+    }
+
+    private ParsedBalance toAlpacaBalance(Map<String, Object> raw) {
+        String symbol = (String) raw.get(ALPACA_SYMBOL_KEY);
+        Object qtyObj = raw.get(ALPACA_QTY_KEY);
+        BigDecimal quantity;
+
+        if (qtyObj instanceof String) {
+            quantity = new BigDecimal((String) qtyObj);
+        } else if (qtyObj instanceof Number) {
+            quantity = new BigDecimal(qtyObj.toString());
+        } else {
+            quantity = BigDecimal.ZERO;
+        }
+
+        return new ParsedBalance(symbol, quantity, ALPACA_PLATFORM);
+    }
+
+    // ==================== Balance Extraction Helpers ====================
+
+    private BigDecimal extractCashBalance(List<ParsedBalance> balances) {
         return balances.stream()
-                .filter(ParsedBalance::isUsdt)
+                .filter(ParsedBalance::isCash)
                 .map(ParsedBalance::quantity)
                 .findFirst()
                 .orElse(BigDecimal.ZERO);
@@ -147,7 +249,7 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
 
     private List<ParsedBalance> filterTradableBalances(List<ParsedBalance> balances) {
         return balances.stream()
-                .filter(b -> !b.isUsdt())
+                .filter(b -> !b.isCash())
                 .toList();
     }
 
@@ -158,7 +260,7 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
             List<ParsedBalance> balances,
             String platformName) {
 
-        BigDecimal reservedCash = extractUsdtBalance(balances);
+        BigDecimal reservedCash = extractCashBalance(balances);
         List<ParsedBalance> tradableBalances = filterTradableBalances(balances);
 
         Map<String, PlatformStock> stockMap = buildStockMap(tradableBalances, platformName);
@@ -177,12 +279,12 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
     }
 
     private Map<String, PlatformStock> buildStockMap(List<ParsedBalance> balances, String platformName) {
-        Set<String> tradingPairs = balances.stream()
-                .map(ParsedBalance::toTradingPair)
+        Set<String> databaseSymbols = balances.stream()
+                .map(ParsedBalance::toDatabaseSymbol)
                 .collect(Collectors.toSet());
 
         return platformStockRepository
-                .findByPlatformNameAndStockNameIn(platformName, tradingPairs)
+                .findByPlatformNameAndStockNameIn(platformName, databaseSymbols)
                 .stream()
                 .collect(Collectors.toMap(
                         ps -> ps.getStock().getStockSymbol(),
@@ -216,7 +318,7 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
             ParsedBalance balance,
             Map<String, PlatformStock> stockMap) {
 
-        PlatformStock stock = stockMap.get(balance.toTradingPair());
+        PlatformStock stock = stockMap.get(balance.toDatabaseSymbol());
         if (stock == null) {
             return Optional.empty();
         }

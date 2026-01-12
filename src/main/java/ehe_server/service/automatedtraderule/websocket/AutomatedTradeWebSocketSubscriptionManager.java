@@ -7,7 +7,6 @@ import ehe_server.entity.MarketCandle;
 import ehe_server.exception.custom.*;
 import ehe_server.repository.AutomatedTradeRuleRepository;
 import ehe_server.repository.JwtRefreshTokenRepository;
-import ehe_server.repository.UserRepository;
 import ehe_server.service.audit.UserContextService;
 import ehe_server.service.intf.automatictrade.websocket.AutomatedTradeNotificationServiceInterface;
 import ehe_server.service.intf.automatictrade.websocket.AutomatedTradeProcessingServiceInterface;
@@ -36,7 +35,6 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
 
     private final UserContextService userContextService;
     private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
-    private final UserRepository userRepository;
     private final WebSocketSessionRegistry sessionRegistry;
     private final AutomatedTradeProcessingServiceInterface processingService;
     private final AutomatedTradeNotificationServiceInterface notificationService;
@@ -46,7 +44,6 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
     public AutomatedTradeWebSocketSubscriptionManager(
             UserContextService userContextService,
             JwtRefreshTokenRepository jwtRefreshTokenRepository,
-            UserRepository userRepository,
             WebSocketSessionRegistry sessionRegistry,
             AutomatedTradeProcessingServiceInterface processingService,
             AutomatedTradeNotificationServiceInterface notificationService,
@@ -54,7 +51,6 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
             AutomatedTradeRuleRepository automatedTradeRuleRepository) {
         this.userContextService = userContextService;
         this.jwtRefreshTokenRepository = jwtRefreshTokenRepository;
-        this.userRepository = userRepository;
         this.sessionRegistry = sessionRegistry;
         this.processingService = processingService;
         this.notificationService = notificationService;
@@ -70,7 +66,7 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
             String sessionId,
             String destination) {
 
-        validateSubscriptionRequest(userId, sessionId, destination);
+        validateSubscriptionRequest(sessionId, destination);
 
         AutomatedTradeSubscription subscription = createAndRegisterSubscription(userId, sessionId, destination);
         registerSessionCleanupIfNeeded(sessionId);
@@ -119,7 +115,7 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
 
     // ==================== Validation ====================
 
-    private void validateSubscriptionRequest(Integer userId, String sessionId, String destination) {
+    private void validateSubscriptionRequest(String sessionId, String destination) {
         validateSessionId(sessionId);
         validateDestination(destination);
     }

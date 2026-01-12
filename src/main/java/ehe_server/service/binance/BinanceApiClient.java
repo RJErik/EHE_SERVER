@@ -8,8 +8,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Instant;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class BinanceApiClient implements BinanceApiClientInterface {
@@ -17,8 +17,8 @@ public class BinanceApiClient implements BinanceApiClientInterface {
     private static final String API_BASE_URL = "https://api.binance.com";
     private final LoggingServiceInterface loggingService;
 
-    private final Map<String, Long> requestWindowStartMap = new ConcurrentHashMap<>();
-    private final Map<String, Integer> requestCountMap = new ConcurrentHashMap<>();
+    private final AtomicLong windowStart = new AtomicLong(0);
+    private final AtomicInteger usedWeight = new AtomicInteger(0);
     private static final int WEIGHT_LIMIT_PER_MINUTE = 1200;
     private static final long MINUTE_IN_MS = 60_000;
 
@@ -28,10 +28,9 @@ public class BinanceApiClient implements BinanceApiClientInterface {
     }
 
     public ResponseEntity<String> getKlines(String symbol, String interval, Long startTime, Long endTime, Integer limit) {
-        String requestKey = "klines_" + symbol;
-        waitForRateLimitIfNeeded(requestKey);
+        waitForRateLimitIfNeeded();
 
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(API_BASE_URL + "/api/v3/klines")
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(API_BASE_URL + "/api/v3/klines")
                 .queryParam("symbol", symbol)
                 .queryParam("interval", interval);
 
@@ -50,66 +49,48 @@ public class BinanceApiClient implements BinanceApiClientInterface {
                 String.class
         );
 
-        // Track this request for rate limiting
-        trackRequest(requestKey);
-
-        // Handle rate limit headers
         updateRateLimitFromHeaders(response.getHeaders());
 
         return response;
     }
 
     // Rate limit management
-    private synchronized void waitForRateLimitIfNeeded(String requestKey) {
+    private void waitForRateLimitIfNeeded() {
         long now = Instant.now().toEpochMilli();
-        long windowStart = requestWindowStartMap.getOrDefault(requestKey, 0L);
-        int count = requestCountMap.getOrDefault(requestKey, 0);
+        long currentWindowStart = windowStart.get();
+        int currentWeight = usedWeight.get();
 
-        // If we're in the same minute window and approaching limits
-        if (now - windowStart < MINUTE_IN_MS && count > WEIGHT_LIMIT_PER_MINUTE * 0.9) {
-            // Calculate remaining time in the current window
-            long waitTime = MINUTE_IN_MS - (now - windowStart);
-            //SYSTEM SET HERE
-            loggingService.logAction("Rate limit approaching for " + requestKey + ", waiting " + waitTime + " ms");
+        if (now - currentWindowStart >= MINUTE_IN_MS) {
+            windowStart.set(now);
+            usedWeight.set(0);
+            return;
+        }
+
+        if (currentWeight > WEIGHT_LIMIT_PER_MINUTE * 0.9) {
+            long waitTime = MINUTE_IN_MS - (now - currentWindowStart);
+            loggingService.logAction("Rate limit approaching, waiting " + waitTime + " ms");
 
             try {
                 Thread.sleep(waitTime);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                //SYSTEM SET HERE
                 loggingService.logError("Rate limit wait interrupted", e);
             }
 
-            // Reset counters after waiting
-            requestWindowStartMap.put(requestKey, Instant.now().toEpochMilli());
-            requestCountMap.put(requestKey, 0);
-        }
-
-        // If window has expired, start a new one
-        if (now - windowStart >= MINUTE_IN_MS) {
-            requestWindowStartMap.put(requestKey, now);
-            requestCountMap.put(requestKey, 0);
-        }
-    }
-
-    private synchronized void trackRequest(String requestKey) {
-        long now = Instant.now().toEpochMilli();
-        long windowStart = requestWindowStartMap.getOrDefault(requestKey, now);
-        int count = requestCountMap.getOrDefault(requestKey, 0);
-
-        // Update counter
-        requestCountMap.put(requestKey, count + 1);
-
-        // If this is a new window, update the start time
-        if (windowStart == 0) {
-            requestWindowStartMap.put(requestKey, now);
+            windowStart.set(Instant.now().toEpochMilli());
+            usedWeight.set(0);
         }
     }
 
     private void updateRateLimitFromHeaders(HttpHeaders headers) {
         if (headers.containsKey("X-MBX-USED-WEIGHT-1M")) {
-            String usedWeight = headers.getFirst("X-MBX-USED-WEIGHT-1M");
-            loggingService.logAction("Current Binance API weight: " + usedWeight + "/" + WEIGHT_LIMIT_PER_MINUTE);
+            String usedWeightHeader = headers.getFirst("X-MBX-USED-WEIGHT-1M");
+            if (usedWeightHeader != null) {
+                int weight = Integer.parseInt(usedWeightHeader);
+                usedWeight.set(weight);
+                loggingService.logAction("Current Binance API weight: " + weight + "/" + WEIGHT_LIMIT_PER_MINUTE);
+            }
         }
     }
+
 }

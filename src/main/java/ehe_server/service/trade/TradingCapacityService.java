@@ -10,8 +10,8 @@ import ehe_server.repository.HoldingRepository;
 import ehe_server.repository.MarketCandleRepository;
 import ehe_server.repository.PlatformStockRepository;
 import ehe_server.repository.PortfolioRepository;
-import ehe_server.service.intf.binance.BinanceAccountServiceInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;
+import ehe_server.service.intf.portfolio.HoldingsSyncServiceInterface;
 import ehe_server.service.intf.trade.TradingCapacityServiceInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +29,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
     private final PlatformStockRepository platformStockRepository;
     private final MarketCandleRepository marketCandleRepository;
     private final LoggingServiceInterface loggingService;
-    private final BinanceAccountServiceInterface binanceAccountService;
+    private final HoldingsSyncServiceInterface holdingsSyncService;
 
     public TradingCapacityService(
             PortfolioRepository portfolioRepository,
@@ -37,13 +37,13 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
             PlatformStockRepository platformStockRepository,
             MarketCandleRepository marketCandleRepository,
             LoggingServiceInterface loggingService,
-            BinanceAccountServiceInterface binanceAccountService) {
+            HoldingsSyncServiceInterface holdingsSyncService) {
         this.portfolioRepository = portfolioRepository;
         this.holdingRepository = holdingRepository;
         this.platformStockRepository = platformStockRepository;
         this.marketCandleRepository = marketCandleRepository;
         this.loggingService = loggingService;
-        this.binanceAccountService = binanceAccountService;
+        this.holdingsSyncService = holdingsSyncService;
     }
 
     @Override
@@ -65,7 +65,7 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
 
         // Update holdings from exchange API
         try {
-            updateHoldingsFromExchange(portfolio, apiKey);
+            holdingsSyncService.syncHoldings(userId, portfolioId);
         } catch (Exception e) {
             // Log the error but continue with existing data
             loggingService.logError("Warning: Failed to update holdings from exchange: " + e.getMessage(), e);
@@ -134,11 +134,9 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
         BigDecimal maxBuyQuantity = BigDecimal.ZERO;
         if (currentPrice.compareTo(BigDecimal.ZERO) > 0) {
             maxBuyQuantity = reservedCash.divide(currentPrice, 8, RoundingMode.DOWN);
-            System.out.println("Max buy quantity: " + maxBuyQuantity);
         }
 
         BigDecimal maxSellQuantity = currentQuantity;
-        System.out.println("Max sell quantity: " + maxSellQuantity);
 
         loggingService.logAction("Calculated trading capacity for " + stockSymbol + " in portfolio " + portfolio.getPortfolioName());
 
@@ -150,79 +148,5 @@ public class TradingCapacityService implements TradingCapacityServiceInterface {
                 maxBuyQuantity,
                 maxSellQuantity
         );
-    }
-
-    private void updateHoldingsFromExchange(Portfolio portfolio, ApiKey apiKey) {
-        String apiKeyValue = apiKey.getApiKeyValue();
-        String secretKeyValue = apiKey.getSecretKey();
-
-        // Get account information from Binance
-        Map<String, Object> accountInfo = binanceAccountService.getAccountInfo(apiKeyValue, secretKeyValue);
-
-        boolean apiCallSuccessful = accountInfo != null && accountInfo.containsKey("balances");
-
-        if (apiCallSuccessful) {
-            List<Map<String, Object>> balances = (List<Map<String, Object>>) accountInfo.get("balances");
-
-            if (balances != null && !balances.isEmpty()) {
-                String platformName = apiKey.getPlatform().getPlatformName();
-
-                BigDecimal reservedCash = BigDecimal.ZERO;
-
-                List<Holding> existingHoldings = holdingRepository.findByPortfolio(portfolio);
-                holdingRepository.deleteAll(existingHoldings);
-                holdingRepository.flush();
-
-                for (Map<String, Object> balance : balances) {
-                    String asset = (String) balance.get("asset");
-                    String free = (String) balance.get("free");
-
-                    BigDecimal quantity = new BigDecimal(free);
-
-                    if (quantity.compareTo(BigDecimal.ZERO) > 0) {
-                        if ("USDT".equals(asset)) {
-                            reservedCash = quantity;
-                            continue;
-                        }
-
-                        List<PlatformStock> stocks = platformStockRepository.findByPlatformPlatformNameAndStockStockSymbol(
-                                platformName, asset);
-
-                        if (!stocks.isEmpty()) {
-                            PlatformStock stock = stocks.getFirst();
-
-                            // Create a new holding
-                            Holding holding = new Holding();
-                            holding.setPortfolio(portfolio);
-                            holding.setPlatformStock(stock);
-                            holding.setQuantity(quantity);
-
-                            holdingRepository.save(holding);
-                        } else {
-                            List<PlatformStock> tradingPairs = platformStockRepository.findByPlatformPlatformNameAndStockStockSymbol(
-                                    platformName, asset + "USDT");
-
-                            if (!tradingPairs.isEmpty()) {
-                                PlatformStock stock = tradingPairs.getFirst();
-
-                                // Create a new holding
-                                Holding holding = new Holding();
-                                holding.setPortfolio(portfolio);
-                                holding.setPlatformStock(stock);
-                                holding.setQuantity(quantity);
-
-                                holdingRepository.save(holding);
-                            }
-                        }
-                    }
-                }
-
-                // Update portfolio with the reserved cash
-                portfolio.setReservedCash(reservedCash);
-                portfolioRepository.save(portfolio);
-            }
-        } else {
-            throw new RuntimeException("Failed to retrieve account information from Binance API");
-        }
     }
 }

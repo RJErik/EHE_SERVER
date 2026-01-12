@@ -1,6 +1,5 @@
 package ehe_server.service.binance;
 
-import ehe_server.service.audit.UserContextService;
 import ehe_server.service.intf.audit.UserContextServiceInterface;
 import ehe_server.service.intf.binance.BinanceWebSocketClientInterface;
 import ehe_server.service.intf.log.LoggingServiceInterface;

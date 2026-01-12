@@ -47,7 +47,7 @@ public class BinanceAccountService implements BinanceAccountServiceInterface {
             String signature = generateSignature(queryParams, secretKey);
 
             // Build the complete URL
-            String url = UriComponentsBuilder.fromHttpUrl(BINANCE_API_URL + ACCOUNT_ENDPOINT)
+            String url = UriComponentsBuilder.fromUriString(BINANCE_API_URL + ACCOUNT_ENDPOINT)
                     .query(queryParams)
                     .queryParam("signature", signature)
                     .toUriString();
@@ -112,7 +112,7 @@ public class BinanceAccountService implements BinanceAccountServiceInterface {
             String signature = generateSignature(queryParams, secretKey);
 
             // Build the complete URL
-            String url = UriComponentsBuilder.fromHttpUrl(BINANCE_API_URL + ORDER_ENDPOINT)
+            String url = UriComponentsBuilder.fromUriString(BINANCE_API_URL + ORDER_ENDPOINT)
                     .query(queryParams)
                     .queryParam("signature", signature)
                     .toUriString();

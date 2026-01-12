@@ -48,7 +48,7 @@ public class AlpacaDataApiClient implements AlpacaDataApiClientInterface {
         waitForRateLimitIfNeeded(requestKey);
 
         String endpoint = "/v2/stocks/" + symbol + "/bars";
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(alpacaProperties.getDataurl() + endpoint)
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(alpacaProperties.getDataurl() + endpoint)
                 .queryParam("timeframe", convertTimeframeToAlpaca(timeframe));
 
         if (start != null) {
@@ -57,12 +57,14 @@ public class AlpacaDataApiClient implements AlpacaDataApiClientInterface {
         if (end != null) {
             builder.queryParam("end", end.format(DateTimeFormatter.ISO_INSTANT));
         }
-        if (pageToken != null) {
+
+        // Defensive check for page token
+        if (isValidPageToken(pageToken)) {
             builder.queryParam("page_token", pageToken);
         }
 
-        // Add limit to control page size
         builder.queryParam("limit", 10000);
+        builder.queryParam("feed", "iex");
 
         HttpHeaders headers = createAuthHeaders();
         HttpEntity<?> entity = new HttpEntity<>(headers);
@@ -80,10 +82,11 @@ public class AlpacaDataApiClient implements AlpacaDataApiClientInterface {
         return response;
     }
 
+
+
     /**
      * Gets historical bars for a crypto symbol
      * Uses /v1beta3/crypto/us/bars endpoint
-     *
      * Note: Crypto symbols should be in format "BTC/USD"
      */
     @Override
@@ -94,7 +97,7 @@ public class AlpacaDataApiClient implements AlpacaDataApiClientInterface {
         waitForRateLimitIfNeeded(requestKey);
 
         String endpoint = "/v1beta3/crypto/us/bars";
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(alpacaProperties.getDataurl() + endpoint)
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(alpacaProperties.getDataurl() + endpoint)
                 .queryParam("symbols", symbol)
                 .queryParam("timeframe", convertTimeframeToAlpaca(timeframe));
 
@@ -104,11 +107,12 @@ public class AlpacaDataApiClient implements AlpacaDataApiClientInterface {
         if (end != null) {
             builder.queryParam("end", end.format(DateTimeFormatter.ISO_INSTANT));
         }
-        if (pageToken != null) {
+
+        // Defensive check for page token
+        if (isValidPageToken(pageToken)) {
             builder.queryParam("page_token", pageToken);
         }
 
-        // Add limit to control page size
         builder.queryParam("limit", 10000);
 
         HttpHeaders headers = createAuthHeaders();
@@ -125,6 +129,16 @@ public class AlpacaDataApiClient implements AlpacaDataApiClientInterface {
 
         trackRequest(requestKey);
         return response;
+    }
+
+
+    /**
+     * Validate that a page token is actually usable
+     */
+    private boolean isValidPageToken(String pageToken) {
+        return pageToken != null
+                && !pageToken.isEmpty()
+                && !pageToken.equalsIgnoreCase("null");
     }
 
     /**

@@ -43,7 +43,14 @@ public class JwtRefreshTokenService implements JwtRefreshTokenServiceInterface {
         this.jwtRefreshTokenRepository = jwtRefreshTokenRepository;
         this.loggingService = loggingService;
         this.tokenHashService = tokenHashService;
-        this.taskScheduler = new ThreadPoolTaskScheduler();
+
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("jwt-cleanup-");
+        scheduler.initialize();
+
+        this.taskScheduler = scheduler;
+
     }
 
     @EventListener(ApplicationReadyEvent.class)
