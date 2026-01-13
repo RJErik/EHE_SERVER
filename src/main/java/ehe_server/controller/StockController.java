@@ -1,16 +1,12 @@
 package ehe_server.controller;
 
 import ehe_server.annotation.validation.NotEmptyString;
-import ehe_server.annotation.validation.NotNullField;
 import ehe_server.dto.*;
 import ehe_server.exception.custom.MissingPlatformNameException;
-import ehe_server.exception.custom.MissingPortfolioIdException;
-import ehe_server.exception.custom.MissingStockSymbolException;
 import ehe_server.service.audit.UserContextService;
 import ehe_server.service.intf.stock.CandleRetrievalServiceInterface;
 import ehe_server.service.intf.stock.PlatformServiceInterface;
 import ehe_server.service.intf.stock.StockServiceInterface;
-import ehe_server.service.intf.trade.TradingCapacityServiceInterface;
 import ehe_server.service.intf.trade.TradingServiceInterface;
 import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
@@ -31,7 +27,6 @@ public class StockController {
 
     private final PlatformServiceInterface platformService;
     private final StockServiceInterface stockService;
-    private final TradingCapacityServiceInterface tradingCapacityService;
     private final TradingServiceInterface tradingService;
     private final UserContextService userContextService;
     private final CandleRetrievalServiceInterface candleRetrievalService;
@@ -40,14 +35,12 @@ public class StockController {
     public StockController(
             PlatformServiceInterface platformService,
             StockServiceInterface stockService,
-            TradingCapacityServiceInterface tradingCapacityService,
             TradingServiceInterface tradingService,
             UserContextService userContextService,
             CandleRetrievalServiceInterface candleRetrievalService,
             MessageSource messageSource) {
         this.platformService = platformService;
         this.stockService = stockService;
-        this.tradingCapacityService = tradingCapacityService;
         this.tradingService = tradingService;
         this.userContextService = userContextService;
         this.candleRetrievalService = candleRetrievalService;
@@ -97,36 +90,6 @@ public class StockController {
         responseBody.put("success", true);
         responseBody.put("message", successMessage);
         responseBody.put("stocks", stocksByPlatformResponse);
-
-        return ResponseEntity.ok(responseBody);
-    }
-
-    /**
-     * GET /api/user/portfolios/{portfolioId}/stocks/{stockSymbol}/trading-capacity
-     * Retrieve trading capacity for a specific stock in a portfolio
-     */
-    @GetMapping("/portfolios/{portfolioId}/stocks/{stockSymbol}/trading-capacity")
-    public ResponseEntity<Map<String, Object>> getTradingCapacity(
-            @NotNullField(exception = MissingPortfolioIdException.class)
-            @PathVariable Integer portfolioId,
-            @NotEmptyString(exception = MissingStockSymbolException.class)
-            @PathVariable String stockSymbol) {
-
-        TradingCapacityResponse tradingCapacityResponse = tradingCapacityService.getTradingCapacity(
-                userContextService.getCurrentUserId(),
-                portfolioId,
-                stockSymbol);
-
-        String successMessage = messageSource.getMessage(
-                "success.message.stock.tradeCapacity.get",
-                null,
-                LocaleContextHolder.getLocale()
-        );
-
-        Map<String, Object> responseBody = new HashMap<>();
-        responseBody.put("success", true);
-        responseBody.put("message", successMessage);
-        responseBody.put("capacity", tradingCapacityResponse);
 
         return ResponseEntity.ok(responseBody);
     }

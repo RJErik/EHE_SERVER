@@ -71,7 +71,10 @@ public class AutomatedTradeNotificationService implements AutomatedTradeNotifica
         notification.setSubscriptionId(subscription.getId());
         notification.setTriggerTime(LocalDateTime.now());
         notification.setTransactionId(transactionId);
-        notification.setTransactionStatus(success ? "COMPLETED" : "FAILED");
+        notification.setTransactionStatus(
+                tradeResult != null && tradeResult.getStatus() != null
+                        ? tradeResult.getStatus().toString()
+                        : (success ? "COMPLETED" : "FAILED"));
         notification.setMessage(formatMessage(rule, triggeringCandle, success, tradeResult));
 
         return notification;

@@ -28,7 +28,8 @@ public class AlpacaAccountService implements AlpacaAccountServiceInterface {
     private static final String ACCOUNT_ENDPOINT = "/v2/account";
     private static final String POSITIONS_ENDPOINT = "/v2/positions";
     private static final String ORDERS_ENDPOINT = "/v2/orders";
-    private static final String TIME_IN_FORCE = "day";
+    private static final String TIME_IN_FORCE_STOCk = "day";
+    private static final String TIME_IN_FORCE_CRYPTO = "gtc";
 
     public AlpacaAccountService(
             @Qualifier("alpacaRestTemplate") RestTemplate restTemplate,
@@ -107,7 +108,7 @@ public class AlpacaAccountService implements AlpacaAccountServiceInterface {
             orderRequest.put("symbol", symbol);
             orderRequest.put("side", side.toLowerCase());
             orderRequest.put("type", type.toLowerCase());
-            orderRequest.put("time_in_force", TIME_IN_FORCE);
+            orderRequest.put("time_in_force", symbol.contains("/") ? TIME_IN_FORCE_CRYPTO : TIME_IN_FORCE_STOCk);
 
             if (quantityType.equals(AutomatedTradeRule.QuantityType.QUANTITY)) {
                 orderRequest.put("qty", amount.toPlainString());

@@ -44,7 +44,6 @@ public class TransactionSearchService implements TransactionSearchServiceInterfa
                     "#status",
                     "#size",
                     "#page",
-                    "#result.size()"
             }
     )
     @Override

@@ -30,7 +30,6 @@ public class TransactionRetrievalService implements TransactionRetrievalServiceI
             params = {
                     "#size",
                     "#page",
-                    "#result.size()"
             }
     )
     @Override

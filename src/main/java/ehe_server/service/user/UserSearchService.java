@@ -37,7 +37,6 @@ public class UserSearchService implements UserSearchServiceInterface {
                     "#registrationDateFromTime",
                     "#size",
                     "#page",
-                    "#result.content.size()"
             }
     )
     @Override

@@ -5,8 +5,10 @@ import ehe_server.annotation.validation.NotNullField;
 import ehe_server.dto.*;
 import ehe_server.exception.custom.MissingPlatformNameException;
 import ehe_server.exception.custom.MissingPortfolioIdException;
+import ehe_server.exception.custom.MissingStockSymbolException;
 import ehe_server.service.audit.UserContextService;
 import ehe_server.service.intf.portfolio.*;
+import ehe_server.service.intf.trade.TradingCapacityServiceInterface;
 import ehe_server.service.portfolio.PortfolioByPlatformService;
 import ehe_server.service.portfolio.PortfolioDetailsService;
 import ehe_server.service.portfolio.PortfolioValueService;
@@ -37,6 +39,7 @@ public class PortfolioController {
     private final PortfolioDetailsServiceInterface portfolioDetailsService;
     private final PortfolioByPlatformServiceInterface portfolioByPlatformService;
     private final HoldingsSyncServiceInterface holdingsSyncService;
+    private final TradingCapacityServiceInterface tradingCapacityService;
 
     public PortfolioController(
             PortfolioRetrievalServiceInterface portfolioRetrievalService,
@@ -48,7 +51,8 @@ public class PortfolioController {
             PortfolioValueService portfolioValueService,
             PortfolioDetailsService portfolioDetailsService,
             PortfolioByPlatformService portfolioByPlatformService,
-            HoldingsSyncServiceInterface holdingsSyncService) {
+            HoldingsSyncServiceInterface holdingsSyncService,
+            TradingCapacityServiceInterface tradingCapacityService) {
         this.portfolioRetrievalService = portfolioRetrievalService;
         this.portfolioCreationService = portfolioCreationService;
         this.portfolioRemovalService = portfolioRemovalService;
@@ -59,6 +63,7 @@ public class PortfolioController {
         this.portfolioDetailsService = portfolioDetailsService;
         this.portfolioByPlatformService = portfolioByPlatformService;
         this.holdingsSyncService = holdingsSyncService;
+        this.tradingCapacityService = tradingCapacityService;
     }
 
     /**
@@ -266,4 +271,35 @@ public class PortfolioController {
 
         return ResponseEntity.ok(responseBody);
     }
+
+    /**
+     * GET /api/user/portfolios/{portfolioId}/trading-capacity?stockSymbol=BTC/USD
+     * Retrieve trading capacity for a specific stock in a portfolio
+     */
+    @GetMapping("/{portfolioId}/trading-capacity")
+    public ResponseEntity<Map<String, Object>> getTradingCapacity(
+            @NotNullField(exception = MissingPortfolioIdException.class)
+            @PathVariable Integer portfolioId,
+            @NotEmptyString(exception = MissingStockSymbolException.class)
+            @RequestParam String stockSymbol) {
+
+        TradingCapacityResponse tradingCapacityResponse = tradingCapacityService.getTradingCapacity(
+                userContextService.getCurrentUserId(),
+                portfolioId,
+                stockSymbol);
+
+        String successMessage = messageSource.getMessage(
+                "success.message.stock.tradeCapacity.get",
+                null,
+                LocaleContextHolder.getLocale()
+        );
+
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("success", true);
+        responseBody.put("message", successMessage);
+        responseBody.put("capacity", tradingCapacityResponse);
+
+        return ResponseEntity.ok(responseBody);
+    }
+
 }

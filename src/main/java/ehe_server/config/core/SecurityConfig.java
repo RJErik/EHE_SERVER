@@ -37,6 +37,8 @@ public class SecurityConfig {
                     auth.requestMatchers("/api/auth/**", "/api/home/**", "/error").permitAll()
                             .requestMatchers(HttpMethod.POST, "/api/session").permitAll()
                             .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.GET, "/api/user/platforms").authenticated()
+                            .requestMatchers(HttpMethod.GET, "/api/user/platforms/*/stocks").authenticated()
                             .requestMatchers("/api/user/**", "/ws/**").hasRole("USER")
                             .anyRequest().authenticated();
                 })
@@ -64,6 +66,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:5173",
                 "http://localhost:5174",
+                "http://localhost:5175",
                 "http://localhost"
         ));
 

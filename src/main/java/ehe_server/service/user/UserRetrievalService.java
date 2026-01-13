@@ -29,7 +29,6 @@ public class UserRetrievalService implements UserRetrievalServiceInterface {
             params = {
                     "#size",
                     "#page",
-                    "#result.content.size()"
             }
     )
     @Override

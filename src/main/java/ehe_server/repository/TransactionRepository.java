@@ -26,18 +26,18 @@ public interface TransactionRepository extends JpaRepository<Transaction, Intege
 
     @EntityGraph(attributePaths = {"portfolio", "portfolio.user", "platformStock", "platformStock.platform", "platformStock.stock"})
     @Query("SELECT t FROM Transaction t WHERE " +
-            "(:userId IS NULL OR t.portfolio.user.userId = :userId) AND " +
-            "(:portfolioId IS NULL OR t.portfolio.portfolioId = :portfolioId) AND " +
-            "(:platform IS NULL OR t.platformStock.platform.platformName = :platform) AND " +
-            "(:symbol IS NULL OR t.platformStock.stock.stockSymbol = :symbol) AND " +
-            "(:type IS NULL OR t.transactionType = :type) AND " +
-            "(:status IS NULL OR t.status = :status) AND " +
-            "(:fromTime IS NULL OR t.transactionDate >= :fromTime) AND " +
-            "(:toTime IS NULL OR t.transactionDate <= :toTime) AND " +
-            "(:fromQuantity IS NULL OR t.quantity >= :fromQuantity) AND " +
-            "(:toQuantity IS NULL OR t.quantity <= :toQuantity) AND " +
-            "(:fromPrice IS NULL OR t.price >= :fromPrice) AND " +
-            "(:toPrice IS NULL OR t.price <= :toPrice) " +
+            "(:#{#userId == null} = true OR t.portfolio.user.userId = :userId) AND " +
+            "(:#{#portfolioId == null} = true OR t.portfolio.portfolioId = :portfolioId) AND " +
+            "(:#{#platform == null} = true OR t.platformStock.platform.platformName = :platform) AND " +
+            "(:#{#symbol == null} = true OR t.platformStock.stock.stockSymbol = :symbol) AND " +
+            "(:#{#type == null} = true OR t.transactionType = :type) AND " +
+            "(:#{#status == null} = true OR t.status = :status) AND " +
+            "(:#{#fromTime == null} = true OR t.transactionDate >= :fromTime) AND " +
+            "(:#{#toTime == null} = true OR t.transactionDate <= :toTime) AND " +
+            "(:#{#fromQuantity == null} = true OR t.quantity >= :fromQuantity) AND " +
+            "(:#{#toQuantity == null} = true OR t.quantity <= :toQuantity) AND " +
+            "(:#{#fromPrice == null} = true OR t.price >= :fromPrice) AND " +
+            "(:#{#toPrice == null} = true OR t.price <= :toPrice) " +
             "ORDER BY t.transactionDate DESC")
     Page<Transaction> searchTransactions(
             @Param("userId") Integer userId,

@@ -16,12 +16,13 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByEmail(String emailHash);
 
     @Query("SELECT u FROM User u WHERE " +
-            "(:userId IS NULL OR u.userId = :userId) AND " +
-            "(:username IS NULL OR u.userName LIKE %:username%) AND " +
-            "(:email IS NULL OR u.email LIKE %:email%) AND " +
-            "(:accountStatus IS NULL OR u.accountStatus = :accountStatus) AND " +
-            "(:registrationDateFrom IS NULL OR u.registrationDate >= :registrationDateFrom) AND " +
-            "(:registrationDateTo IS NULL OR u.registrationDate <= :registrationDateTo) " +
+            "NOT EXISTS (SELECT a FROM Admin a WHERE a.user = u) AND " +
+            "(:#{#userId == null} = true OR u.userId = :userId) AND " +
+            "(:#{#username == null} = true OR u.userName LIKE %:username%) AND " +
+            "(:#{#email == null} = true OR u.email LIKE %:email%) AND " +
+            "(:#{#accountStatus == null} = true OR u.accountStatus = :accountStatus) AND " +
+            "(:#{#registrationDateFrom == null} = true OR u.registrationDate >= :registrationDateFrom) AND " +
+            "(:#{#registrationDateTo == null} = true OR u.registrationDate <= :registrationDateTo) " +
             "ORDER BY u.registrationDate DESC")
     Page<User> searchUsers(
             @Param("userId") Integer userId,
@@ -32,8 +33,6 @@ public interface UserRepository extends JpaRepository<User, Integer> {
             @Param("registrationDateTo") LocalDateTime registrationDateTo,
             Pageable pageable
     );
-
-
 
     @Query("SELECT u FROM User u WHERE NOT EXISTS (SELECT a FROM Admin a WHERE a.user = u) ORDER BY u.registrationDate DESC")
     Page<User> findAllNonAdminsOrderByRegistrationDateDesc(Pageable pageable);
