@@ -2,7 +2,6 @@ package ehe_server.config.core;
 
 import ehe_server.filter.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -23,9 +22,6 @@ import java.util.Arrays;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-
-    @Value("${spring.security.require-https:false}")
-    private boolean requireHttps;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
@@ -52,9 +48,6 @@ public class SecurityConfig {
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
                 .anonymous(AnonymousConfigurer::disable);
-        if (requireHttps) {
-            http.requiresChannel(channel -> channel.anyRequest().requiresSecure());
-        }
 
         return http.build();
     }
@@ -67,7 +60,8 @@ public class SecurityConfig {
                 "http://localhost:5173",
                 "http://localhost:5174",
                 "http://localhost:5175",
-                "http://localhost"
+                "http://localhost",
+                "https://www.eventhorizonexchange.com"
         ));
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));

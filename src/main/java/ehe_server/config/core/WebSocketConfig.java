@@ -35,7 +35,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
                 // Allow the same origins as your CORS config
-                .setAllowedOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost")
+                .setAllowedOrigins("http://localhost:5173",
+                        "http://localhost:5174",
+                        "http://localhost:5175",
+                        "http://localhost",
+                        "https://www.eventhorizonexchange.com")
                 // Enable SockJS fallback
                 .withSockJS();
     }
