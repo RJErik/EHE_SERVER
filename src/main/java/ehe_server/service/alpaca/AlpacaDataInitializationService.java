@@ -79,18 +79,16 @@ public class AlpacaDataInitializationService implements AlpacaDataInitialization
                 loggingService.logAction("Found " + stockSymbols.size() + " stock symbols and " +
                         cryptoSymbols.size() + " crypto symbols");
 
-                // Initialize crypto symbols immediately (24/7 market)
                 for (PlatformStock crypto : cryptoSymbols) {
                     setupSymbol(crypto.getStock().getStockSymbol());
                 }
 
-                // NEW: Always sync historical data, but only start WebSocket if market is open
                 for (PlatformStock stock : stockSymbols) {
                     String symbol = stock.getStock().getStockSymbol();
-                    syncHistoricalDataOnly(symbol);  // New method - always runs
+                    syncHistoricalDataOnly(symbol);
 
                     if (marketHoursService.isMarketOpen()) {
-                        setupLiveStream(symbol);  // New method - only when market open
+                        setupLiveStream(symbol);
                     }
                 }
 

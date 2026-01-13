@@ -62,8 +62,6 @@ public class StockWebSocketSubscriptionManager implements StockWebSocketSubscrip
         this.loggingService = loggingService;
     }
 
-    // ==================== Subscription Management ====================
-
     @Override
     public StockCandleSubscriptionResponse createSubscription(
             Integer userId,
@@ -101,7 +99,6 @@ public class StockWebSocketSubscriptionManager implements StockWebSocketSubscrip
         loggingService.logAction("Cancelled candle subscription: " + subscriptionId);
     }
 
-    // ==================== Scheduled Task ====================
 
     @Scheduled(fixedRate = UPDATE_CHECK_INTERVAL_MS)
     public void checkForUpdatesAndSendHeartbeats() {
@@ -116,7 +113,6 @@ public class StockWebSocketSubscriptionManager implements StockWebSocketSubscrip
 
     }
 
-    // ==================== Validation ====================
 
     private void validateSubscriptionRequest(
             String sessionId,
@@ -176,8 +172,6 @@ public class StockWebSocketSubscriptionManager implements StockWebSocketSubscrip
         }
     }
 
-    // ==================== Subscription Helpers ====================
-
     private StockCandleSubscription createAndRegisterSubscription(
             Integer userId,
             String sessionId,
@@ -229,8 +223,6 @@ public class StockWebSocketSubscriptionManager implements StockWebSocketSubscrip
         }
     }
 
-    // ==================== Initial Candle ====================
-
     private void sendInitialCandle(StockCandleSubscription subscription) {
         try {
             Optional<CandleData> latestCandle = processingService.getLatestCandle(subscription);
@@ -248,8 +240,6 @@ public class StockWebSocketSubscriptionManager implements StockWebSocketSubscrip
             throw e;
         }
     }
-
-    // ==================== Update Processing ====================
 
     private void processSubscriptionUpdate(StockCandleSubscription subscription, LocalDateTime now) {
         try {
@@ -273,8 +263,6 @@ public class StockWebSocketSubscriptionManager implements StockWebSocketSubscrip
             throw e;
         }
     }
-
-    // ==================== Subscription Cleanup ====================
 
     private void cleanupInvalidSubscriptions() {
         List<String> toRemove = activeSubscriptions.values().stream()

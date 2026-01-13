@@ -58,8 +58,6 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
         this.automatedTradeRuleRepository = automatedTradeRuleRepository;
     }
 
-    // ==================== Subscription Management ====================
-
     @Override
     public AutomatedTradeSubscriptionResponse createSubscription(
             Integer userId,
@@ -100,8 +98,6 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
                 .collect(Collectors.toList());
     }
 
-    // ==================== Scheduled Task ====================
-
     @Scheduled(fixedRate = RULE_CHECK_INTERVAL_MS)
     public void checkAutomatedTradeRules() {
         userContextService.setUser("SYSTEM", "SYSTEM");
@@ -112,8 +108,6 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
         cleanupInvalidSubscriptions();
         processAllActiveRules();
     }
-
-    // ==================== Validation ====================
 
     private void validateSubscriptionRequest(String sessionId, String destination) {
         validateSessionId(sessionId);
@@ -131,8 +125,6 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
             throw new MissingDestinationException();
         }
     }
-
-    // ==================== Subscription Helpers ====================
 
     private AutomatedTradeSubscription createAndRegisterSubscription(
             Integer userId, String sessionId, String destination) {
@@ -179,8 +171,6 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
                     " trade subscriptions for session " + sessionId);
         }
     }
-
-    // ==================== Rule Processing ====================
 
     private void processAllActiveRules() {
         try {
@@ -243,8 +233,6 @@ public class AutomatedTradeWebSocketSubscriptionManager implements AutomatedTrad
         loggingService.logAction("Automated trade rule #" + rule.getAutomatedTradeRuleId() +
                 " executed and deactivated. Trade success: " + result.success());
     }
-
-    // ==================== Subscription Cleanup ====================
 
     private void cleanupInvalidSubscriptions() {
         List<String> toRemove = activeSubscriptions.values().stream()

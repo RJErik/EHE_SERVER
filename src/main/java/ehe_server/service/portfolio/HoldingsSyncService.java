@@ -26,14 +26,12 @@ import java.util.stream.Collectors;
 @Transactional
 public class HoldingsSyncService implements HoldingsSyncServiceInterface {
 
-    // Binance constants
     private static final String BINANCE_PLATFORM = "Binance";
     private static final String BINANCE_CASH_CURRENCY = "USDT";
     private static final String BINANCE_BALANCE_KEY = "balances";
     private static final String BINANCE_ASSET_KEY = "asset";
     private static final String BINANCE_FREE_KEY = "free";
 
-    // Alpaca constants
     private static final String ALPACA_PLATFORM = "Alpaca";
     private static final String ALPACA_CASH_CURRENCY = "USD";
     private static final String ALPACA_CASH_KEY = "cash";
@@ -41,7 +39,6 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
     private static final String ALPACA_SYMBOL_KEY = "symbol";
     private static final String ALPACA_QTY_KEY = "qty";
 
-    // Decimal precision constant (matches @Digits(integer=10, fraction=8) constraint)
     private static final int DECIMAL_SCALE = 8;
 
     private final PortfolioRepository portfolioRepository;
@@ -66,11 +63,9 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
         this.alpacaAccountService = alpacaAccountService;
     }
 
-    // ==================== Decimal Scaling ====================
 
     /**
      * Rounds BigDecimal to 8 decimal places for database compatibility.
-     * Matches the @Digits(integer=10, fraction=8) constraint on entity fields.
      */
     private BigDecimal scaleDecimal(BigDecimal value) {
         if (value == null) {
@@ -78,8 +73,6 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
         }
         return value.setScale(DECIMAL_SCALE, RoundingMode.HALF_UP);
     }
-
-    // ==================== Parsed Balance Record ====================
 
     private record ParsedBalance(String asset, BigDecimal quantity, String platformName) {
 
@@ -101,30 +94,23 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
             if (BINANCE_PLATFORM.equals(platformName)) {
                 return asset + BINANCE_CASH_CURRENCY;
             } else if (ALPACA_PLATFORM.equals(platformName)) {
-                // Check if it's a crypto symbol (ends with USD)
                 if (asset.endsWith(ALPACA_CASH_CURRENCY) && asset.length() > 3) {
-                    // BTCUSD → BTC/USD
                     String base = asset.substring(0, asset.length() - 3);
                     return base + "/" + ALPACA_CASH_CURRENCY;
                 }
-                // Regular stock symbol - keep as-is
                 return asset;
             }
             return asset;
         }
     }
 
-    // ==================== Public Interface ====================
-
     @Override
-    @Transactional(propagation = Propagation.REQUIRED)
     public HoldingsUpdateResponse syncHoldings(Integer userId, Integer portfolioId) {
         Portfolio portfolio = getPortfolioOrThrow(userId, portfolioId);
         return syncHoldings(userId, portfolio);
     }
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRED)
     public HoldingsUpdateResponse syncHoldings(Integer userId, Portfolio portfolio) {
         validatePortfolioOwnership(portfolio, userId);
         ApiKey apiKey = getApiKeyOrThrow(portfolio);
@@ -134,8 +120,6 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
 
         return syncHoldingsWithBalances(portfolio, balances, platformName);
     }
-
-    // ==================== Portfolio Validation Helpers ====================
 
     private Portfolio getPortfolioOrThrow(Integer userId, Integer portfolioId) {
         Portfolio portfolio = portfolioRepository.findById(portfolioId)
@@ -160,8 +144,6 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
         return apiKey;
     }
 
-    // ==================== Exchange Communication ====================
-
     private List<ParsedBalance> fetchAndParseBalances(ApiKey apiKey, String platformName) {
         if (BINANCE_PLATFORM.equals(platformName)) {
             return fetchAndParseBinanceBalances(apiKey);
@@ -171,8 +153,6 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
             throw new UnsupportedPlatformException(platformName);
         }
     }
-
-    // ==================== Binance Balance Fetching ====================
 
     private List<ParsedBalance> fetchAndParseBinanceBalances(ApiKey apiKey) {
         Map<String, Object> accountInfo = binanceAccountService.getAccountInfo(
@@ -198,8 +178,6 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
         BigDecimal quantity = new BigDecimal((String) raw.get(BINANCE_FREE_KEY));
         return new ParsedBalance(asset, quantity, BINANCE_PLATFORM);
     }
-
-    // ==================== Alpaca Balance Fetching ====================
 
     private List<ParsedBalance> fetchAndParseAlpacaBalances(ApiKey apiKey) {
         Map<String, Object> accountInfo = alpacaAccountService.getAccountInfo(
@@ -254,8 +232,6 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
         return new ParsedBalance(symbol, quantity, ALPACA_PLATFORM);
     }
 
-    // ==================== Balance Extraction Helpers ====================
-
     private BigDecimal extractCashBalance(List<ParsedBalance> balances) {
         return balances.stream()
                 .filter(ParsedBalance::isCash)
@@ -269,8 +245,6 @@ public class HoldingsSyncService implements HoldingsSyncServiceInterface {
                 .filter(b -> !b.isCash())
                 .toList();
     }
-
-    // ==================== Holdings Synchronization ====================
 
     private HoldingsUpdateResponse syncHoldingsWithBalances(
             Portfolio portfolio,

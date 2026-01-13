@@ -48,7 +48,6 @@ public class AlpacaAccountService implements AlpacaAccountServiceInterface {
             HttpHeaders headers = createAuthHeaders(apiKey, secretKey);
             HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
 
-            // 1. Fetch Account Data (for Cash)
             String accountUrl = ALPACA_API_URL + ACCOUNT_ENDPOINT;
             ResponseEntity<Map> accountResponse = restTemplate.exchange(
                     accountUrl,
@@ -58,7 +57,6 @@ public class AlpacaAccountService implements AlpacaAccountServiceInterface {
             );
             Map<String, Object> accountData = accountResponse.getBody();
 
-            // 2. Fetch Positions (for Holdings)
             String positionsUrl = ALPACA_API_URL + POSITIONS_ENDPOINT;
             ResponseEntity<List<Map<String, Object>>> positionsResponse = restTemplate.exchange(
                     positionsUrl,
@@ -68,14 +66,11 @@ public class AlpacaAccountService implements AlpacaAccountServiceInterface {
             );
             List<Map<String, Object>> positionsData = positionsResponse.getBody();
 
-            // 3. Merge them
-            // We start with accountData so "cash" is at the top level
             Map<String, Object> mergedResult = new HashMap<>();
             if (accountData != null) {
                 mergedResult.putAll(accountData);
             }
 
-            // Add positions under the key "positions" so HoldingsSyncService can find it
             if (positionsData != null) {
                 mergedResult.put("positions", positionsData);
             }
@@ -103,7 +98,6 @@ public class AlpacaAccountService implements AlpacaAccountServiceInterface {
         try {
             String url = ALPACA_API_URL + ORDERS_ENDPOINT;
 
-            // Prepare the POST request
             Map<String, Object> orderRequest = new HashMap<>();
             orderRequest.put("symbol", symbol);
             orderRequest.put("side", side.toLowerCase());
@@ -137,7 +131,6 @@ public class AlpacaAccountService implements AlpacaAccountServiceInterface {
 
                 String getOrderUrl = ALPACA_API_URL + ORDERS_ENDPOINT + "/" + orderId;
 
-                // We can reuse the headers, but we don't need the JSON body for a GET
                 HttpEntity<Void> getRequestEntity = new HttpEntity<>(headers);
 
                 ResponseEntity<Map> getResponse = restTemplate.exchange(
@@ -147,11 +140,9 @@ public class AlpacaAccountService implements AlpacaAccountServiceInterface {
                         Map.class
                 );
 
-                // Return the UPDATED status
                 return getResponse.getBody();
             }
 
-            // Fallback: If we couldn't find an ID, return the initial response
             return initialOrderData;
 
         } catch (Exception e) {
@@ -163,13 +154,6 @@ public class AlpacaAccountService implements AlpacaAccountServiceInterface {
         }
     }
 
-    /**
-     * Creates HTTP headers with Alpaca authentication
-     *
-     * @param apiKey    The API key
-     * @param secretKey The secret key
-     * @return HttpHeaders with authentication set
-     */
     private HttpHeaders createAuthHeaders(String apiKey, String secretKey) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("APCA-API-KEY-ID", apiKey);

@@ -10,8 +10,6 @@ public class AlpacaConfig {
 
     /**
      * Provides a configured RestTemplate for making HTTP requests to Alpaca API.
-     * - Configures proper URI encoding
-     * - Sets reasonable timeouts
      */
     @Bean(name = "alpacaRestTemplate")
     public RestTemplate alpacaRestTemplate() {

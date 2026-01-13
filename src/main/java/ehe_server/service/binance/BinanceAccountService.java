@@ -43,16 +43,13 @@ public class BinanceAccountService implements BinanceAccountServiceInterface {
             long timestamp = Instant.now().toEpochMilli();
             String queryParams = "timestamp=" + timestamp;
 
-            // Generate signature
             String signature = generateSignature(queryParams, secretKey);
 
-            // Build the complete URL
             String url = UriComponentsBuilder.fromUriString(BINANCE_API_URL + ACCOUNT_ENDPOINT)
                     .query(queryParams)
                     .queryParam("signature", signature)
                     .toUriString();
 
-            // Set headers
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-MBX-APIKEY", apiKey);
 
@@ -75,22 +72,9 @@ public class BinanceAccountService implements BinanceAccountServiceInterface {
         }
     }
 
-    /**
-     * Places a market order on Binance
-     *
-     * @param apiKey        The API key
-     * @param secretKey     The secret key
-     * @param symbol        The trading pair symbol (e.g., "BTCUSDT")
-     * @param side          "BUY" or "SELL"
-     * @param type          Order type (e.g., "MARKET")
-     * @param quantity      The quantity to trade
-     * @param quantityType  The quantity type (e.g., QUANTITY, QUOTE_ORDER_QTY)
-     * @return Response from Binance API
-     */
     public Map<String, Object> placeMarketOrder(String apiKey, String secretKey, String symbol,
                                                 String side, String type, BigDecimal quantity, AutomatedTradeRule.QuantityType quantityType) {
         try {
-            // Build URL with required parameters
             long timestamp = Instant.now().toEpochMilli();
             StringBuilder queryParamsBuilder = new StringBuilder();
             queryParamsBuilder.append("symbol=").append(symbol)
@@ -108,20 +92,16 @@ public class BinanceAccountService implements BinanceAccountServiceInterface {
 
             String queryParams = queryParamsBuilder.toString();
 
-            // Generate signature
             String signature = generateSignature(queryParams, secretKey);
 
-            // Build the complete URL
             String url = UriComponentsBuilder.fromUriString(BINANCE_API_URL + ORDER_ENDPOINT)
                     .query(queryParams)
                     .queryParam("signature", signature)
                     .toUriString();
 
-            // Set headers
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-MBX-APIKEY", apiKey);
 
-            // Create request entity with empty body (POST request)
             HttpEntity<String> requestEntity = new HttpEntity<>("", headers);
 
             // Make POST request

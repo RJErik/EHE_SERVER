@@ -51,9 +51,9 @@ public class AutomatedTradeWebSocketController {
                 "/user/queue/automated-trades");
 
         String successMessage = messageSource.getMessage(
-                "success.message.automatedTradeRule.create", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.automatedTradeRule.create",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
         // Return subscription details
@@ -77,9 +77,9 @@ public class AutomatedTradeWebSocketController {
         automatedTradeWebSocketSubscriptionManager.cancelSubscription(subscriptionId);
 
         String successMessage = messageSource.getMessage(
-                "success.message.automatedTradeRule.cancel", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.automatedTradeRule.cancel",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
         response.put("success", true);

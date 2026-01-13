@@ -56,12 +56,10 @@ public class StockCandleWebSocketController {
                 "/user/" + userId + "/queue/candles");
 
         String successMessage = messageSource.getMessage(
-                "success.message.stock.candle.create", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.stock.candle.create",
+                null,
+                LocaleContextHolder.getLocale()
         );
-
-        //LOOK OVER FRONTEND
 
         // Return subscription details
         response.put("success", true);
@@ -85,9 +83,9 @@ public class StockCandleWebSocketController {
         stockWebSocketSubscriptionManager.cancelSubscription(subscriptionId);
 
         String successMessage = messageSource.getMessage(
-                "success.message.stock.candle.cancel", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.stock.candle.cancel",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
         response.put("success", true);

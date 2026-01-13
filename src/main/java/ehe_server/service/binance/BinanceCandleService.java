@@ -94,19 +94,15 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
             return;
         }
 
-        // Step 1: Deduplicate within the batch (group by timeframe + timestamp)
-        // Key: "TIMEFRAME|TIMESTAMP" -> keeps last occurrence
         Map<String, MarketCandle> uniqueCandles = new LinkedHashMap<>();
         for (MarketCandle candle : candles) {
             String key = candle.getTimeframe() + "|" + candle.getTimestamp();
             uniqueCandles.put(key, candle);
         }
 
-        // Step 2: Group by timeframe for efficient batch queries
         Map<MarketCandle.Timeframe, List<MarketCandle>> byTimeframe = uniqueCandles.values().stream()
                 .collect(Collectors.groupingBy(MarketCandle::getTimeframe));
 
-        // Step 3: Batch query existing candles for each timeframe
         Map<String, MarketCandle> existingMap = new HashMap<>();
 
         for (Map.Entry<MarketCandle.Timeframe, List<MarketCandle>> entry : byTimeframe.entrySet()) {
@@ -124,9 +120,8 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
             }
         }
 
-        // Step 4: Process - update existing or keep new
         List<MarketCandle> candlesToSave = new ArrayList<>();
-        List<MarketCandle> savedCandles = new ArrayList<>();  // For aggregation tracking
+        List<MarketCandle> savedCandles = new ArrayList<>();
 
         for (MarketCandle candle : uniqueCandles.values()) {
             String key = candle.getTimeframe() + "|" + candle.getTimestamp();
@@ -148,10 +143,8 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
             }
         }
 
-        // Step 5: Save all candles in one batch
         marketCandleRepository.saveAll(candlesToSave);
 
-        // Step 6: Aggregate (only M1 candles need aggregation)
         List<MarketCandle> minuteCandles = savedCandles.stream()
                 .filter(c -> c.getTimeframe() == MarketCandle.Timeframe.M1)
                 .collect(Collectors.toList());
@@ -338,7 +331,6 @@ public class BinanceCandleService implements BinanceCandleServiceInterface {
                 LocalDateTime timeframeStart = entry.getKey();
                 LocalDateTime timeframeEnd = timeframeStart.plusMinutes(minutes);
 
-                // === FIX: Fetch ALL M1 candles in this timeframe period ===
                 List<MarketCandle> allCandlesInPeriod = marketCandleRepository
                         .findByPlatformStockAndTimeframeAndTimestampBetween(
                                 stock,

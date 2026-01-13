@@ -107,8 +107,6 @@ public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscrip
                 .forEach(subscription -> processSubscriptionAlerts(subscription, currentMinute));
     }
 
-    // ==================== Subscription Management ====================
-
     private void validateDestination(String destination) {
         if (destination == null || destination.trim().isEmpty()) {
             throw new MissingDestinationException();
@@ -157,8 +155,6 @@ public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscrip
         }
     }
 
-    // ==================== Scheduled Alert Checking ====================
-
     private boolean shouldCheckSubscription(AlertSubscription subscription, LocalDateTime currentMinute) {
         LocalDateTime lastChecked = subscription.getLastCheckedMinuteCandle();
         return lastChecked == null || currentMinute.isAfter(lastChecked);
@@ -205,15 +201,11 @@ public class AlertWebSocketSubscriptionManager implements AlertWebSocketSubscrip
         triggeringCandle.ifPresent(marketCandle -> handleTriggeredAlert(alert, marketCandle, subscription));
     }
 
-    // ==================== Alert Trigger Handling ====================
-
     private void handleTriggeredAlert(Alert alert, MarketCandle triggeringCandle, AlertSubscription subscription) {
         notificationService.sendTriggeredNotification(alert, triggeringCandle, subscription);
         processingService.deleteAlert(alert);
         loggingService.logAction("Alert #" + alert.getAlertId() + " triggered and deactivated");
     }
-
-    // ==================== Subscription Cleanup ====================
 
     protected void cleanupInvalidSubscriptions() {
         List<String> toRemove = activeSubscriptions.values().stream()

@@ -26,7 +26,6 @@ public class WatchlistItem {
     @Column(name = "date_added", nullable = false, updatable = false)
     private LocalDateTime dateAdded;
 
-    // Getters and setters
     public Integer getWatchlistItemId() {
         return watchlistItemId;
     }

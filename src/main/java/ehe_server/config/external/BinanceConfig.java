@@ -10,8 +10,6 @@ public class BinanceConfig {
 
     /**
      * Provides a configured RestTemplate for making HTTP requests to Binance API.
-     * - Configures proper URI encoding
-     * - Sets reasonable timeouts
      */
     @Bean
     public RestTemplate restTemplate() {

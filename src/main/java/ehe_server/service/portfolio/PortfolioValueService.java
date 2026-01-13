@@ -55,17 +55,14 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
         this.holdingsSyncService = holdingsSyncService;
     }
 
-    // ==================== Public Interface Methods ====================
 
     @Override
     @Transactional
     public PortfolioValueResponse calculatePortfolioValue(Integer userId, Integer portfolioId) {
         Portfolio portfolio = getPortfolioOrThrow(userId, portfolioId);
 
-        // Delegate sync to specialized service
         holdingsSyncService.syncHoldings(userId, portfolio);
 
-        // Refresh portfolio to get latest reservedCash
         portfolio = portfolioRepository.findById(portfolioId).orElse(portfolio);
 
         List<Holding> holdings = holdingRepository.findByPortfolio(portfolio);
@@ -89,8 +86,6 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
         );
     }
 
-    // ==================== Portfolio Validation Helpers ====================
-
     private Portfolio getPortfolioOrThrow(Integer userId, Integer portfolioId) {
         Portfolio portfolio = portfolioRepository.findById(portfolioId)
                 .orElseThrow(() -> new PortfolioNotFoundException(portfolioId));
@@ -105,8 +100,6 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
             throw new UnauthorizedPortfolioAccessException(userId, portfolio.getPortfolioId());
         }
     }
-
-    // ==================== Holdings Details Building ====================
 
     private List<HoldingDetails> buildHoldingDetails(List<Holding> holdings) {
         return holdings.stream()
@@ -125,8 +118,6 @@ public class PortfolioValueService implements PortfolioValueServiceInterface {
                 valueInUsdt.setScale(DECIMAL_SCALE, RoundingMode.HALF_UP)
         );
     }
-
-    // ==================== Value Calculation ====================
 
     private BigDecimal calculateHoldingValueInUsdt(Holding holding) {
         PlatformStock stock = holding.getPlatformStock();

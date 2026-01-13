@@ -25,7 +25,6 @@ public class PositiveAmountValidator implements ConstraintValidator<PositiveAmou
             return true;
         }
 
-        // Must be greater than zero (exclusive)
         if (value.compareTo(BigDecimal.ZERO) > 0) {
             return true;
         }

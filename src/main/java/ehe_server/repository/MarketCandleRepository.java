@@ -68,7 +68,6 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 
-    // Find the latest candle for a specific stock and timeframe
     MarketCandle findTopByPlatformStockAndTimeframeOrderByTimestampDesc(
             PlatformStock platformStock,
             Timeframe timeframe);
@@ -78,10 +77,6 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
             MarketCandle.Timeframe timeframe,
             LocalDateTime timestamp);
 
-    /**
-     * Finds the single latest candle with its calculated sequence number.
-     * Uses LIMIT 1 on the sequenced data.
-     */
     @Query(value = """
         SELECT * FROM (
             SELECT mc.market_candle_id as marketCandleId,
@@ -105,9 +100,6 @@ public interface MarketCandleRepository extends JpaRepository<MarketCandle, Inte
             @Param("stockId") Integer stockId,
             @Param("timeframe") Timeframe timeframe);
 
-    /**
-     * Finds a specific candle by timestamp with its calculated sequence number.
-     */
     @Query(value = """
         SELECT * FROM (
             SELECT mc.market_candle_id as marketCandleId,

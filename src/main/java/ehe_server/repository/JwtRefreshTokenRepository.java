@@ -11,19 +11,10 @@ import java.util.Optional;
 @Repository
 public interface JwtRefreshTokenRepository extends JpaRepository<JwtRefreshToken, Integer> {
 
-    /**
-     * Find all tokens that have expired before the given date
-     */
     List<JwtRefreshToken> findByJwtRefreshTokenExpiryDateBefore(LocalDateTime date);
 
-    /**
-     * Find the first token that expires after the given date, ordered by expiry date
-     */
     Optional<JwtRefreshToken> findFirstByJwtRefreshTokenExpiryDateAfterOrderByJwtRefreshTokenExpiryDateAsc(LocalDateTime date);
 
-    /**
-     * Find all tokens for a specific user
-     */
     List<JwtRefreshToken> findByUser_UserId(Integer userId);
 
     Optional<JwtRefreshToken> findByJwtRefreshTokenHash(String hash);

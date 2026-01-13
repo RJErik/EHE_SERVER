@@ -3,9 +3,7 @@ package ehe_server.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "platform_stock", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"platform_id", "stock_id"})
-})
+@Table(name = "platform_stock", uniqueConstraints = {@UniqueConstraint(columnNames = {"platform_id", "stock_id"})})
 public class PlatformStock {
 
     @Id

@@ -25,7 +25,6 @@ public class BinanceWebSocketClient extends TextWebSocketHandler implements Bina
     private final LoggingServiceInterface loggingService;
     private final UserContextServiceInterface userContextService;
 
-    // Single connection for all subscriptions
     private volatile WebSocketSession session;
 
     private final Set<String> subscriptions = ConcurrentHashMap.newKeySet();
@@ -143,8 +142,6 @@ public class BinanceWebSocketClient extends TextWebSocketHandler implements Bina
         try {
             WebSocketClient client = new StandardWebSocketClient();
 
-            // FIX: Use 'execute' instead of 'doHandshake'
-            // 'execute' returns a CompletableFuture<WebSocketSession>
             session = client.execute(this, new WebSocketHttpHeaders(), URI.create(WS_BASE_URL)).get();
 
             TextMessage subscribeMsg = createSubscriptionMessage(new ArrayList<>(subscriptions));

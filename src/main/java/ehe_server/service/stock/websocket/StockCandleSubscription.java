@@ -39,7 +39,6 @@ public class StockCandleSubscription {
         this.destination = destination;
     }
 
-    // Getters
     public String getId() {
         return id;
     }

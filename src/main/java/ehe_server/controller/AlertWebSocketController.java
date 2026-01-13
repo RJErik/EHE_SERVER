@@ -53,9 +53,9 @@ public class AlertWebSocketController {
                 "/user/queue/alerts");
 
         String successMessage = messageSource.getMessage(
-                "success.message.alert.subscription.create", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.alert.subscription.create",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
         // Return subscription details
@@ -78,9 +78,9 @@ public class AlertWebSocketController {
         alertWebSocketSubscriptionManager.cancelSubscription(subscriptionId);
 
         String successMessage = messageSource.getMessage(
-                "success.message.alert.subscription.cancel", // The key from your properties file
-                null,                // Arguments for the message (none in this case)
-                LocaleContextHolder.getLocale() // Gets the current request's locale
+                "success.message.alert.subscription.cancel",
+                null,
+                LocaleContextHolder.getLocale()
         );
 
         response.put("success", true);
