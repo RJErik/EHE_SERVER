@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class CookieService implements CookieServiceInterface {
 
-    @Value("${spring.security.require-https}")
+    @Value("${spring.security.secure-cookie}")
     private boolean requireHttps;
 
     private final JwtProperties jwtConfig;
